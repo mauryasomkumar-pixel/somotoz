@@ -1,0 +1,7 @@
+{
+  "name": "Somotoz - AI Multimodal Suite & Engineering Workspace",
+  "description": "An AI engineer multimodal workspace and creative journal powered by Gemini AI and Firebase Firestore for text reasoning, generative visuals, procedural audio synthesis, and reflective intelligence.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

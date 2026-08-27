@@ -1,0 +1,26 @@
+{
+  "entities": {
+    "JournalEntry": {
+      "path": "users/{userId}/entries/{entryId}",
+      "fields": {
+        "userId": { "type": "string", "description": "The user UID owner of this journal entry" },
+        "title": { "type": "string", "description": "Short title or generated summary title" },
+        "content": { "type": "string", "description": "The original reflection text written by the user" },
+        "aiResponse": {
+          "type": "object",
+          "description": "Structured AI reflection payload",
+          "properties": {
+            "conversationalReply": { "type": "string" },
+            "moodTags": { "type": "array", "items": { "type": "string" } },
+            "actionableTakeaways": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "moodTags": { "type": "array", "items": { "type": "string" }, "description": "Extracted mood tags" },
+        "createdAt": { "type": "timestamp", "description": "Creation timestamp in Firestore" },
+        "updatedAt": { "type": "timestamp", "description": "Last updated timestamp in Firestore" },
+        "wordCount": { "type": "number", "description": "Word count of reflection" },
+        "isFavorite": { "type": "boolean", "description": "Whether user marked entry as favorite" }
+      }
+    }
+  }
+}
