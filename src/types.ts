@@ -61,8 +61,23 @@ export interface UserProfile {
   displayName: string | null;
   email: string | null;
   photoURL: string | null;
+  phoneNumber?: string | null;
+  bio?: string | null;
+  updatedAt?: number;
 }
 
-export type ViewMode = 'write' | 'view' | 'edit' | 'chat' | 'wisdom' | 'soundscapes';
+export interface UserActivityLog {
+  id: string;
+  userId: string;
+  mode: GenerationMode;
+  action: string;
+  timestamp: number;
+  tokens?: number;
+  metadata?: Record<string, any>;
+}
+
+export type ViewMode = 'dashboard' | 'chat' | 'write' | 'view' | 'edit' | 'wisdom' | 'soundscapes';
+
+export type AppTheme = 'black' | 'white' | 'mix';
 
 

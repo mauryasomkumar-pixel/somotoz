@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Globe, BookOpen, Sparkles, ExternalLink, Compass, ShieldCheck, HeartPulse, Brain, Moon, Terminal, Cpu } from 'lucide-react';
+import { Search, Globe, BookOpen, Sparkles, ExternalLink, Compass, ShieldCheck, HeartPulse, Brain, Moon, Terminal, CheckCircle2, ArrowRight } from 'lucide-react';
 import { GroundingSource } from '../types';
 
 interface WisdomExplorerProps {
@@ -8,28 +8,28 @@ interface WisdomExplorerProps {
 
 const FEATURED_TOPICS = [
   {
-    title: '5-4-3-2-1 Somatic Grounding Technique',
-    query: 'How does the 5-4-3-2-1 grounding method regulate the nervous system during stress?',
+    title: '5-4-3-2-1 Grounding Method',
+    query: 'How does the 5-4-3-2-1 grounding technique help calm the mind during moments of stress or anxiety?',
     icon: Compass,
-    category: 'Somatic Systems',
+    category: 'Stress Relief',
   },
   {
-    title: 'Cognitive Reframing & CBT Distortions',
-    query: 'What are evidence-based CBT cognitive reframing strategies to overcome catastrophizing?',
+    title: 'Positive Mindset & Reframing',
+    query: 'What are simple, effective ways to reframe negative thoughts into constructive, positive solutions?',
     icon: Brain,
-    category: 'Cognitive Architecture',
+    category: 'Mental Clarity',
   },
   {
-    title: 'Sleep Hygiene & Circadian Optimization',
-    query: 'What does modern neuroscience say about the relationship between REM sleep and emotional resilience?',
+    title: 'Better Sleep Habits',
+    query: 'What are practical, science-backed daily habits to improve sleep quality and wake up refreshed?',
     icon: Moon,
-    category: 'Neuroscience & Health',
+    category: 'Rest & Health',
   },
   {
-    title: 'Polyvagal Theory & Vagus Nerve Exercises',
-    query: 'What are simple vagus nerve stimulation exercises for nervous system down-regulation?',
+    title: 'Breathing for Instant Calm',
+    query: 'What are easy breathing exercises like Box Breathing or 4-7-8 breathing to relax quickly?',
     icon: HeartPulse,
-    category: 'Vagus Regulation',
+    category: 'Quick Relaxation',
   },
 ];
 
@@ -57,14 +57,14 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to retrieve wisdom insights.');
+        throw new Error(data.error || 'Failed to search guide information.');
       }
 
       setAnswer(data.answer);
       setSources(data.sources || []);
     } catch (err: any) {
       console.error('Wisdom search error:', err);
-      setErrorMsg(err.message || 'Unable to complete search.');
+      setErrorMsg(err.message || 'Unable to complete search. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -73,17 +73,17 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6 font-sans">
       {/* Search Header */}
-      <div className="bg-[#0d1322] rounded-2xl p-6 border border-slate-800/90 shadow-xl font-mono">
+      <div className="bg-[#0A0A0A] border border-[#262626] hover:border-[#00FF41] shadow-[4px_4px_0px_0px_#141414] p-6 font-mono transition-all">
         <div className="flex items-center space-x-3 mb-2">
-          <div className="w-9 h-9 rounded-xl bg-cyan-950 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shadow-md">
+          <div className="w-9 h-9 bg-black border border-[#00FF41] text-[#00FF41] flex items-center justify-center shadow-[2px_2px_0px_0px_#00FF41]">
             <Globe className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-base sm:text-lg font-bold text-white tracking-tight">
-              Somotoz Research & Grounding Hub
+            <h1 className="text-base sm:text-lg font-bold text-[#EDEDED] tracking-tight">
+              Knowledge & Guide Hub
             </h1>
-            <p className="text-xs text-slate-400">
-              Evidence-based psychology, cognitive neuroscience, and mental models verified in real-time
+            <p className="text-xs text-[#737373] font-sans">
+              Explore easy-to-understand wellness guides, stress-relief techniques, and healthy habits.
             </p>
           </div>
         </div>
@@ -96,21 +96,21 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
           className="mt-4 flex gap-2"
         >
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-[#737373] absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Inquire on somatic techniques, dopamine regulation, CBT schemas..."
-              className="w-full pl-10 pr-4 py-3 bg-slate-900/90 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:bg-[#090d16] focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all font-sans"
+              placeholder="Search for stress relief, study tips, better sleep, healthy habits..."
+              className="w-full pl-10 pr-4 py-3 bg-black border border-[#262626] text-sm text-[#EDEDED] placeholder-[#525252] focus:outline-none focus:border-[#00FF41] transition-all font-sans"
             />
           </div>
           <button
             type="submit"
             disabled={isLoading || !searchQuery.trim()}
-            className="px-5 py-3 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 active:scale-95 disabled:opacity-40 text-white rounded-xl text-xs font-mono font-semibold transition-all shadow-md shadow-cyan-500/20 flex items-center space-x-1.5 cursor-pointer"
+            className="px-5 py-3 bg-[#00FF41] hover:bg-[#00E038] disabled:opacity-40 text-black font-mono font-bold text-xs tracking-wider border border-[#00FF41] shadow-[2px_2px_0px_0px_#262626] hover:shadow-[3px_3px_0px_0px_#00FF41] active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center space-x-1.5 cursor-pointer"
           >
-            <Search className="w-4 h-4" />
+            <Search className="w-4 h-4 text-black" />
             <span>Search</span>
           </button>
         </form>
@@ -118,17 +118,17 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
 
       {/* Answer & Sources Display */}
       {isLoading ? (
-        <div className="bg-[#0d1322] rounded-2xl p-8 border border-slate-800/90 shadow-xl flex flex-col items-center justify-center text-center space-y-3 font-mono">
-          <div className="w-10 h-10 rounded-full border-3 border-cyan-900 border-t-cyan-400 animate-spin" />
-          <p className="text-sm font-semibold text-slate-200">[GROUNDING RESEARCH & SYNTHESIZING INSIGHTS]</p>
-          <p className="text-xs text-slate-500">Querying real-time scientific repositories and structuring actionable takeaways</p>
+        <div className="bg-[#0A0A0A] border border-[#00FF41] shadow-[0_0_20px_rgba(0,255,65,0.15)] p-8 flex flex-col items-center justify-center text-center space-y-3 font-mono">
+          <div className="w-8 h-8 border-2 border-[#141414] border-t-[#00FF41] animate-spin" />
+          <p className="text-sm font-bold text-[#EDEDED]">[SEARCHING KNOWLEDGE BASE]</p>
+          <p className="text-xs text-[#737373] font-sans">Retrieving helpful insights and practical takeaways...</p>
         </div>
       ) : answer ? (
-        <div className="bg-[#0d1322] rounded-2xl p-6 sm:p-7 border border-slate-800/90 shadow-xl space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4 font-mono">
-            <div className="flex items-center space-x-2 text-cyan-400">
+        <div className="bg-[#0A0A0A] border border-[#262626] hover:border-[#00FF41] shadow-[4px_4px_0px_0px_#141414] p-6 sm:p-7 space-y-6">
+          <div className="flex items-center justify-between border-b border-[#262626] pb-4 font-mono">
+            <div className="flex items-center space-x-2 text-[#00FF41]">
               <Sparkles className="w-4 h-4" />
-              <span className="text-xs font-bold uppercase tracking-wider">Verified Research Synthesis</span>
+              <span className="text-xs font-bold uppercase tracking-wider">Helpful Guide & Summary</span>
             </div>
             <button
               onClick={() => {
@@ -136,23 +136,23 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
                 setSources([]);
                 setSearchQuery('');
               }}
-              className="text-xs text-slate-500 hover:text-slate-300"
+              className="text-xs text-[#737373] hover:text-[#EDEDED] font-mono cursor-pointer"
             >
-              Clear
+              [Clear Search]
             </button>
           </div>
 
-          <div className="prose prose-invert max-w-none text-sm leading-relaxed whitespace-pre-wrap text-slate-200 font-sans">
+          <div className="text-sm sm:text-base leading-relaxed text-[#EDEDED] font-sans whitespace-pre-wrap">
             {answer}
           </div>
 
-          {/* Sources Section */}
+          {/* Sources List */}
           {sources.length > 0 && (
-            <div className="pt-4 border-t border-slate-800 font-mono">
-              <h3 className="text-xs font-semibold text-slate-400 flex items-center gap-1.5 mb-2.5">
-                <Globe className="w-3.5 h-3.5 text-cyan-400" />
-                Verified Grounding Citations ({sources.length}):
-              </h3>
+            <div className="pt-4 border-t border-[#262626] font-mono">
+              <h4 className="text-xs font-bold text-[#A1A1AA] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-[#00FF41]" />
+                <span>Reference Sources</span>
+              </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {sources.map((src, i) => (
                   <a
@@ -160,12 +160,10 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
                     href={src.uri}
                     target="_blank"
                     rel="noreferrer"
-                    className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:bg-slate-800 hover:border-cyan-500/40 flex items-center justify-between gap-2 transition-colors group"
+                    className="p-2.5 bg-black border border-[#262626] hover:border-[#00FF41] text-xs text-[#A1A1AA] hover:text-[#00FF41] flex items-center justify-between transition-colors"
                   >
-                    <span className="text-xs text-slate-300 group-hover:text-cyan-300 font-medium truncate">
-                      {src.title || src.uri}
-                    </span>
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400 shrink-0" />
+                    <span className="truncate pr-2">{src.title || src.uri}</span>
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0 text-[#00FF41]" />
                   </a>
                 ))}
               </div>
@@ -174,41 +172,51 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
         </div>
       ) : null}
 
+      {/* Error display */}
       {errorMsg && (
-        <div className="p-4 bg-rose-950/60 border border-rose-800 text-rose-300 text-xs rounded-xl font-mono">
+        <div className="p-4 bg-rose-950/40 border border-rose-800 text-rose-300 text-xs font-mono">
           {errorMsg}
         </div>
       )}
 
-      {/* Featured Topics Grid */}
+      {/* Featured Topics Section */}
       <div className="space-y-3 font-mono">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">
-          Explore Cognitive Science & Behavioral Architectures
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-          {FEATURED_TOPICS.map((topic, idx) => {
+        <h3 className="text-xs font-bold text-[#A1A1AA] uppercase tracking-wider flex items-center gap-2">
+          <BookOpen className="w-3.5 h-3.5 text-[#00FF41]" />
+          <span>Popular Topics to Explore</span>
+        </h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {FEATURED_TOPICS.map((topic, index) => {
             const Icon = topic.icon;
             return (
-              <div
-                key={idx}
+              <button
+                key={index}
                 onClick={() => handleSearch(topic.query)}
-                className="p-4 bg-[#0d1322] hover:bg-slate-900/90 rounded-2xl border border-slate-800 hover:border-cyan-500/40 transition-all cursor-pointer shadow-lg group flex items-start gap-3.5"
+                className="p-4 bg-[#0A0A0A] border border-[#262626] hover:border-[#00FF41] hover:-translate-y-0.5 text-left transition-all cursor-pointer shadow-[2px_2px_0px_0px_#141414] hover:shadow-[3px_3px_0px_0px_#00FF41] group flex flex-col justify-between"
               >
-                <div className="w-9 h-9 rounded-xl bg-slate-900 text-cyan-400 group-hover:bg-cyan-950 group-hover:border group-hover:border-cyan-500/30 flex items-center justify-center shrink-0 transition-colors">
-                  <Icon className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[10px] font-semibold text-cyan-400 uppercase tracking-wider">
-                    {topic.category}
-                  </span>
-                  <h3 className="text-sm font-semibold text-slate-200 group-hover:text-cyan-300 mt-0.5 truncate font-sans">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] text-[#00FF41] bg-black px-2 py-0.5 border border-[#262626]">
+                      {topic.category}
+                    </span>
+                    <div className="p-1.5 bg-black border border-[#262626] group-hover:border-[#00FF41] text-[#00FF41] transition-colors">
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-bold text-[#EDEDED] group-hover:text-[#00FF41] transition-colors font-mono">
                     {topic.title}
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed font-sans">
+                  </h4>
+                  <p className="text-[11px] text-[#737373] mt-1 line-clamp-2 font-sans">
                     {topic.query}
                   </p>
                 </div>
-              </div>
+
+                <div className="pt-3 mt-2 flex items-center justify-between text-[10px] text-[#737373] group-hover:text-[#00FF41]">
+                  <span>Explore Guide</span>
+                  <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform text-[#00FF41]" />
+                </div>
+              </button>
             );
           })}
         </div>

@@ -22,11 +22,13 @@ import {
   MessageSquare,
   RefreshCw,
   Loader2,
-  Cpu,
-  Terminal,
   Zap,
-  Activity
+  Activity,
+  FileDown,
+  Download
 } from 'lucide-react';
+import { exportJournalEntryToPdf } from '../utils/pdfExport';
+import { downloadSvgImage, downloadPngImage } from '../utils/mediaExport';
 
 interface ReflectionDetailProps {
   entry: JournalEntry;
@@ -63,7 +65,7 @@ export const ReflectionDetail: React.FC<ReflectionDetailProps> = ({
   };
 
   const handleCopy = async () => {
-    const textToCopy = `Title: ${entry.title}\nDate: ${new Date(entry.createdAt).toLocaleDateString()}\n\nReflection:\n${entry.content}\n\nAI Insights:\n${entry.aiResponse?.conversationalReply || ''}\n\nMoods: ${entry.moodTags?.join(' ') || ''}\n\nTakeaways:\n${entry.aiResponse?.actionableTakeaways?.map((t) => `• ${t}`).join('\n') || ''}`;
+    const textToCopy = `Title: ${entry.title}\nDate: ${new Date(entry.createdAt).toLocaleDateString()}\n\nNote:\n${entry.content}\n\nAI Insights:\n${entry.aiResponse?.conversationalReply || ''}\n\nMoods: ${entry.moodTags?.join(' ') || ''}\n\nKey Steps:\n${entry.aiResponse?.actionableTakeaways?.map((t) => `• ${t}`).join('\n') || ''}`;
     
     try {
       await navigator.clipboard.writeText(textToCopy);
@@ -138,251 +140,274 @@ export const ReflectionDetail: React.FC<ReflectionDetailProps> = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 15 }}
       transition={{ duration: 0.3 }}
-      className="max-w-4xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-6 font-sans text-slate-200"
+      className="max-w-4xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-6 font-sans text-[#EDEDED]"
     >
       {/* Top Navigation & Action Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800 font-mono">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#262626] font-mono">
         <button
           onClick={onNewReflection}
-          className="inline-flex items-center space-x-1.5 text-xs sm:text-sm font-medium text-slate-400 hover:text-cyan-300 p-1.5 rounded-lg transition-colors cursor-pointer"
+          className="inline-flex items-center space-x-1.5 text-xs sm:text-sm font-medium text-[#A1A1AA] hover:text-[#00FF41] p-1.5 transition-colors cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>New Input</span>
+          <ArrowLeft className="w-4 h-4 text-[#00FF41]" />
+          <span>Write New Note</span>
         </button>
 
         <div className="flex items-center space-x-2">
-          {/* TTS Audio Readout */}
+          {/* Export Note to PDF */}
           <button
-            onClick={handleToggleSpeak}
-            className={`p-2 rounded-xl transition-all border cursor-pointer ${
-              isSpeaking
-                ? 'bg-cyan-950/80 border-cyan-500/50 text-cyan-300 shadow-md shadow-cyan-500/10'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-cyan-300 hover:bg-slate-800'
-            }`}
-            title={isSpeaking ? 'Stop reading' : 'Synthesize speech'}
+            onClick={() => exportJournalEntryToPdf(entry)}
+            className="px-2.5 py-1.5 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#00FF41] text-xs font-mono flex items-center space-x-1.5 transition-all cursor-pointer shadow-[2px_2px_0px_0px_#171717]"
+            title="Download note as PDF document"
           >
-            {isSpeaking ? <VolumeX className="w-4 h-4 text-cyan-400" /> : <Volume2 className="w-4 h-4" />}
+            <FileDown className="w-3.5 h-3.5 text-[#00FF41]" />
+            <span className="hidden sm:inline">Export PDF</span>
           </button>
 
-          {/* Discuss in Chat */}
-          {onOpenChatWithReflection && (
-            <button
-              onClick={() => onOpenChatWithReflection(entry)}
-              className="px-3 py-2 bg-cyan-950/70 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-900/80 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm"
-              title="Discuss this reflection in Somotoz Multimodal Workspace"
-            >
-              <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Discuss in Chat</span>
-            </button>
-          )}
+          {/* Audio voice playback toggle */}
+          <button
+            onClick={handleToggleSpeak}
+            className={`p-2 border transition-all cursor-pointer ${
+              isSpeaking
+                ? 'bg-[#00FF41] text-black border-[#00FF41]'
+                : 'bg-black text-[#A1A1AA] hover:text-[#00FF41] border-[#262626] hover:border-[#00FF41]'
+            }`}
+            title={isSpeaking ? 'Stop speaking' : 'Listen to note'}
+          >
+            {isSpeaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+
+          {/* Copy to clipboard */}
+          <button
+            onClick={handleCopy}
+            className="p-2 bg-black border border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#00FF41] transition-all cursor-pointer"
+            title="Copy note text"
+          >
+            {copied ? <Check className="w-4 h-4 text-[#00FF41]" /> : <Copy className="w-4 h-4" />}
+          </button>
 
           {/* Favorite Toggle */}
           <button
             onClick={(e) => onToggleFavorite(entry.id, !!entry.isFavorite, e)}
-            className={`p-2 rounded-xl transition-all border cursor-pointer ${
+            className={`p-2 border transition-all cursor-pointer ${
               entry.isFavorite
-                ? 'bg-amber-950/80 border-amber-500/50 text-amber-400'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-amber-400 hover:bg-slate-800'
+                ? 'bg-black text-[#00FF41] border-[#00FF41]'
+                : 'bg-black text-[#737373] hover:text-[#00FF41] border-[#262626] hover:border-[#00FF41]'
             }`}
-            title={entry.isFavorite ? 'Starred reflection' : 'Star this reflection'}
+            title={entry.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
           >
-            <Star className={`w-4 h-4 ${entry.isFavorite ? 'fill-amber-400 text-amber-400' : ''}`} />
+            <Star className={`w-4 h-4 ${entry.isFavorite ? 'fill-[#00FF41] text-[#00FF41]' : ''}`} />
           </button>
 
-          {/* Copy Button */}
-          <button
-            onClick={handleCopy}
-            className="p-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
-            title="Copy reflection & insights"
-          >
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-          </button>
-
-          {/* Edit Button */}
+          {/* Edit Entry */}
           <button
             onClick={() => onEdit(entry)}
-            className="px-3 py-2 bg-slate-900 border border-slate-800 text-slate-300 hover:text-cyan-300 hover:border-cyan-500/40 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 cursor-pointer shadow-sm"
+            className="p-2 bg-black border border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#00FF41] transition-all cursor-pointer"
+            title="Edit this note"
           >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>Edit</span>
+            <Edit3 className="w-4 h-4" />
           </button>
 
-          {/* Delete Button */}
+          {/* Delete Entry */}
           <button
             onClick={(e) => onDelete(entry, e)}
-            className="p-2 bg-slate-900 border border-slate-800 text-slate-500 hover:text-rose-400 hover:border-rose-800 hover:bg-rose-950/60 rounded-xl transition-all cursor-pointer"
-            title="Delete this reflection"
+            className="p-2 bg-black border border-[#262626] hover:border-rose-500 text-[#737373] hover:text-rose-400 transition-all cursor-pointer"
+            title="Delete this note"
           >
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Entry Header Info */}
-      <div className="space-y-3 font-mono">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-          <div className="flex items-center space-x-1 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
-            <Calendar className="w-3.5 h-3.5 text-cyan-400" />
-            <span>{formattedDate}</span>
+      {/* Main Content Card */}
+      <div className="bg-[#0A0A0A] border border-[#262626] hover:border-[#00FF41]/80 shadow-[4px_4px_0px_0px_#141414] p-6 sm:p-8 space-y-6">
+        {/* Title and Timestamp */}
+        <div className="space-y-3 border-b border-[#262626] pb-6">
+          <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-[#737373]">
+            <div className="flex items-center space-x-1.5 text-[#00FF41]">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>{formattedDate}</span>
+            </div>
+            <span>•</span>
+            <div className="flex items-center space-x-1.5 text-[#A1A1AA]">
+              <Clock className="w-3.5 h-3.5" />
+              <span>{formattedTime}</span>
+            </div>
+            <span>•</span>
+            <span className="px-2 py-0.5 bg-black border border-[#262626] text-[#A1A1AA]">
+              {entry.wordCount || entry.content.split(/\s+/).length} words
+            </span>
           </div>
-          <div className="flex items-center space-x-1 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
-            <Clock className="w-3.5 h-3.5 text-cyan-400" />
-            <span>{formattedTime}</span>
-          </div>
-          <div className="flex items-center space-x-1 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
-            <FileText className="w-3.5 h-3.5 text-cyan-400" />
-            <span>{entry.wordCount} words</span>
-          </div>
+
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-[#EDEDED] font-display tracking-tight leading-tight">
+            {entry.title || 'Untitled Note'}
+          </h1>
+
+          {/* Mood Tags */}
+          {entry.moodTags && entry.moodTags.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-1 font-mono">
+              {entry.moodTags.map((tag, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => onSelectTag && onSelectTag(tag)}
+                  className="px-2.5 py-1 text-xs bg-black text-[#00FF41] border border-[#262626] hover:border-[#00FF41] transition-colors cursor-pointer"
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-mono">
-          {entry.title || 'Untitled Reflection'}
-        </h1>
+        {/* User Content */}
+        <div className="text-sm sm:text-base leading-relaxed text-[#D4D4D8] font-sans whitespace-pre-wrap">
+          {entry.content}
+        </div>
 
-        {/* Mood Tags */}
-        {entry.moodTags && entry.moodTags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            <Tag className="w-3.5 h-3.5 text-slate-500 mr-1" />
-            {entry.moodTags.map((tag, idx) => (
-              <button
-                key={idx}
-                onClick={() => onSelectTag && onSelectTag(tag)}
-                className="text-xs font-semibold font-mono px-3 py-0.5 rounded-full bg-cyan-950/70 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-900 transition-colors cursor-pointer"
-              >
-                {tag}
-              </button>
-            ))}
+        {/* Action button to discuss in chat */}
+        {onOpenChatWithReflection && (
+          <div className="pt-4 border-t border-[#262626] flex justify-end font-mono">
+            <button
+              onClick={() => onOpenChatWithReflection(entry)}
+              className="px-4 py-2 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-xs font-bold text-[#EDEDED] hover:text-[#00FF41] transition-all flex items-center space-x-2 cursor-pointer shadow-[2px_2px_0px_0px_#171717]"
+            >
+              <MessageSquare className="w-4 h-4 text-[#00FF41]" />
+              <span>Discuss Note in Chat</span>
+            </button>
           </div>
         )}
       </div>
 
-      {/* Generative Mood Art Section */}
-      <div className="bg-[#0d1322] rounded-2xl p-5 border border-slate-800/90 shadow-xl space-y-3 font-mono">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Palette className="w-4 h-4 text-purple-400" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Vector Mood Illustration
-            </h3>
-          </div>
-          <button
-            onClick={handleGenerateArtwork}
-            disabled={isGeneratingArt}
-            className="px-3 py-1.5 bg-purple-950/80 hover:bg-purple-900 border border-purple-500/40 text-purple-300 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer disabled:opacity-50"
-          >
-            {isGeneratingArt ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Synthesizing Vector Art...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                <span>{artworkSvg ? 'Regenerate Vector Art' : 'Synthesize Vector Art'}</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {artworkSvg && (
-          <div
-            className="w-full max-h-72 overflow-hidden rounded-xl border border-purple-500/20 shadow-inner flex items-center justify-center bg-[#090d16] p-3"
-            dangerouslySetInnerHTML={{ __html: artworkSvg }}
-          />
-        )}
-      </div>
-
-      {/* Main Grid: User Reflection & AI Companion Insights */}
-      <div className="grid grid-cols-1 gap-6">
-        {/* User's Original Reflection */}
-        <div className="bg-[#0d1322] rounded-2xl p-6 sm:p-7 border border-slate-800/90 shadow-xl space-y-3">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs font-mono font-semibold uppercase tracking-wider text-slate-400">
-            <div className="flex items-center space-x-2">
-              <BookOpen className="w-4 h-4 text-cyan-400" />
-              <span>User Reflection Input</span>
-            </div>
-            <span className="text-[10px] text-slate-500">ENCRYPTED // USER_UID</span>
-          </div>
-          <div className="prose prose-invert max-w-none text-slate-200 text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans">
-            {entry.content}
-          </div>
-        </div>
-
-        {/* AI Companion Empathy & Takeaways Card */}
-        {entry.aiResponse ? (
-          <div className="bg-[#0d1322] rounded-2xl p-6 sm:p-7 border border-cyan-500/30 shadow-xl space-y-6">
-            {/* AI Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 font-mono">
-              <div className="flex items-center space-x-2 text-cyan-300">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500 to-indigo-600 text-white flex items-center justify-center shadow-md">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <span className="font-bold text-sm tracking-tight">
-                  Somotoz Cognitive Synthesis
-                </span>
+      {/* AI Summary & Insights Card */}
+      {entry.aiResponse && (
+        <div className="bg-[#0A0A0A] border border-[#262626] hover:border-[#00FF41] shadow-[4px_4px_0px_0px_#141414] p-6 sm:p-8 space-y-6">
+          <div className="flex items-center justify-between border-b border-[#262626] pb-4 font-mono">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 bg-black border border-[#00FF41] text-[#00FF41] flex items-center justify-center shadow-[2px_2px_0px_0px_#00FF41]">
+                <Sparkles className="w-4 h-4" />
               </div>
-              <span className="text-[10px] font-semibold text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-500/30">
-                SYSTEM DECODED
-              </span>
-            </div>
-
-            {/* Conversational Empathetic Reply */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-cyan-400" />
-                Empathetic Analysis & Perspective Reframing
-              </h4>
-              <div className="text-slate-300 text-sm sm:text-base leading-relaxed whitespace-pre-wrap space-y-2 font-sans">
-                {entry.aiResponse.conversationalReply}
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-[#EDEDED]">
+                  AI Summary & Insights
+                </h2>
+                <p className="text-xs text-[#737373]">Helpful perspective and highlights</p>
               </div>
             </div>
+            <span className="text-[10px] px-2 py-0.5 bg-black text-[#00FF41] border border-[#262626]">
+              COMPLETED
+            </span>
+          </div>
 
-            {/* Actionable Takeaways Checklist */}
-            {entry.aiResponse.actionableTakeaways && entry.aiResponse.actionableTakeaways.length > 0 && (
-              <div className="pt-4 border-t border-slate-800 space-y-3 font-mono">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                  Actionable Micro-Directives & Behavioral Systems
-                </h4>
-                <div className="space-y-2">
-                  {entry.aiResponse.actionableTakeaways.map((takeaway, idx) => {
-                    const isDone = !!completedTakeaways[idx];
-                    return (
+          {/* AI Conversational Feedback */}
+          {entry.aiResponse.conversationalReply && (
+            <div className="text-sm leading-relaxed text-[#EDEDED] font-sans bg-black p-5 border border-[#262626]">
+              {entry.aiResponse.conversationalReply}
+            </div>
+          )}
+
+          {/* Actionable Takeaways Checklist */}
+          {entry.aiResponse.actionableTakeaways && entry.aiResponse.actionableTakeaways.length > 0 && (
+            <div className="space-y-3 font-mono">
+              <h3 className="text-xs font-bold text-[#A1A1AA] uppercase tracking-wider flex items-center gap-1.5">
+                <CheckCircle className="w-3.5 h-3.5 text-[#00FF41]" />
+                <span>Key Action Steps</span>
+              </h3>
+              <div className="space-y-2">
+                {entry.aiResponse.actionableTakeaways.map((takeaway, idx) => {
+                  const isDone = !!completedTakeaways[idx];
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => toggleTakeaway(idx)}
+                      className={`p-3 border transition-all cursor-pointer flex items-start space-x-3 ${
+                        isDone
+                          ? 'bg-black border-[#262626] text-[#737373] line-through'
+                          : 'bg-[#0D0D0D] hover:bg-[#141414] border-[#262626] hover:border-[#00FF41] text-[#EDEDED]'
+                      }`}
+                    >
                       <div
-                        key={idx}
-                        onClick={() => toggleTakeaway(idx)}
-                        className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-start space-x-3 ${
-                          isDone
-                            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                            : 'bg-slate-900/90 hover:bg-slate-900 border-slate-800 text-slate-200'
+                        className={`w-4 h-4 mt-0.5 border flex items-center justify-center shrink-0 transition-colors ${
+                          isDone ? 'bg-[#00FF41] border-[#00FF41] text-black' : 'border-[#404040] bg-black'
                         }`}
                       >
-                        <div
-                          className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-                            isDone
-                              ? 'bg-emerald-500 border-emerald-500 text-slate-950'
-                              : 'border-slate-700 bg-slate-950'
-                          }`}
-                        >
-                          {isDone && <Check className="w-3.5 h-3.5 font-bold" />}
-                        </div>
-                        <p
-                          className={`text-xs sm:text-sm font-sans leading-relaxed ${
-                            isDone ? 'line-through opacity-60' : ''
-                          }`}
-                        >
-                          {takeaway}
-                        </p>
+                        {isDone && <Check className="w-3 h-3 text-black" />}
                       </div>
-                    );
-                  })}
-                </div>
+                      <p className="text-xs sm:text-sm font-sans flex-1">{takeaway}</p>
+                    </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Visual Artwork Section */}
+      <div className="bg-[#0A0A0A] border border-[#262626] hover:border-[#00FF41] shadow-[4px_4px_0px_0px_#141414] p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 font-mono">
+          <div className="flex items-center space-x-2">
+            <Palette className="w-4 h-4 text-[#00FF41]" />
+            <h3 className="text-xs sm:text-sm font-bold text-[#EDEDED] uppercase tracking-wider">
+              Visual Artwork
+            </h3>
           </div>
+          
+          <div className="flex items-center space-x-1.5">
+            {artworkSvg && (
+              <>
+                <button
+                  onClick={() => downloadSvgImage(artworkSvg, entry.title || 'note-artwork')}
+                  className="px-2.5 py-1.5 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#00FF41] text-xs font-mono flex items-center space-x-1 transition-all cursor-pointer"
+                  title="Download vector SVG"
+                >
+                  <Download className="w-3 h-3 text-[#00FF41]" />
+                  <span>SVG</span>
+                </button>
+                <button
+                  onClick={() => downloadPngImage(artworkSvg, entry.title || 'note-artwork')}
+                  className="px-2.5 py-1.5 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#00FF41] text-xs font-mono flex items-center space-x-1 transition-all cursor-pointer"
+                  title="Download rasterized PNG"
+                >
+                  <Download className="w-3 h-3 text-[#00FF41]" />
+                  <span>PNG</span>
+                </button>
+              </>
+            )}
+
+            <button
+              onClick={handleGenerateArtwork}
+              disabled={isGeneratingArt}
+              className="px-3 py-1.5 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-xs font-bold text-[#EDEDED] hover:text-[#00FF41] transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {isGeneratingArt ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#00FF41]" />
+                  <span>Creating Art...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 text-[#00FF41]" />
+                  <span>{artworkSvg ? 'Regenerate Art' : 'Create Artwork'}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {artworkSvg ? (
+          <div
+            className="w-full h-64 sm:h-80 bg-black border border-[#262626] overflow-hidden flex items-center justify-center p-4"
+            dangerouslySetInnerHTML={{ __html: artworkSvg }}
+          />
         ) : (
-          <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 text-center text-slate-500 text-xs font-mono">
-            No AI synthesis response found for this reflection.
+          <div className="w-full py-12 bg-black border border-dashed border-[#262626] text-center font-mono text-xs text-[#737373] space-y-2">
+            <Palette className="w-8 h-8 mx-auto text-[#333333]" />
+            <p>No artwork generated for this note yet.</p>
+            <button
+              onClick={handleGenerateArtwork}
+              className="text-[#00FF41] underline hover:text-[#00E038] cursor-pointer"
+            >
+              Click here to generate visual artwork
+            </button>
           </div>
         )}
       </div>

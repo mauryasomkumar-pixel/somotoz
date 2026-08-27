@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Send, Lightbulb, RotateCcw, AlertCircle, Heart, Feather, Compass, Mic, Square, Loader2, Terminal, Zap, Activity, Cpu } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Sparkles, Send, Lightbulb, Heart, Feather, Compass, Mic, Square, Loader2, Zap, BookOpen, CheckCircle2, AlertCircle } from 'lucide-react';
 import { DynamicWelcomeBanner } from './DynamicWelcomeBanner';
 
 interface ReflectionEditorProps {
@@ -18,25 +18,25 @@ const PROMPT_SUGGESTIONS = [
     id: 'gratitude',
     icon: Heart,
     title: 'Daily Gratitude',
-    prompt: 'What are three specific things—small or significant—that brought you peace, comfort, or joy today?',
+    prompt: 'What are three specific things—big or small—that brought you happiness, peace, or relief today?',
   },
   {
     id: 'unpacking',
     icon: Compass,
-    title: 'Deconstruct Tension',
-    prompt: 'What situation is taking up mental bandwidth right now? What parts can you engineer or control, and what must you release?',
+    title: 'Solve a Problem',
+    prompt: 'What situation is causing stress or taking your energy right now? What is one step you can take to make it better?',
   },
   {
     id: 'breakthrough',
     icon: Lightbulb,
-    title: 'Lesson & Architecture',
-    prompt: 'Reflect on a challenge you navigated recently. What did it reveal about your resilience, values, or mental models?',
+    title: 'Key Learning',
+    prompt: 'Reflect on a challenge you recently faced. What did it teach you, and how will you handle it better next time?',
   },
   {
     id: 'freewrite',
     icon: Feather,
-    title: 'Freeform Thought Stream',
-    prompt: 'Write without filtering. What is occupying your cognitive buffer right this second?',
+    title: 'Free Writing',
+    prompt: 'Write whatever comes to mind freely. What are your main thoughts and feelings right now?',
   },
 ];
 
@@ -74,13 +74,13 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
     if (isSubmitting) {
       setLoadingStep(0);
       const steps = [
-        '[COMPUTING]: Parsing semantic structures...',
-        '[REASONING]: Synthesizing emotional patterns & mood tags...',
-        '[DECODING]: Generating compassionate insights & actionable takeaways...',
+        'Reading and organizing your note...',
+        'Understanding moods and key highlights...',
+        'Creating helpful tips and key action takeaways...',
       ];
       timer = setInterval(() => {
         setLoadingStep((prev) => (prev < steps.length - 1 ? prev + 1 : prev));
-      }, 1800);
+      }, 1600);
     } else {
       setLoadingStep(0);
     }
@@ -129,7 +129,7 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
       setIsRecording(true);
     } catch (err: any) {
       console.error('Microphone access error:', err);
-      setError('Microphone access denied or not supported in this browser.');
+      setError('Microphone access was denied or is not supported in this browser.');
     }
   };
 
@@ -158,7 +158,7 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
 
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.error || 'Failed to transcribe audio.');
+          throw new Error(data.error || 'Failed to transcribe voice.');
         }
 
         const transcribed = data.transcription || '';
@@ -169,7 +169,7 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
       };
     } catch (err: any) {
       console.error('Transcription error:', err);
-      setError(err.message || 'Audio transcription failed. You can continue typing manually.');
+      setError(err.message || 'Voice to text conversion failed. You can continue typing manually.');
       setIsTranscribing(false);
     }
   };
@@ -181,7 +181,7 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!content.trim()) {
-      setError('Please input or speak a reflection before submitting.');
+      setError('Please type your thoughts or record voice before saving.');
       return;
     }
     setError(null);
@@ -193,7 +193,7 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
         setActivePrompt(null);
       }
     } catch (err: any) {
-      setError(err?.message || 'Failed to submit reflection. Please try again.');
+      setError(err?.message || 'Failed to save note. Please try again.');
     }
   };
 
@@ -216,56 +216,56 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
   };
 
   const loadingMessages = [
-    '[INGESTING]: Processing reflection text tokens...',
-    '[REASONING]: Synthesizing emotional patterns & mood tags...',
-    '[CONVERGING]: Formulating actionable insights...',
+    'Reading and organizing your note...',
+    'Understanding moods and key highlights...',
+    'Creating helpful tips and key action takeaways...',
   ];
 
   return (
     <div className="max-w-4xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-4 font-sans">
-      {/* Dynamic Animated Welcome Transmission Banner */}
+      {/* Welcome Banner */}
       {!isEditMode && <DynamicWelcomeBanner userName={userName} />}
 
       {/* Editor Card */}
-      <div className="bg-[#0d1322] rounded-2xl shadow-xl border border-slate-800/90 overflow-hidden transition-all">
+      <div className="bg-[#0A0A0A] border border-[#262626] hover:border-[#00FF41]/80 shadow-[4px_4px_0px_0px_#141414] transition-all">
         {/* Header Bar */}
-        <div className="px-6 py-4 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 font-mono">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-xl bg-cyan-950/90 border border-cyan-500/30 text-cyan-400 flex items-center justify-center shadow-md">
-              <Cpu className="w-4 h-4" />
+        <div className="px-5 py-4 border-b border-[#262626] flex flex-wrap items-center justify-between gap-3 bg-black font-mono">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-black border border-[#00FF41] text-[#00FF41] flex items-center justify-center shadow-[2px_2px_0px_0px_#00FF41]">
+              <BookOpen className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm sm:text-base font-bold text-slate-100 flex items-center gap-2">
-                {isEditMode ? 'Edit Reflection Stream' : 'Reflection Input Terminal'}
-                <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-400 border border-cyan-500/30">
-                  LIVE
+              <h2 className="text-sm sm:text-base font-bold text-[#EDEDED] flex items-center gap-2">
+                {isEditMode ? 'Edit Daily Note' : 'Daily Note & Journal'}
+                <span className="text-[9px] px-1.5 py-0.2 bg-[#141414] text-[#00FF41] border border-[#262626]">
+                  ACTIVE
                 </span>
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#737373]">
                 {isEditMode
-                  ? 'Update reflection and regenerate multi-factor AI synthesis'
-                  : 'Synthesize thoughts via manual keyboard buffer or voice microphone'}
+                  ? 'Update your note and generate fresh AI insights'
+                  : 'Write your thoughts or speak using your microphone'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3 text-xs text-slate-400 font-mono">
-            <span className="px-2 py-0.5 rounded bg-slate-950 text-cyan-300 border border-slate-800">
+          <div className="flex items-center space-x-2 text-xs text-[#737373] font-mono">
+            <span className="px-2 py-0.5 bg-black text-[#00FF41] border border-[#262626]">
               {wordCount} words
             </span>
-            <span className="px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-800">
+            <span className="px-2 py-0.5 bg-black text-[#A1A1AA] border border-[#262626]">
               {charCount} chars
             </span>
           </div>
         </div>
 
-        {/* Prompt Inspiration Starters */}
+        {/* Quick Starters (Prompt Inspiration) */}
         {!isEditMode && (
-          <div className="px-6 pt-5 pb-2 font-mono">
-            <div className="flex items-center space-x-2 mb-3">
-              <Zap className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Cognitive Ingestion Templates (Optional)
+          <div className="px-5 pt-4 pb-2 font-mono">
+            <div className="flex items-center space-x-2 mb-2.5">
+              <Zap className="w-3.5 h-3.5 text-[#00FF41]" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#A1A1AA]">
+                Quick Starters (Optional)
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -277,22 +277,24 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
                     key={item.id}
                     type="button"
                     onClick={() => handleApplyPrompt(item.prompt, item.id)}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start space-x-2.5 ${
+                    className={`p-3 border text-left transition-all cursor-pointer flex items-start space-x-2.5 ${
                       isSelected
-                        ? 'bg-cyan-950/80 border-cyan-500/50 text-cyan-200 ring-1 ring-cyan-400/30 shadow-md'
-                        : 'bg-slate-900/70 hover:bg-slate-900 border-slate-800 text-slate-300'
+                        ? 'bg-black border-[#00FF41] text-[#00FF41] shadow-[2px_2px_0px_0px_#00FF41]'
+                        : 'bg-[#0D0D0D] hover:bg-[#141414] border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#EDEDED]'
                     }`}
                   >
                     <div
-                      className={`p-1.5 rounded-lg shrink-0 ${
-                        isSelected ? 'bg-cyan-500 text-slate-950' : 'bg-slate-950 text-slate-400'
+                      className={`p-1.5 border shrink-0 ${
+                        isSelected
+                          ? 'bg-[#00FF41] text-black border-[#00FF41]'
+                          : 'bg-black border-[#262626] text-[#00FF41]'
                       }`}
                     >
                       <IconComponent className="w-3.5 h-3.5" />
                     </div>
                     <div className="min-w-0 flex-1 font-sans">
-                      <h4 className="text-xs font-semibold text-slate-200 font-mono">{item.title}</h4>
-                      <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{item.prompt}</p>
+                      <h4 className="text-xs font-bold text-[#EDEDED] font-mono">{item.title}</h4>
+                      <p className="text-[11px] text-[#737373] line-clamp-1 mt-0.5">{item.prompt}</p>
                     </div>
                   </button>
                 );
@@ -302,46 +304,46 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
         )}
 
         {/* Audio Recording Bar */}
-        <div className="px-6 pt-3 font-mono">
-          <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
+        <div className="px-5 pt-3 font-mono">
+          <div className="p-3 bg-black border border-[#262626] flex items-center justify-between gap-3">
             <div className="flex items-center space-x-2.5">
               {isRecording ? (
                 <div className="flex items-center space-x-2 text-rose-400 font-medium text-xs">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-                  <span>Recording Voice ({recordingSeconds}s)...</span>
+                  <span className="w-2.5 h-2.5 bg-rose-500 animate-ping inline-block" />
+                  <span>Recording audio ({recordingSeconds}s)...</span>
                 </div>
               ) : isTranscribing ? (
-                <div className="flex items-center space-x-2 text-cyan-400 font-medium text-xs">
+                <div className="flex items-center space-x-2 text-[#00FF41] font-medium text-xs">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Transcribing via Gemini Neural Transcriber...</span>
+                  <span>Converting your voice to text...</span>
                 </div>
               ) : (
-                <div className="text-xs text-slate-400 flex items-center space-x-1.5">
-                  <Mic className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Speak reflection via microphone for automatic transcription</span>
+                <div className="text-xs text-[#737373] flex items-center space-x-1.5">
+                  <Mic className="w-3.5 h-3.5 text-[#00FF41]" />
+                  <span>Voice Note: Click record to speak naturally</span>
                 </div>
               )}
             </div>
 
-            <div>
+            <div className="flex items-center space-x-2">
               {isRecording ? (
                 <button
                   type="button"
                   onClick={handleStopRecording}
-                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-md transition-colors cursor-pointer"
+                  className="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-600 text-rose-300 text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer"
                 >
-                  <Square className="w-3 h-3 fill-white" />
-                  <span>End Recording</span>
+                  <Square className="w-3 h-3 text-rose-400" />
+                  <span>Stop & Convert</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={handleStartRecording}
-                  disabled={isTranscribing || isSubmitting}
-                  className="px-3 py-1.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  disabled={isSubmitting || isTranscribing}
+                  className="px-3 py-1.5 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-xs font-bold text-[#EDEDED] hover:text-[#00FF41] transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  <Mic className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Voice Stream</span>
+                  <Mic className="w-3 h-3 text-[#00FF41]" />
+                  <span>Record Voice</span>
                 </button>
               )}
             </div>
@@ -349,122 +351,92 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
         </div>
 
         {/* Input Form */}
-        <form onSubmit={handleSubmit} className="p-6 pt-3 space-y-4">
-          {/* Optional Title Input */}
-          <div>
-            <label className="block text-xs font-mono font-medium text-slate-400 mb-1">
-              Title <span className="text-slate-500 font-normal">(Optional — Somotoz AI can auto-synthesize one)</span>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 font-mono">
+          {/* Title Input */}
+          <div className="space-y-1">
+            <label className="block text-[11px] font-bold text-[#A1A1AA] uppercase tracking-wider">
+              Note Title (Optional)
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Architecting calm amid complex system releases..."
+              placeholder="e.g., Today's learnings, project planning, morning reflection..."
               disabled={isSubmitting}
-              className="w-full px-4 py-2.5 bg-slate-900/80 focus:bg-[#090d16] text-sm text-slate-100 placeholder-slate-500 rounded-xl border border-slate-800 focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500/80 transition-all font-sans"
+              className="w-full px-3.5 py-2.5 bg-black border border-[#262626] text-[#EDEDED] text-sm placeholder-[#525252] focus:outline-none focus:border-[#00FF41] transition-all font-sans"
             />
           </div>
 
-          {/* Main Reflection Textarea */}
-          <div className="relative">
+          {/* Main Content Textarea */}
+          <div className="space-y-1">
+            <label className="block text-[11px] font-bold text-[#A1A1AA] uppercase tracking-wider flex items-center justify-between">
+              <span>Your Thoughts & Notes</span>
+              <span className="text-[#737373] text-[10px]">Tip: Press Ctrl+Enter to save</span>
+            </label>
             <textarea
+              rows={8}
               value={content}
-              onChange={(e) => {
-                setContent(e.target.value);
-                if (error) setError(null);
-              }}
+              onChange={(e) => setContent(e.target.value)}
               onKeyDown={handleKeyDown}
+              placeholder="Write what happened today, ideas you're thinking about, or challenges you're facing..."
               disabled={isSubmitting}
-              rows={10}
-              placeholder="What is occupying your cognitive buffer today? Write candidly about projects, tensions, breakthroughs, emotional states, or open inquiries..."
-              className="w-full p-4 bg-slate-900/70 focus:bg-[#090d16] text-slate-100 placeholder-slate-500 text-sm sm:text-base leading-relaxed rounded-xl border border-slate-800 focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500/80 transition-all resize-y min-h-[220px] font-sans"
+              className="w-full px-3.5 py-3 bg-black border border-[#262626] text-[#EDEDED] text-sm placeholder-[#525252] focus:outline-none focus:border-[#00FF41] transition-all font-sans resize-y leading-relaxed"
             />
           </div>
 
-          {/* Error Banner */}
+          {/* Error Message */}
           {error && (
-            <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-start space-x-2 font-mono">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <div className="p-3 bg-rose-950/40 border border-rose-800/80 text-rose-300 text-xs flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Loading States Overlay Banner */}
-          <AnimatePresence>
-            {isSubmitting && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="p-4 rounded-xl bg-cyan-950/80 border border-cyan-500/50 flex items-center space-x-3 text-cyan-200 font-mono"
-              >
-                <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin shrink-0" />
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-cyan-300">
-                    Somotoz Neural Companion Synthesizing
-                  </p>
-                  <p className="text-xs text-cyan-400/90 transition-all duration-300">
-                    {loadingMessages[loadingStep]}
-                  </p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Footer Actions */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-800/80 font-mono">
-            <div className="text-xs text-slate-400 flex items-center space-x-1.5">
-              <span className="kbd px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-[10px] text-cyan-400">
-                ⌘ / Ctrl + Enter
-              </span>
-              <span>to execute synthesis</span>
+          {/* Submitting Loading Status Banner */}
+          {isSubmitting && (
+            <div className="p-4 bg-black border border-[#00FF41] shadow-[0_0_15px_rgba(0,255,65,0.2)] flex items-center space-x-3">
+              <Loader2 className="w-5 h-5 text-[#00FF41] animate-spin shrink-0" />
+              <div className="font-mono text-xs">
+                <p className="text-[#00FF41] font-bold">{loadingMessages[loadingStep]}</p>
+                <p className="text-[#737373] text-[10px]">Processing note with Somotoz AI...</p>
+              </div>
             </div>
+          )}
 
-            <div className="flex items-center space-x-3 w-full sm:w-auto justify-end">
-              {isEditMode && onCancelEdit && (
-                <button
-                  type="button"
-                  onClick={onCancelEdit}
-                  disabled={isSubmitting}
-                  className="px-4 py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-              )}
-
-              {content && !isSubmitting && !isEditMode && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setContent('');
-                    setTitle('');
-                    setActivePrompt(null);
-                  }}
-                  className="p-2.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
-                  title="Clear buffer"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                </button>
-              )}
-
+          {/* Action Buttons */}
+          <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-[#262626]">
+            {isEditMode && onCancelEdit ? (
               <button
-                type="submit"
-                disabled={isSubmitting || !content.trim()}
-                className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-cyan-500 via-indigo-600 to-purple-600 hover:from-cyan-400 hover:to-purple-500 active:scale-95 text-white text-xs font-mono font-semibold rounded-xl shadow-lg shadow-cyan-500/20 transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+                onClick={onCancelEdit}
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-black hover:bg-[#141414] border border-[#262626] text-xs font-bold text-[#A1A1AA] hover:text-[#EDEDED] transition-colors cursor-pointer"
               >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Executing Model...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 text-cyan-200" />
-                    <span>{isEditMode ? 'Update & Re-Synthesize' : 'Synthesize Reflection'}</span>
-                  </>
-                )}
+                CANCEL EDIT
               </button>
-            </div>
+            ) : (
+              <div className="text-[11px] text-[#737373] font-mono">
+                Saved securely to your private cloud storage
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSubmitting || !content.trim()}
+              className="px-5 py-2.5 bg-[#00FF41] hover:bg-[#00E038] text-black font-mono font-bold text-xs tracking-wider border border-[#00FF41] shadow-[2px_2px_0px_0px_#262626] hover:shadow-[3px_3px_0px_0px_#00FF41] active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center space-x-2 cursor-pointer disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-black" />
+                  <span>ANALYZING & SAVING...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 text-black" />
+                  <span>{isEditMode ? 'UPDATE NOTE' : 'SAVE & ANALYZE NOTE'}</span>
+                </>
+              )}
+            </button>
           </div>
         </form>
       </div>
