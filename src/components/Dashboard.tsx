@@ -501,8 +501,48 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return user.displayName.slice(0, 2).toUpperCase();
   }, [user.displayName]);
 
+  const isLight = theme === 'white';
+  const isMix = theme === 'mix';
+
+  // Dynamic theme background & text color classes
+  const containerBgClass = isLight
+    ? 'bg-white/95 border-2 border-[#CBD5E1] shadow-[0_4px_30px_rgba(2,132,199,0.1)]'
+    : isMix
+    ? 'bg-[#FAF6EE]/95 border-2 border-[#D3C7B5] shadow-[0_4px_30px_rgba(217,119,6,0.1)]'
+    : 'bg-gradient-to-br from-[#0B0B14] via-[#07070E] to-[#030306] border-2 border-[#2D2D45] shadow-[0_0_35px_rgba(0,240,255,0.08)]';
+
+  const cardHeaderBorderClass = isLight
+    ? 'border-[#E2E8F0]'
+    : isMix
+    ? 'border-[#E5DEC9]'
+    : 'border-[#252538]';
+
+  const textPrimaryClass = isLight
+    ? 'text-[#090D16]'
+    : isMix
+    ? 'text-[#231E19]'
+    : 'text-[#EDEDED]';
+
+  const textSecondaryClass = isLight
+    ? 'text-[#475569]'
+    : isMix
+    ? 'text-[#5F564D]'
+    : 'text-[#A1A1AA]';
+
+  const textMutedClass = isLight
+    ? 'text-[#64748B]'
+    : isMix
+    ? 'text-[#7D7365]'
+    : 'text-[#737373]';
+
+  const subCardBgClass = isLight
+    ? 'bg-[#F8FAFC] border-[#E2E8F0]'
+    : isMix
+    ? 'bg-[#F4EFE6] border-[#E2D9CA]'
+    : 'bg-[#101018] border-[#252538]';
+
   return (
-    <div className="w-full text-[#EDEDED] font-sans space-y-6 select-none">
+    <div className={`w-full font-sans space-y-6 select-none transition-colors duration-300 ${textPrimaryClass}`}>
       
       {/* ========================================================================= */}
       {/* 1. DEDICATED FLOATING GREETING & GENZ QUOTES CONTAINER                    */}
@@ -516,31 +556,43 @@ export const Dashboard: React.FC<DashboardProps> = ({
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
-        className="p-4 sm:p-5 bg-gradient-to-br from-[#0D0D18] via-[#080810] to-[#030306] border border-[#2D2D45] relative overflow-hidden clip-stealth-notch shadow-[0_0_30px_rgba(0,240,255,0.08)]"
+        className={`p-4 sm:p-5 relative overflow-hidden clip-stealth-notch transition-all duration-300 ${
+          isLight
+            ? 'bg-white/95 border-2 border-[#CBD5E1] shadow-[0_8px_30px_rgba(2,132,199,0.12)]'
+            : isMix
+            ? 'bg-[#FAF6EE]/95 border-2 border-[#D3C7B5] shadow-[0_8px_30px_rgba(217,119,6,0.12)]'
+            : 'bg-gradient-to-br from-[#0D0D18] via-[#080810] to-[#030306] border-2 border-[#2D2D45] shadow-[0_0_30px_rgba(0,240,255,0.08)]'
+        }`}
       >
-        {/* Subtle multi-hue gradient line at the top */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#00F0FF] via-[#A855F7] via-[#FF007A] to-[#FFB800]" />
+        {/* Vibrant multi-hue gradient line at the top */}
+        <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#00F0FF] via-[#A855F7] via-[#FF007A] to-[#FFB800] z-20" />
 
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 relative z-10">
           <div className="space-y-1.5">
             {/* Top metadata tags */}
-            <div className="flex items-center space-x-2.5 text-xs font-mono text-[#737373] flex-wrap gap-y-1">
-              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 bg-black/80 border border-[#00F0FF]/60 text-[#00F0FF] text-[11px] font-bold clip-badge-poly shadow-[0_0_12px_rgba(0,240,255,0.3)]">
+            <div className="flex items-center space-x-2.5 text-xs font-mono flex-wrap gap-y-1">
+              <span className={`inline-flex items-center gap-1.5 px-3 py-0.5 text-[11px] font-bold clip-badge-poly border ${
+                isLight
+                  ? 'bg-sky-50 border-sky-300 text-sky-700 shadow-sm'
+                  : isMix
+                  ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-sm'
+                  : 'bg-black/80 border-[#00F0FF]/60 text-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.3)]'
+              }`}>
                 <span className="w-2 h-2 bg-[#00F0FF] animate-pulse rounded-full" />
                 COMMAND_CENTER // ACTIVE
               </span>
-              <span className="hidden sm:inline-block text-[#333333]">|</span>
-              <span className="hidden sm:flex items-center gap-1 text-[#A1A1AA]">
+              <span className={textMutedClass}>|</span>
+              <span className={`hidden sm:flex items-center gap-1 font-semibold ${textSecondaryClass}`}>
                 <Cpu className="w-3.5 h-3.5 text-[#A855F7]" />
                 Gemini 2.5 Multi-Modal Engine
               </span>
-              <span className="hidden sm:inline-block text-[#333333]">|</span>
-              <span className="hidden sm:inline-block text-[#A1A1AA]">
-                Active Architect: <strong className="text-[#EDEDED]">{user.displayName || 'Som Maurya'}</strong>
+              <span className={textMutedClass}>|</span>
+              <span className={`hidden sm:inline-block ${textSecondaryClass}`}>
+                Active Architect: <strong className={textPrimaryClass}>{user.displayName || 'Som Maurya'}</strong>
               </span>
             </div>
 
-            <p className="text-xs text-[#A1A1AA] font-mono flex items-center gap-2">
+            <p className={`text-xs font-mono flex items-center gap-2 ${textSecondaryClass}`}>
               <span className="w-1.5 h-1.5 bg-[#FF007A] rounded-full animate-ping" />
               Real-time Firestore cluster synced. 100% live user syntheses.
             </p>
@@ -549,8 +601,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {/* Right Status Badges & Quick Action & Profile Avatar */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {/* Real Streak Badge */}
-            <div className="px-3 py-2 bg-black/70 border border-[#2D2D45] font-mono text-xs text-left clip-badge-poly shadow-[0_0_15px_rgba(255,184,0,0.15)]">
-              <div className="text-[10px] text-[#A1A1AA]">ACTIVE STREAK</div>
+            <div className={`px-3 py-2 font-mono text-xs text-left clip-badge-poly border transition-colors ${
+              isLight
+                ? 'bg-amber-50/80 border-amber-200 shadow-sm'
+                : isMix
+                ? 'bg-[#EFE7DA] border-[#D8CEBF] shadow-sm'
+                : 'bg-black/70 border-[#2D2D45] shadow-[0_0_15px_rgba(255,184,0,0.15)]'
+            }`}>
+              <div className={`text-[10px] ${textMutedClass}`}>ACTIVE STREAK</div>
               <div className="text-[#FFB800] font-bold flex items-center gap-1">
                 <Flame className={`w-3.5 h-3.5 ${streakDays > 0 ? 'text-[#FFB800] animate-bounce' : 'text-[#737373]'}`} />
                 {streakDays} {streakDays === 1 ? 'DAY' : 'DAYS'}
@@ -558,8 +616,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Total Syntheses Real Count */}
-            <div className="px-3 py-2 bg-black/70 border border-[#2D2D45] font-mono text-xs text-left clip-badge-poly shadow-[0_0_15px_rgba(168,85,247,0.15)]">
-              <div className="text-[10px] text-[#A1A1AA]">TOTAL SYNTHESES</div>
+            <div className={`px-3 py-2 font-mono text-xs text-left clip-badge-poly border transition-colors ${
+              isLight
+                ? 'bg-sky-50/80 border-sky-200 shadow-sm'
+                : isMix
+                ? 'bg-[#ECE5D6] border-[#D8CEBF] shadow-sm'
+                : 'bg-black/70 border-[#2D2D45] shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+            }`}>
+              <div className={`text-[10px] ${textMutedClass}`}>TOTAL SYNTHESES</div>
               <div className="text-[#00F0FF] font-bold">{totalSyntheses.toLocaleString()}</div>
             </div>
 
@@ -575,17 +639,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {/* Top Right User Profile Trigger Button */}
             <button
               onClick={onOpenProfile}
-              className="group p-1.5 bg-black/80 hover:bg-[#A855F7]/20 border border-[#2D2D45] hover:border-[#A855F7] text-[#A855F7] transition-all flex items-center space-x-2 cursor-pointer clip-badge-poly shadow-[0_0_15px_rgba(168,85,247,0.25)] active:translate-x-0.5 active:translate-y-0.5"
+              className={`group p-1.5 border transition-all flex items-center space-x-2 cursor-pointer clip-badge-poly active:translate-x-0.5 active:translate-y-0.5 ${
+                isLight
+                  ? 'bg-white hover:bg-slate-100 border-slate-300 text-[#090D16] shadow-sm'
+                  : isMix
+                  ? 'bg-[#EFE7DA] hover:bg-[#E2DAC8] border-[#D8CEBF] text-[#231E19] shadow-sm'
+                  : 'bg-black/80 hover:bg-[#A855F7]/20 border-[#2D2D45] hover:border-[#A855F7] text-[#A855F7] shadow-[0_0_15px_rgba(168,85,247,0.25)]'
+              }`}
               title="Open Profile & Settings"
             >
-              <div className="w-8 h-8 bg-[#141422] border border-[#A855F7]/80 group-hover:border-[#00F0FF] group-hover:bg-gradient-to-br group-hover:from-[#00F0FF] group-hover:to-[#A855F7] group-hover:text-black flex items-center justify-center font-mono font-bold text-xs text-[#00F0FF] transition-all clip-badge-poly">
+              <div className={`w-8 h-8 flex items-center justify-center font-mono font-bold text-xs transition-all clip-badge-poly border ${
+                isLight
+                  ? 'bg-slate-100 text-[#0284C7] border-slate-300 group-hover:bg-[#0284C7] group-hover:text-white'
+                  : isMix
+                  ? 'bg-[#E6DEC9] text-[#D97706] border-[#D8CEBF] group-hover:bg-[#D97706] group-hover:text-white'
+                  : 'bg-[#141422] border-[#A855F7]/80 text-[#00F0FF] group-hover:border-[#00F0FF] group-hover:bg-gradient-to-br group-hover:from-[#00F0FF] group-hover:to-[#A855F7] group-hover:text-black'
+              }`}>
                 {userInitials}
               </div>
               <div className="hidden sm:flex flex-col text-left pr-2 font-mono">
-                <span className="text-[11px] font-bold text-[#EDEDED] group-hover:text-[#00F0FF] leading-tight">
+                <span className={`text-[11px] font-bold leading-tight ${textPrimaryClass}`}>
                   {user.displayName?.split(' ')[0] || 'Profile'}
                 </span>
-                <span className="text-[9px] text-[#A1A1AA] group-hover:text-[#A855F7] flex items-center gap-1">
+                <span className={`text-[9px] flex items-center gap-1 ${textSecondaryClass}`}>
                   <Settings className="w-2.5 h-2.5 text-[#A855F7]" /> Settings
                 </span>
               </div>
@@ -604,17 +680,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.45, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="lg:col-span-6 p-5 sm:p-6 bg-gradient-to-br from-[#0B0B14] via-[#07070E] to-[#030306] border border-[#2D2D45] clip-cyber-corner shadow-[0_0_30px_rgba(0,240,255,0.07)] flex flex-col justify-between"
+          className={`lg:col-span-6 p-5 sm:p-6 clip-cyber-corner flex flex-col justify-between relative overflow-hidden transition-all duration-300 ${containerBgClass}`}
         >
+          {/* Top Multi-Color Glowing Gradient Accent Border */}
+          <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-[#00F0FF] via-[#A855F7] to-[#FF007A]" />
+
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-[#252538] pb-3 mb-4">
+          <div className={`flex items-center justify-between border-b pb-3 mb-4 ${cardHeaderBorderClass}`}>
             <div className="flex items-center space-x-2">
               <div className="w-2.5 h-2.5 bg-[#00F0FF] clip-badge-poly" />
-              <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#EDEDED]">
+              <h2 className={`text-xs font-mono font-bold uppercase tracking-wider ${textPrimaryClass}`}>
                 01 // Multimodal Engine Distribution
               </h2>
             </div>
-            <span className="text-[11px] font-mono px-2.5 py-0.5 bg-black/80 text-[#00F0FF] border border-[#00F0FF]/40 clip-badge-poly shadow-[0_0_10px_rgba(0,240,255,0.25)]">
+            <span className={`text-[11px] font-mono px-2.5 py-0.5 clip-badge-poly border ${
+              isLight
+                ? 'bg-sky-50 text-[#0284C7] border-sky-300 font-bold'
+                : isMix
+                ? 'bg-amber-50 text-[#D97706] border-amber-300 font-bold'
+                : 'bg-black/80 text-[#00F0FF] border-[#00F0FF]/40 shadow-[0_0_10px_rgba(0,240,255,0.25)]'
+            }`}>
               REAL-TIME
             </span>
           </div>
@@ -675,14 +760,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                 {/* Hollow Center Telemetry Display */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                  <span className="text-[10px] font-mono text-[#A1A1AA] uppercase">
+                  <span className={`text-[10px] font-mono uppercase ${textSecondaryClass}`}>
                     {hoveredDonutSegment
                       ? usageMetrics.find((m) => m.id === hoveredDonutSegment)?.badge
                       : totalSyntheses > 0
                       ? 'ALL MODALITIES'
                       : 'EMPTY LOGS'}
                   </span>
-                  <span className="text-xl font-bold font-mono text-[#EDEDED] tracking-tight">
+                  <span className={`text-xl font-bold font-mono tracking-tight ${textPrimaryClass}`}>
                     {hoveredDonutSegment
                       ? `${usageMetrics.find((m) => m.id === hoveredDonutSegment)?.percentage}%`
                       : totalSyntheses}
@@ -711,11 +796,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     onClick={() => onNavigate('chat', metric.id)}
                     className={`p-2.5 border transition-all cursor-pointer flex items-center justify-between clip-badge-poly ${
                       isHovered
-                        ? 'bg-black/90 translate-x-1'
-                        : 'bg-[#101018] hover:bg-[#161622]'
+                        ? isLight
+                          ? 'bg-sky-50/90 translate-x-1'
+                          : isMix
+                          ? 'bg-[#EFE7DA] translate-x-1'
+                          : 'bg-black/90 translate-x-1'
+                        : subCardBgClass
                     }`}
                     style={{
-                      borderColor: isHovered ? metric.color : '#252538',
+                      borderColor: isHovered ? metric.color : undefined,
                       boxShadow: isHovered ? `0 0 12px ${metric.glow}` : 'none',
                     }}
                   >
@@ -725,10 +814,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         style={{ backgroundColor: metric.color, boxShadow: `0 0 6px ${metric.glow}` }}
                       />
                       <Icon className="w-3.5 h-3.5 text-[#A1A1AA]" />
-                      <span className="text-[11px] font-bold text-[#EDEDED]">{metric.label}</span>
+                      <span className={`text-[11px] font-bold ${textPrimaryClass}`}>{metric.label}</span>
                     </div>
                     <div className="flex items-center space-x-2 text-[11px]">
-                      <span className="text-[#737373]">{metric.count}</span>
+                      <span className={textMutedClass}>{metric.count}</span>
                       <span className="font-bold" style={{ color: metric.color }}>
                         {metric.percentage}%
                       </span>
@@ -741,7 +830,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Footer Footnote */}
-          <div className="pt-3 border-t border-[#252538] flex items-center justify-between text-[11px] font-mono text-[#737373]">
+          <div className={`pt-3 border-t flex items-center justify-between text-[11px] font-mono ${cardHeaderBorderClass} ${textMutedClass}`}>
             <span>Click slice to launch neural mode</span>
             <span className="text-[#00F0FF] font-bold">100% User Data Authoritative</span>
           </div>
@@ -752,27 +841,32 @@ export const Dashboard: React.FC<DashboardProps> = ({
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.45, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-          className="lg:col-span-6 p-5 sm:p-6 bg-gradient-to-br from-[#0B0B14] via-[#07070E] to-[#030306] border border-[#2D2D45] clip-cyber-corner shadow-[0_0_30px_rgba(168,85,247,0.07)] flex flex-col justify-between"
+          className={`lg:col-span-6 p-5 sm:p-6 clip-cyber-corner flex flex-col justify-between relative overflow-hidden transition-all duration-300 ${containerBgClass}`}
         >
+          {/* Top Multi-Color Glowing Gradient Accent Border */}
+          <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-[#A855F7] via-[#FF007A] to-[#FFB800]" />
+
           {/* Header & Filter Toggle */}
-          <div className="flex items-center justify-between border-b border-[#252538] pb-3 mb-4">
+          <div className={`flex items-center justify-between border-b pb-3 mb-4 ${cardHeaderBorderClass}`}>
             <div className="flex items-center space-x-2">
               <div className="w-2.5 h-2.5 bg-[#A855F7] clip-badge-poly" />
-              <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#EDEDED]">
+              <h2 className={`text-xs font-mono font-bold uppercase tracking-wider ${textPrimaryClass}`}>
                 02 // Synthesis Activity Volume
               </h2>
             </div>
             
             {/* Filter Toggle */}
-            <div className="flex bg-black/80 border border-[#2D2D45] p-0.5 font-mono text-[10px] clip-badge-poly">
+            <div className={`flex p-0.5 font-mono text-[10px] clip-badge-poly border ${
+              isLight ? 'bg-slate-100 border-slate-300' : isMix ? 'bg-[#ECE5D6] border-[#D8CEBF]' : 'bg-black/80 border-[#2D2D45]'
+            }`}>
               {(['7d', '14d', '30d'] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTimeframe(t)}
                   className={`px-2.5 py-0.5 transition-all cursor-pointer clip-badge-poly ${
                     timeframe === t
-                      ? 'bg-[#A855F7] text-black font-bold shadow-[0_0_8px_rgba(168,85,247,0.5)]'
-                      : 'text-[#737373] hover:text-[#EDEDED]'
+                      ? 'bg-[#A855F7] text-white font-bold shadow-[0_0_8px_rgba(168,85,247,0.5)]'
+                      : `${textMutedClass} hover:${textPrimaryClass}`
                   }`}
                 >
                   {t.toUpperCase()}
@@ -783,7 +877,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           {/* Minimalist Neo-Brutalist Bar Chart Area */}
           <div className="my-2 space-y-2">
-            <div className="h-44 flex items-end justify-between gap-1.5 sm:gap-2 pt-6 px-2 border-b border-[#252538] relative">
+            <div className={`h-44 flex items-end justify-between gap-1.5 sm:gap-2 pt-6 px-2 border-b relative ${cardHeaderBorderClass}`}>
               {/* Background horizontal grid lines */}
               <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
                 <div className="border-b border-dashed w-full" style={{ borderColor: palette.gridLine }} />
@@ -810,11 +904,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 4, scale: 0.95 }}
                           transition={{ duration: 0.15 }}
-                          className="absolute -top-12 z-30 px-2.5 py-1.5 bg-[#000000] border shadow-[0_0_15px_rgba(0,240,255,0.4)] text-[10px] font-mono text-[#EDEDED] whitespace-nowrap pointer-events-none clip-badge-poly"
+                          className={`absolute -top-12 z-30 px-2.5 py-1.5 border shadow-lg text-[10px] font-mono whitespace-nowrap pointer-events-none clip-badge-poly ${
+                            isLight ? 'bg-white text-slate-900 border-slate-300' : isMix ? 'bg-[#FAF6EE] text-[#231E19] border-[#D3C7B5]' : 'bg-[#000000] text-[#EDEDED]'
+                          }`}
                           style={{ borderColor: palette.barCurrent }}
                         >
                           <div className="font-bold" style={{ color: palette.barCurrent }}>{d.count} Syntheses</div>
-                          <div className="text-[#737373] text-[9px]">~{d.tokens.toLocaleString()} tokens</div>
+                          <div className={`text-[9px] ${textMutedClass}`}>~{d.tokens.toLocaleString()} tokens</div>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -856,7 +952,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <span
                       className="text-[9px] sm:text-[10px] font-mono mt-2 transition-colors truncate max-w-full text-center"
                       style={{
-                        color: d.isCurrent ? palette.barCurrent : isHovered ? '#EDEDED' : '#737373',
+                        color: d.isCurrent ? palette.barCurrent : isHovered ? (isLight ? '#090D16' : '#EDEDED') : (isLight ? '#64748B' : '#737373'),
                         fontWeight: d.isCurrent ? 'bold' : 'normal',
                       }}
                     >
@@ -869,7 +965,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Footer Stats */}
-          <div className="pt-3 border-t border-[#252538] flex items-center justify-between text-[11px] font-mono text-[#737373]">
+          <div className={`pt-3 border-t flex items-center justify-between text-[11px] font-mono ${cardHeaderBorderClass} ${textMutedClass}`}>
             <div className="flex items-center gap-1 text-[#A855F7]">
               <TrendingUp className="w-3.5 h-3.5" />
               <span>Real User Activity Logged</span>
@@ -887,26 +983,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        className="p-5 sm:p-6 bg-gradient-to-br from-[#0B0B14] via-[#07070E] to-[#030306] border border-[#2D2D45] clip-cyber-corner shadow-[0_0_30px_rgba(255,0,122,0.07)] text-left relative"
+        className={`p-5 sm:p-6 clip-cyber-corner text-left relative overflow-hidden transition-all duration-300 ${containerBgClass}`}
       >
+        {/* Top Multi-Color Glowing Gradient Accent Border */}
+        <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-[#FF007A] via-[#FFB800] via-[#00F0FF] to-[#A855F7]" />
+
         {/* Heatmap Top Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#252538] pb-3 mb-4">
+        <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b pb-3 mb-4 ${cardHeaderBorderClass}`}>
           <div className="flex items-center space-x-2">
             <div className="w-2.5 h-2.5 bg-[#FF007A] clip-badge-poly" />
-            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-[#EDEDED]">
+            <h2 className={`text-xs font-mono font-bold uppercase tracking-wider ${textPrimaryClass}`}>
               03 // Colorful Week-Based Activity Matrix
             </h2>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-[#737373]">
+          <div className={`flex flex-wrap items-center gap-3 text-xs font-mono ${textSecondaryClass}`}>
             <div className="flex items-center gap-1.5">
               <Flame className={`w-3.5 h-3.5 ${streakDays > 0 ? 'text-[#FFB800]' : 'text-[#737373]'}`} />
               <span>Current Streak: <strong className="text-[#FFB800]">{streakDays} {streakDays === 1 ? 'Day' : 'Days'}</strong></span>
             </div>
-            <span className="text-[#333333]">|</span>
+            <span className={textMutedClass}>|</span>
             <div className="flex items-center space-x-1 text-[10px]">
-              <span className="text-[#A1A1AA] mr-1">Intensity:</span>
-              <span className="w-3 h-3 bg-[#141422] border border-[#2D2D45] inline-block clip-badge-poly" title="0 events" />
+              <span className="mr-1">Intensity:</span>
+              <span className={`w-3 h-3 inline-block clip-badge-poly border ${isLight ? 'bg-slate-200 border-slate-300' : isMix ? 'bg-[#E5DEC9] border-[#D3C7B5]' : 'bg-[#141422] border-[#2D2D45]'}`} title="0 events" />
               <span className="w-3 h-3 bg-[#00F0FF]/30 border border-[#00F0FF]/50 inline-block clip-badge-poly" title="1-2 events" />
               <span className="w-3 h-3 bg-[#00F0FF]/60 border border-[#00F0FF]/80 inline-block clip-badge-poly" title="3-4 events" />
               <span className="w-3 h-3 bg-[#00F0FF] border border-[#67E8F9] inline-block shadow-[0_0_6px_#00F0FF] clip-badge-poly" title="5-7 events" />
@@ -917,13 +1016,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         {/* Interactive Day-of-Week Filters (Non-Rectangular Polygon Pills) */}
         <div className="flex flex-wrap items-center gap-1.5 mb-4 font-mono text-[10px]">
-          <span className="text-[#737373] text-[11px] mr-1">Filter Matrix:</span>
+          <span className={`text-[11px] mr-1 ${textMutedClass}`}>Filter Matrix:</span>
           
           <button
             onClick={() => setSelectedDayFilter(null)}
             className={`px-2.5 py-1 clip-badge-poly font-bold transition-all cursor-pointer ${
               selectedDayFilter === null
                 ? 'bg-gradient-to-r from-[#00F0FF] to-[#A855F7] text-black shadow-[0_0_12px_rgba(0,240,255,0.4)]'
+                : isLight
+                ? 'bg-slate-100 border border-slate-300 text-slate-700 hover:text-slate-900'
+                : isMix
+                ? 'bg-[#ECE5D6] border border-[#D8CEBF] text-[#231E19] hover:text-black'
                 : 'bg-black/60 border border-[#2D2D45] text-[#A1A1AA] hover:text-[#EDEDED] hover:border-[#737373]'
             }`}
           >
@@ -941,15 +1044,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 onClick={() => setSelectedDayFilter(isSelected ? null : dayNum)}
                 className="px-2 py-1 clip-badge-poly font-bold transition-all flex items-center gap-1 cursor-pointer"
                 style={{
-                  backgroundColor: isSelected ? dayColor : 'rgba(0,0,0,0.5)',
-                  color: isSelected ? '#000000' : '#EDEDED',
-                  border: `1px solid ${isSelected ? dayColor : 'rgba(45,45,69,0.8)'}`,
+                  backgroundColor: isSelected ? dayColor : isLight ? '#F1F5F9' : isMix ? '#ECE5D6' : 'rgba(0,0,0,0.5)',
+                  color: isSelected ? '#FFFFFF' : isLight ? '#090D16' : isMix ? '#231E19' : '#EDEDED',
+                  border: `1px solid ${isSelected ? dayColor : isLight ? '#CBD5E1' : isMix ? '#D8CEBF' : 'rgba(45,45,69,0.8)'}`,
                   boxShadow: isSelected ? `0 0 10px ${config.glow}` : 'none',
                 }}
               >
                 <span
                   className="w-1.5 h-1.5 rounded-full"
-                  style={{ backgroundColor: isSelected ? '#000000' : dayColor }}
+                  style={{ backgroundColor: isSelected ? '#FFFFFF' : dayColor }}
                 />
                 <span>{config.short}</span>
               </button>
@@ -989,8 +1092,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 const dayColor = currentTheme === 'white' ? config.lightColor : currentTheme === 'mix' ? config.mixColor : config.darkColor;
                 const isFilteredOut = selectedDayFilter !== null && selectedDayFilter !== node.dayOfWeek;
 
-                let cellBg = 'rgba(20, 20, 34, 0.8)';
-                let cellBorder = 'rgba(45, 45, 69, 0.8)';
+                let cellBg = isLight ? '#E2E8F0' : isMix ? '#E5DEC9' : 'rgba(20, 20, 34, 0.8)';
+                let cellBorder = isLight ? '#CBD5E1' : isMix ? '#D3C7B5' : 'rgba(45, 45, 69, 0.8)';
                 let cellGlow = 'none';
 
                 if (node.level === 1) {
@@ -1025,8 +1128,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     }}
                     onMouseLeave={() => setHoveredHeatmapDay(null)}
                     style={{
-                      backgroundColor: isFilteredOut ? 'rgba(10, 10, 15, 0.4)' : cellBg,
-                      borderColor: isFilteredOut ? 'rgba(30, 30, 45, 0.3)' : cellBorder,
+                      backgroundColor: isFilteredOut ? (isLight ? '#F1F5F9' : isMix ? '#ECE5D6' : 'rgba(10, 10, 15, 0.4)') : cellBg,
+                      borderColor: isFilteredOut ? (isLight ? '#E2E8F0' : isMix ? '#E2D9CA' : 'rgba(30, 30, 45, 0.3)') : cellBorder,
                       boxShadow: isFilteredOut ? 'none' : cellGlow,
                       opacity: isFilteredOut ? 0.2 : 1,
                     }}
@@ -1051,7 +1154,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               initial={{ opacity: 0, y: 4, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed z-50 px-3 py-2 bg-black/95 border border-[#00F0FF] shadow-[0_0_20px_rgba(0,240,255,0.5)] text-xs font-mono text-[#EDEDED] pointer-events-none transform -translate-x-1/2 -translate-y-full -mt-2 clip-badge-poly"
+              className={`fixed z-50 px-3 py-2 border shadow-xl text-xs font-mono pointer-events-none transform -translate-x-1/2 -translate-y-full -mt-2 clip-badge-poly ${
+                isLight ? 'bg-white text-slate-900 border-sky-500' : isMix ? 'bg-[#FAF6EE] text-[#231E19] border-amber-600' : 'bg-black/95 text-[#EDEDED] border-[#00F0FF] shadow-[0_0_20px_rgba(0,240,255,0.5)]'
+              }`}
               style={{
                 left: hoveredHeatmapDay.x,
                 top: hoveredHeatmapDay.y,
@@ -1068,7 +1173,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   {hoveredHeatmapDay.day.count} {hoveredHeatmapDay.day.count === 1 ? 'Synthesis' : 'Syntheses'}
                 </span>
               </div>
-              <div className="text-[10px] text-[#A1A1AA]">
+              <div className={`text-[10px] ${textSecondaryClass}`}>
                 {hoveredHeatmapDay.day.formattedDate}
               </div>
               <div className="text-[9px] text-[#FF007A] mt-0.5">
@@ -1086,10 +1191,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                className="w-full max-w-lg bg-[#0D0D18] border border-[#00F0FF]/60 clip-cyber-card shadow-[0_0_40px_rgba(0,240,255,0.25)] p-6 relative text-left space-y-4 max-h-[85vh] overflow-y-auto"
+                className={`w-full max-w-lg clip-cyber-card p-6 relative text-left space-y-4 max-h-[85vh] overflow-y-auto border-2 ${
+                  isLight
+                    ? 'bg-white text-slate-900 border-[#0284C7] shadow-2xl'
+                    : isMix
+                    ? 'bg-[#FAF6EE] text-[#231E19] border-[#D97706] shadow-2xl'
+                    : 'bg-[#0D0D18] text-[#EDEDED] border-[#00F0FF]/60 shadow-[0_0_40px_rgba(0,240,255,0.25)]'
+                }`}
               >
                 {/* Header */}
-                <div className="flex items-start justify-between border-b border-[#252538] pb-3">
+                <div className={`flex items-start justify-between border-b pb-3 ${cardHeaderBorderClass}`}>
                   <div>
                     <div className="flex items-center gap-2">
                       <span
@@ -1099,18 +1210,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           boxShadow: `0 0 10px ${DAY_OF_WEEK_CONFIG[inspectedDay.dayOfWeek]?.glow}`,
                         }}
                       />
-                      <h3 className="text-base font-bold text-[#EDEDED] font-display">
+                      <h3 className={`text-base font-bold font-display ${textPrimaryClass}`}>
                         {inspectedDay.formattedDate}
                       </h3>
                     </div>
-                    <p className="text-xs font-mono text-[#A1A1AA] mt-0.5">
+                    <p className={`text-xs font-mono mt-0.5 ${textSecondaryClass}`}>
                       Day Activity Breakdown // {DAY_OF_WEEK_CONFIG[inspectedDay.dayOfWeek]?.name}
                     </p>
                   </div>
 
                   <button
                     onClick={() => setInspectedDay(null)}
-                    className="p-1.5 bg-black/60 border border-[#2D2D45] hover:border-[#FF007A] text-[#A1A1AA] hover:text-[#FF007A] clip-badge-poly transition-colors cursor-pointer text-xs font-mono"
+                    className={`p-1.5 border clip-badge-poly transition-colors cursor-pointer text-xs font-mono ${
+                      isLight ? 'bg-slate-100 border-slate-300 text-slate-700 hover:text-rose-600' : isMix ? 'bg-[#ECE5D6] border-[#D8CEBF] text-[#231E19] hover:text-rose-600' : 'bg-black/60 border-[#2D2D45] hover:border-[#FF007A] text-[#A1A1AA] hover:text-[#FF007A]'
+                    }`}
                   >
                     CLOSE [X]
                   </button>
@@ -1118,18 +1231,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                 {/* Day Summary Stats */}
                 <div className="grid grid-cols-3 gap-2 font-mono text-center">
-                  <div className="p-2.5 bg-black/50 border border-[#2D2D45] clip-badge-poly">
-                    <span className="text-[10px] text-[#A1A1AA] block">TOTAL EVENTS</span>
+                  <div className={`p-2.5 clip-badge-poly border ${subCardBgClass}`}>
+                    <span className={`text-[10px] block ${textSecondaryClass}`}>TOTAL EVENTS</span>
                     <span className="text-sm font-bold text-[#00F0FF]">{inspectedDay.count}</span>
                   </div>
-                  <div className="p-2.5 bg-black/50 border border-[#2D2D45] clip-badge-poly">
-                    <span className="text-[10px] text-[#A1A1AA] block">TOKENS PROCESSED</span>
+                  <div className={`p-2.5 clip-badge-poly border ${subCardBgClass}`}>
+                    <span className={`text-[10px] block ${textSecondaryClass}`}>TOKENS PROCESSED</span>
                     <span className="text-sm font-bold text-[#A855F7]">
                       {inspectedDay.events.reduce((acc, ev) => acc + ev.tokens, 0).toLocaleString()}
                     </span>
                   </div>
-                  <div className="p-2.5 bg-black/50 border border-[#2D2D45] clip-badge-poly">
-                    <span className="text-[10px] text-[#A1A1AA] block">ACTIVITY LEVEL</span>
+                  <div className={`p-2.5 clip-badge-poly border ${subCardBgClass}`}>
+                    <span className={`text-[10px] block ${textSecondaryClass}`}>ACTIVITY LEVEL</span>
                     <span className="text-sm font-bold text-[#FFB800]">
                       {inspectedDay.level === 0 ? 'QUIET' : inspectedDay.level === 4 ? 'MAX' : `LVL ${inspectedDay.level}`}
                     </span>
@@ -1138,13 +1251,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                 {/* Events List or Empty State */}
                 <div className="space-y-2">
-                  <h4 className="text-xs font-mono font-bold text-[#EDEDED] uppercase tracking-wider">
+                  <h4 className={`text-xs font-mono font-bold uppercase tracking-wider ${textPrimaryClass}`}>
                     Logged Interactions ({inspectedDay.events.length})
                   </h4>
 
                   {inspectedDay.events.length === 0 ? (
-                    <div className="p-4 bg-black/40 border border-dashed border-[#2D2D45] clip-badge-poly text-center space-y-2">
-                      <p className="text-xs text-[#737373] font-mono">
+                    <div className={`p-4 border border-dashed clip-badge-poly text-center space-y-2 ${subCardBgClass}`}>
+                      <p className={`text-xs font-mono ${textMutedClass}`}>
                         No telemetry recorded on this date.
                       </p>
                       <button
@@ -1164,7 +1277,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         return (
                           <div
                             key={idx}
-                            className="p-2.5 bg-black/60 border border-[#2D2D45] hover:border-[#00F0FF]/60 clip-badge-poly flex items-center justify-between text-xs font-mono transition-colors"
+                            className={`p-2.5 border clip-badge-poly flex items-center justify-between text-xs font-mono transition-colors ${subCardBgClass}`}
                           >
                             <div className="flex items-center space-x-2.5">
                               <span
@@ -1176,9 +1289,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               >
                                 {ev.mode.toUpperCase()}
                               </span>
-                              <span className="text-[#EDEDED]">{ev.preview || 'Synthesis Operation'}</span>
+                              <span className={textPrimaryClass}>{ev.preview || 'Synthesis Operation'}</span>
                             </div>
-                            <div className="text-right text-[#737373] text-[10px]">
+                            <div className={`text-right text-[10px] ${textMutedClass}`}>
                               <span>{timeStr}</span>
                               <span className="block text-[#A855F7]">{ev.tokens} tok</span>
                             </div>
@@ -1190,7 +1303,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
 
                 {/* Footer Action */}
-                <div className="pt-3 border-t border-[#252538] flex items-center justify-between">
+                <div className={`pt-3 border-t flex items-center justify-between ${cardHeaderBorderClass}`}>
                   <button
                     onClick={() => {
                       setInspectedDay(null);
@@ -1204,7 +1317,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                   <button
                     onClick={() => setInspectedDay(null)}
-                    className="px-3 py-2 bg-transparent text-[#737373] hover:text-[#EDEDED] font-mono text-xs cursor-pointer"
+                    className={`px-3 py-2 font-mono text-xs cursor-pointer ${textMutedClass} hover:${textPrimaryClass}`}
                   >
                     Dismiss
                   </button>
@@ -1215,9 +1328,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </AnimatePresence>
 
         {/* Footnote */}
-        <div className="pt-3 mt-3 border-t border-[#252538] flex items-center justify-between text-[11px] font-mono text-[#737373]">
+        <div className={`pt-3 mt-3 border-t flex items-center justify-between text-[11px] font-mono ${cardHeaderBorderClass} ${textMutedClass}`}>
           <span>Synced with your actual Firestore records (56-Day Window)</span>
-          <span className="text-[#EDEDED]">
+          <span className={textPrimaryClass}>
             Total Tracker: <strong className="text-[#00F0FF]">{allEvents.length}</strong>
           </span>
         </div>
@@ -1231,25 +1344,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Card 1: AI Chat (Electric Cyan Engine) */}
         <div
           onClick={() => onNavigate('chat', 'text')}
-          className="p-5 bg-gradient-to-br from-[#0C1222] via-[#080B14] to-[#04060A] border border-[#00F0FF]/30 hover:border-[#00F0FF] hover:-translate-y-2 hover:shadow-[0_0_30px_rgba(0,240,255,0.4)] transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden"
+          className={`p-5 transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden border-2 ${
+            isLight
+              ? 'bg-gradient-to-br from-sky-50/90 via-white to-sky-100/50 border-sky-300 hover:border-sky-500 hover:shadow-lg'
+              : isMix
+              ? 'bg-gradient-to-br from-[#FAF6EE] via-[#F4EFE6] to-[#ECE5D6] border-[#D3C7B5] hover:border-teal-600 hover:shadow-lg'
+              : 'bg-gradient-to-br from-[#0C1222] via-[#080B14] to-[#04060A] border-[#00F0FF]/30 hover:border-[#00F0FF] hover:-translate-y-2 hover:shadow-[0_0_30px_rgba(0,240,255,0.4)]'
+          }`}
         >
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#00F0FF] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#00F0FF] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <div>
             <div className="flex items-center justify-between mb-3">
-              <div className="p-2.5 bg-black/80 border border-[#00F0FF]/60 text-[#00F0FF] group-hover:bg-[#00F0FF] group-hover:text-black transition-all clip-badge-poly shadow-[0_0_12px_rgba(0,240,255,0.3)]">
+              <div className={`p-2.5 clip-badge-poly border transition-all ${
+                isLight ? 'bg-sky-100 border-sky-300 text-sky-700 group-hover:bg-[#0284C7] group-hover:text-white' : isMix ? 'bg-[#ECE5D6] border-[#D8CEBF] text-[#0D9488] group-hover:bg-[#0D9488] group-hover:text-white' : 'bg-black/80 border-[#00F0FF]/60 text-[#00F0FF] group-hover:bg-[#00F0FF] group-hover:text-black shadow-[0_0_12px_rgba(0,240,255,0.3)]'
+              }`}>
                 <MessageSquare className="w-4 h-4" />
               </div>
-              <span className="text-[10px] font-mono text-[#00F0FF]/80 group-hover:text-[#00F0FF] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#00F0FF]/20">01 // REASONING</span>
+              <span className="text-[10px] font-mono text-[#00F0FF] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#00F0FF]/30 font-bold">01 // REASONING</span>
             </div>
-            <h3 className="text-base font-bold text-[#EDEDED] font-display mb-1 group-hover:text-[#00F0FF] transition-colors">
+            <h3 className={`text-base font-bold font-display mb-1 group-hover:text-[#00F0FF] transition-colors ${textPrimaryClass}`}>
               AI Reasoning Engine
             </h3>
-            <p className="text-xs text-[#A1A1AA] font-sans leading-relaxed">
+            <p className={`text-xs font-sans leading-relaxed ${textSecondaryClass}`}>
               Multi-turn reasoning, mathematical proofing, architecture diagrams, and syntax processing.
             </p>
           </div>
-          <div className="pt-4 flex items-center justify-between text-[11px] font-mono text-[#737373] group-hover:text-[#00F0FF]">
-            <span>Launch Engine</span>
+          <div className="pt-4 flex items-center justify-between text-[11px] font-mono text-[#00F0FF]">
+            <span className="font-bold">Launch Engine</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform text-[#00F0FF]" />
           </div>
         </div>
@@ -1257,25 +1378,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Card 2: Image Generation (Ultraviolet Purple Engine) */}
         <div
           onClick={() => onNavigate('chat', 'image')}
-          className="p-5 bg-gradient-to-br from-[#1A0B2E] via-[#0F071C] to-[#06030A] border border-[#A855F7]/30 hover:border-[#A855F7] hover:-translate-y-2 hover:shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden"
+          className={`p-5 transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden border-2 ${
+            isLight
+              ? 'bg-gradient-to-br from-purple-50/90 via-white to-purple-100/50 border-purple-300 hover:border-purple-500 hover:shadow-lg'
+              : isMix
+              ? 'bg-gradient-to-br from-[#FAF6EE] via-[#F4EFE6] to-[#ECE5D6] border-[#D3C7B5] hover:border-purple-600 hover:shadow-lg'
+              : 'bg-gradient-to-br from-[#1A0B2E] via-[#0F071C] to-[#06030A] border-[#A855F7]/30 hover:border-[#A855F7] hover:-translate-y-2 hover:shadow-[0_0_30px_rgba(168,85,247,0.4)]'
+          }`}
         >
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#A855F7] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#A855F7] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <div>
             <div className="flex items-center justify-between mb-3">
-              <div className="p-2.5 bg-black/80 border border-[#A855F7]/60 text-[#A855F7] group-hover:bg-[#A855F7] group-hover:text-black transition-all clip-badge-poly shadow-[0_0_12px_rgba(168,85,247,0.3)]">
+              <div className={`p-2.5 clip-badge-poly border transition-all ${
+                isLight ? 'bg-purple-100 border-purple-300 text-purple-700 group-hover:bg-[#7C3AED] group-hover:text-white' : isMix ? 'bg-[#ECE5D6] border-[#D8CEBF] text-[#6366F1] group-hover:bg-[#6366F1] group-hover:text-white' : 'bg-black/80 border-[#A855F7]/60 text-[#A855F7] group-hover:bg-[#A855F7] group-hover:text-black shadow-[0_0_12px_rgba(168,85,247,0.3)]'
+              }`}>
                 <ImageIcon className="w-4 h-4" />
               </div>
-              <span className="text-[10px] font-mono text-[#A855F7]/80 group-hover:text-[#A855F7] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#A855F7]/20">02 // VISUALS</span>
+              <span className="text-[10px] font-mono text-[#A855F7] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#A855F7]/30 font-bold">02 // VISUALS</span>
             </div>
-            <h3 className="text-base font-bold text-[#EDEDED] font-display mb-1 group-hover:text-[#A855F7] transition-colors">
+            <h3 className={`text-base font-bold font-display mb-1 group-hover:text-[#A855F7] transition-colors ${textPrimaryClass}`}>
               Photoreal & Vector Suite
             </h3>
-            <p className="text-xs text-[#A1A1AA] font-sans leading-relaxed">
+            <p className={`text-xs font-sans leading-relaxed ${textSecondaryClass}`}>
               Cinematic 1K photorealism and crisp vector SVG generation with true lighting and optics.
             </p>
           </div>
-          <div className="pt-4 flex items-center justify-between text-[11px] font-mono text-[#737373] group-hover:text-[#A855F7]">
-            <span>Launch Engine</span>
+          <div className="pt-4 flex items-center justify-between text-[11px] font-mono text-[#A855F7]">
+            <span className="font-bold">Launch Engine</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform text-[#A855F7]" />
           </div>
         </div>
@@ -1283,25 +1412,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Card 3: Video Generator (Neon Hot Magenta Engine) */}
         <div
           onClick={() => onNavigate('chat', 'video')}
-          className="p-5 bg-gradient-to-br from-[#240B1A] via-[#14060F] to-[#080206] border border-[#FF007A]/30 hover:border-[#FF007A] hover:-translate-y-2 hover:shadow-[0_0_30px_rgba(255,0,122,0.4)] transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden"
+          className={`p-5 transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden border-2 ${
+            isLight
+              ? 'bg-gradient-to-br from-rose-50/90 via-white to-rose-100/50 border-rose-300 hover:border-rose-500 hover:shadow-lg'
+              : isMix
+              ? 'bg-gradient-to-br from-[#FAF6EE] via-[#F4EFE6] to-[#ECE5D6] border-[#D3C7B5] hover:border-rose-600 hover:shadow-lg'
+              : 'bg-gradient-to-br from-[#240B1A] via-[#14060F] to-[#080206] border-[#FF007A]/30 hover:border-[#FF007A] hover:-translate-y-2 hover:shadow-[0_0_30px_rgba(255,0,122,0.4)]'
+          }`}
         >
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FF007A] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#FF007A] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <div>
             <div className="flex items-center justify-between mb-3">
-              <div className="p-2.5 bg-black/80 border border-[#FF007A]/60 text-[#FF007A] group-hover:bg-[#FF007A] group-hover:text-black transition-all clip-badge-poly shadow-[0_0_12px_rgba(255,0,122,0.3)]">
+              <div className={`p-2.5 clip-badge-poly border transition-all ${
+                isLight ? 'bg-rose-100 border-rose-300 text-rose-700 group-hover:bg-[#E11D48] group-hover:text-white' : isMix ? 'bg-[#ECE5D6] border-[#D8CEBF] text-[#F43F5E] group-hover:bg-[#F43F5E] group-hover:text-white' : 'bg-black/80 border-[#FF007A]/60 text-[#FF007A] group-hover:bg-[#FF007A] group-hover:text-black shadow-[0_0_12px_rgba(255,0,122,0.3)]'
+              }`}>
                 <Film className="w-4 h-4" />
               </div>
-              <span className="text-[10px] font-mono text-[#FF007A]/80 group-hover:text-[#FF007A] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#FF007A]/20">03 // MOTION</span>
+              <span className="text-[10px] font-mono text-[#FF007A] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#FF007A]/30 font-bold">03 // MOTION</span>
             </div>
-            <h3 className="text-base font-bold text-[#EDEDED] font-display mb-1 group-hover:text-[#FF007A] transition-colors">
+            <h3 className={`text-base font-bold font-display mb-1 group-hover:text-[#FF007A] transition-colors ${textPrimaryClass}`}>
               60FPS Motion Simulator
             </h3>
-            <p className="text-xs text-[#A1A1AA] font-sans leading-relaxed">
+            <p className={`text-xs font-sans leading-relaxed ${textSecondaryClass}`}>
               60FPS motion keyframing, camera tracking, and procedural scene storyboard animation engine.
             </p>
           </div>
-          <div className="pt-4 flex items-center justify-between text-[11px] font-mono text-[#737373] group-hover:text-[#FF007A]">
-            <span>Launch Engine</span>
+          <div className="pt-4 flex items-center justify-between text-[11px] font-mono text-[#FF007A]">
+            <span className="font-bold">Launch Engine</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform text-[#FF007A]" />
           </div>
         </div>
@@ -1309,25 +1446,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Card 4: Music Generator (Electric Amber Gold Engine) */}
         <div
           onClick={() => onNavigate('chat', 'music')}
-          className="p-5 bg-gradient-to-br from-[#241A0B] via-[#140E06] to-[#080502] border border-[#FFB800]/30 hover:border-[#FFB800] hover:-translate-y-2 hover:shadow-[0_0_30px_rgba(255,184,0,0.4)] transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden"
+          className={`p-5 transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden border-2 ${
+            isLight
+              ? 'bg-gradient-to-br from-amber-50/90 via-white to-amber-100/50 border-amber-300 hover:border-amber-500 hover:shadow-lg'
+              : isMix
+              ? 'bg-gradient-to-br from-[#FAF6EE] via-[#F4EFE6] to-[#ECE5D6] border-[#D3C7B5] hover:border-amber-600 hover:shadow-lg'
+              : 'bg-gradient-to-br from-[#241A0B] via-[#140E06] to-[#080502] border-[#FFB800]/30 hover:border-[#FFB800] hover:-translate-y-2 hover:shadow-[0_0_30px_rgba(255,184,0,0.4)]'
+          }`}
         >
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FFB800] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#FFB800] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           <div>
             <div className="flex items-center justify-between mb-3">
-              <div className="p-2.5 bg-black/80 border border-[#FFB800]/60 text-[#FFB800] group-hover:bg-[#FFB800] group-hover:text-black transition-all clip-badge-poly shadow-[0_0_12px_rgba(255,184,0,0.3)]">
+              <div className={`p-2.5 clip-badge-poly border transition-all ${
+                isLight ? 'bg-amber-100 border-amber-300 text-amber-700 group-hover:bg-[#D97706] group-hover:text-white' : isMix ? 'bg-[#ECE5D6] border-[#D8CEBF] text-[#EA580C] group-hover:bg-[#EA580C] group-hover:text-white' : 'bg-black/80 border-[#FFB800]/60 text-[#FFB800] group-hover:bg-[#FFB800] group-hover:text-black shadow-[0_0_12px_rgba(255,184,0,0.3)]'
+              }`}>
                 <Music className="w-4 h-4" />
               </div>
-              <span className="text-[10px] font-mono text-[#FFB800]/80 group-hover:text-[#FFB800] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#FFB800]/20">04 // AUDIO</span>
+              <span className="text-[10px] font-mono text-[#FFB800] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#FFB800]/30 font-bold">04 // AUDIO</span>
             </div>
-            <h3 className="text-base font-bold text-[#EDEDED] font-display mb-1 group-hover:text-[#FFB800] transition-colors">
+            <h3 className={`text-base font-bold font-display mb-1 group-hover:text-[#FFB800] transition-colors ${textPrimaryClass}`}>
               Harmonic Soundscapes
             </h3>
-            <p className="text-xs text-[#A1A1AA] font-sans leading-relaxed">
+            <p className={`text-xs font-sans leading-relaxed ${textSecondaryClass}`}>
               432Hz harmonic acoustic modeling, procedural synthesizer frequencies, and binaural focus sound.
             </p>
           </div>
-          <div className="pt-4 flex items-center justify-between text-[11px] font-mono text-[#737373] group-hover:text-[#FFB800]">
-            <span>Launch Engine</span>
+          <div className="pt-4 flex items-center justify-between text-[11px] font-mono text-[#FFB800]">
+            <span className="font-bold">Launch Engine</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform text-[#FFB800]" />
           </div>
         </div>
@@ -1335,20 +1480,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Persistent Technical Footer */}
-      <div className="pt-4 border-t border-[#252538] flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-mono text-[#737373]">
+      <div className={`pt-4 border-t flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-mono ${cardHeaderBorderClass} ${textMutedClass}`}>
         <div className="flex items-center space-x-2">
-          <span className="text-[#00F0FF]">SOMOTOZ AI SUITE</span>
+          <span className="text-[#00F0FF] font-bold">SOMOTOZ AI SUITE</span>
           <span>•</span>
-          <span className="text-[#A855F7]">GEMINI MULTIMODAL</span>
+          <span className="text-[#A855F7] font-bold">GEMINI MULTIMODAL</span>
           <span>•</span>
-          <span className="text-[#FF007A]">CLOUD FIRESTORE</span>
+          <span className="text-[#FF007A] font-bold">CLOUD FIRESTORE</span>
         </div>
-        <div className="flex items-center space-x-2 text-[#EDEDED]">
+        <div className={`flex items-center space-x-2 ${textPrimaryClass}`}>
           <span>ENGINEERED WITH PASSION BY</span>
           <strong className="text-transparent bg-clip-text bg-gradient-to-r from-[#00F0FF] via-[#A855F7] to-[#FF007A] underline decoration-[#00F0FF]/40 underline-offset-2">
             SOM MAURYA
           </strong>
-          <span className="text-[#737373]">(DATA SCIENCE & COMPUTATIONAL THINKING)</span>
+          <span className={`text-[10px] ${textMutedClass}`}>(DATA SCIENCE & COMPUTATIONAL THINKING)</span>
         </div>
       </div>
 

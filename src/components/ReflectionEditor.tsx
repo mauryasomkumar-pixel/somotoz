@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Sparkles, Send, Lightbulb, Heart, Feather, Compass, Mic, Square, Loader2, Zap, BookOpen, CheckCircle2, AlertCircle } from 'lucide-react';
 import { DynamicWelcomeBanner } from './DynamicWelcomeBanner';
+import { useTheme } from '../context/ThemeContext';
 
 interface ReflectionEditorProps {
   initialContent?: string;
@@ -49,6 +50,46 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
   isEditMode = false,
   userName,
 }) => {
+  const { theme } = useTheme();
+  const isLight = theme === 'white';
+  const isMix = theme === 'mix';
+
+  const textPrimaryClass = isLight
+    ? 'text-[#090D16]'
+    : isMix
+    ? 'text-[#231E19]'
+    : 'text-[#EDEDED]';
+
+  const textSecondaryClass = isLight
+    ? 'text-[#475569]'
+    : isMix
+    ? 'text-[#5F564D]'
+    : 'text-[#A1A1AA]';
+
+  const textMutedClass = isLight
+    ? 'text-[#64748B]'
+    : isMix
+    ? 'text-[#7D7365]'
+    : 'text-[#737373]';
+
+  const cardBgClass = isLight
+    ? 'bg-white/95 border-2 border-[#CBD5E1] shadow-[0_8px_30px_rgba(2,132,199,0.12)]'
+    : isMix
+    ? 'bg-[#FAF6EE]/95 border-2 border-[#D3C7B5] shadow-[0_8px_30px_rgba(217,119,6,0.12)]'
+    : 'bg-gradient-to-br from-[#0B0B14] via-[#07070E] to-[#030306] border-2 border-[#2D2D45] shadow-[0_0_35px_rgba(0,255,65,0.08)]';
+
+  const subCardBgClass = isLight
+    ? 'bg-[#F8FAFC] border-[#CBD5E1]'
+    : isMix
+    ? 'bg-[#F4EFE6] border-[#D8CEBF]'
+    : 'bg-[#0D0D14] border-[#262626]';
+
+  const inputBgClass = isLight
+    ? 'bg-white border-[#CBD5E1] text-[#090D16] placeholder-[#94A3B8] focus:border-[#0284C7]'
+    : isMix
+    ? 'bg-[#FDFBF7] border-[#D8CEBF] text-[#231E19] placeholder-[#A89F91] focus:border-[#D97706]'
+    : 'bg-black border-[#262626] text-[#EDEDED] placeholder-[#525252] focus:border-[#00FF41]';
+
   const [content, setContent] = useState(initialContent);
   const [title, setTitle] = useState(initialTitle);
   const [activePrompt, setActivePrompt] = useState<string | null>(null);
@@ -222,26 +263,43 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
   ];
 
   return (
-    <div className="max-w-4xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-4 font-sans">
+    <div className={`max-w-4xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-5 font-sans transition-colors duration-300 ${textPrimaryClass}`}>
       {/* Welcome Banner */}
       {!isEditMode && <DynamicWelcomeBanner userName={userName} />}
 
-      {/* Editor Card */}
-      <div className="bg-[#0A0A0A] border border-[#262626] hover:border-[#00FF41]/80 shadow-[4px_4px_0px_0px_#141414] transition-all">
+      {/* Editor Card with Non-Rectangular Polygon & Multi-Color Glowing Gradient Border */}
+      <div className={`relative overflow-hidden clip-cyber-card transition-all duration-300 ${cardBgClass}`}>
+        {/* Top Multi-Color Glowing Gradient Accent Border */}
+        <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#00FF41] via-[#00F0FF] via-[#A855F7] to-[#FF007A] z-20" />
+
         {/* Header Bar */}
-        <div className="px-5 py-4 border-b border-[#262626] flex flex-wrap items-center justify-between gap-3 bg-black font-mono">
+        <div className={`px-5 py-4 border-b flex flex-wrap items-center justify-between gap-3 font-mono ${
+          isLight ? 'bg-slate-50/90 border-[#CBD5E1]' : isMix ? 'bg-[#ECE5D6]/90 border-[#D8CEBF]' : 'bg-black/90 border-[#262626]'
+        }`}>
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-black border border-[#00FF41] text-[#00FF41] flex items-center justify-center shadow-[2px_2px_0px_0px_#00FF41]">
+            <div className={`w-9 h-9 flex items-center justify-center clip-badge-poly border transition-all ${
+              isLight
+                ? 'bg-emerald-100 border-emerald-300 text-emerald-700 shadow-sm'
+                : isMix
+                ? 'bg-amber-100 border-amber-300 text-amber-800 shadow-sm'
+                : 'bg-black border-[#00FF41] text-[#00FF41] shadow-[0_0_12px_rgba(0,255,65,0.4)]'
+            }`}>
               <BookOpen className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm sm:text-base font-bold text-[#EDEDED] flex items-center gap-2">
+              <h2 className={`text-sm sm:text-base font-bold flex items-center gap-2 ${textPrimaryClass}`}>
                 {isEditMode ? 'Edit Daily Note' : 'Daily Note & Journal'}
-                <span className="text-[9px] px-1.5 py-0.2 bg-[#141414] text-[#00FF41] border border-[#262626]">
+                <span className={`text-[9px] px-2 py-0.5 clip-badge-poly border font-bold ${
+                  isLight
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                    : isMix
+                    ? 'bg-amber-50 text-amber-800 border-amber-300'
+                    : 'bg-[#141414] text-[#00FF41] border-[#262626]'
+                }`}>
                   ACTIVE
                 </span>
               </h2>
-              <p className="text-xs text-[#737373]">
+              <p className={`text-xs ${textSecondaryClass}`}>
                 {isEditMode
                   ? 'Update your note and generate fresh AI insights'
                   : 'Write your thoughts or speak using your microphone'}
@@ -249,11 +307,23 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 text-xs text-[#737373] font-mono">
-            <span className="px-2 py-0.5 bg-black text-[#00FF41] border border-[#262626]">
+          <div className="flex items-center space-x-2 text-xs font-mono">
+            <span className={`px-2.5 py-0.5 clip-badge-poly border font-bold ${
+              isLight
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                : isMix
+                ? 'bg-amber-50 text-amber-800 border-amber-300'
+                : 'bg-black text-[#00FF41] border-[#262626]'
+            }`}>
               {wordCount} words
             </span>
-            <span className="px-2 py-0.5 bg-black text-[#A1A1AA] border border-[#262626]">
+            <span className={`px-2.5 py-0.5 clip-badge-poly border ${
+              isLight
+                ? 'bg-slate-100 text-slate-700 border-slate-300'
+                : isMix
+                ? 'bg-[#EFE7DA] text-[#231E19] border-[#D8CEBF]'
+                : 'bg-black text-[#A1A1AA] border-[#262626]'
+            }`}>
               {charCount} chars
             </span>
           </div>
@@ -264,7 +334,7 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
           <div className="px-5 pt-4 pb-2 font-mono">
             <div className="flex items-center space-x-2 mb-2.5">
               <Zap className="w-3.5 h-3.5 text-[#00FF41]" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#A1A1AA]">
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${textSecondaryClass}`}>
                 Quick Starters (Optional)
               </span>
             </div>
@@ -277,24 +347,36 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
                     key={item.id}
                     type="button"
                     onClick={() => handleApplyPrompt(item.prompt, item.id)}
-                    className={`p-3 border text-left transition-all cursor-pointer flex items-start space-x-2.5 ${
+                    className={`p-3 border text-left transition-all cursor-pointer flex items-start space-x-2.5 clip-badge-poly ${
                       isSelected
-                        ? 'bg-black border-[#00FF41] text-[#00FF41] shadow-[2px_2px_0px_0px_#00FF41]'
-                        : 'bg-[#0D0D0D] hover:bg-[#141414] border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#EDEDED]'
+                        ? isLight
+                          ? 'bg-emerald-50 border-emerald-500 text-emerald-950 shadow-md ring-1 ring-emerald-500'
+                          : isMix
+                          ? 'bg-amber-50 border-amber-500 text-amber-950 shadow-md ring-1 ring-amber-500'
+                          : 'bg-black border-[#00FF41] text-[#00FF41] shadow-[0_0_15px_rgba(0,255,65,0.3)]'
+                        : subCardBgClass
                     }`}
                   >
                     <div
-                      className={`p-1.5 border shrink-0 ${
+                      className={`p-1.5 border shrink-0 clip-badge-poly ${
                         isSelected
-                          ? 'bg-[#00FF41] text-black border-[#00FF41]'
+                          ? isLight
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : isMix
+                            ? 'bg-amber-600 text-white border-amber-600'
+                            : 'bg-[#00FF41] text-black border-[#00FF41]'
+                          : isLight
+                          ? 'bg-slate-100 border-slate-300 text-emerald-700'
+                          : isMix
+                          ? 'bg-[#ECE5D6] border-[#D8CEBF] text-amber-800'
                           : 'bg-black border-[#262626] text-[#00FF41]'
                       }`}
                     >
                       <IconComponent className="w-3.5 h-3.5" />
                     </div>
                     <div className="min-w-0 flex-1 font-sans">
-                      <h4 className="text-xs font-bold text-[#EDEDED] font-mono">{item.title}</h4>
-                      <p className="text-[11px] text-[#737373] line-clamp-1 mt-0.5">{item.prompt}</p>
+                      <h4 className={`text-xs font-bold font-mono ${textPrimaryClass}`}>{item.title}</h4>
+                      <p className={`text-[11px] line-clamp-1 mt-0.5 ${textSecondaryClass}`}>{item.prompt}</p>
                     </div>
                   </button>
                 );
@@ -305,11 +387,11 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
 
         {/* Audio Recording Bar */}
         <div className="px-5 pt-3 font-mono">
-          <div className="p-3 bg-black border border-[#262626] flex items-center justify-between gap-3">
+          <div className={`p-3 border flex items-center justify-between gap-3 clip-badge-poly ${subCardBgClass}`}>
             <div className="flex items-center space-x-2.5">
               {isRecording ? (
-                <div className="flex items-center space-x-2 text-rose-400 font-medium text-xs">
-                  <span className="w-2.5 h-2.5 bg-rose-500 animate-ping inline-block" />
+                <div className="flex items-center space-x-2 text-rose-500 font-medium text-xs">
+                  <span className="w-2.5 h-2.5 bg-rose-500 animate-ping inline-block rounded-full" />
                   <span>Recording audio ({recordingSeconds}s)...</span>
                 </div>
               ) : isTranscribing ? (
@@ -318,7 +400,7 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
                   <span>Converting your voice to text...</span>
                 </div>
               ) : (
-                <div className="text-xs text-[#737373] flex items-center space-x-1.5">
+                <div className={`text-xs flex items-center space-x-1.5 ${textSecondaryClass}`}>
                   <Mic className="w-3.5 h-3.5 text-[#00FF41]" />
                   <span>Voice Note: Click record to speak naturally</span>
                 </div>
@@ -330,7 +412,7 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
                 <button
                   type="button"
                   onClick={handleStopRecording}
-                  className="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-600 text-rose-300 text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer"
+                  className="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-600 text-rose-300 text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer clip-badge-poly"
                 >
                   <Square className="w-3 h-3 text-rose-400" />
                   <span>Stop & Convert</span>
@@ -340,7 +422,13 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
                   type="button"
                   onClick={handleStartRecording}
                   disabled={isSubmitting || isTranscribing}
-                  className="px-3 py-1.5 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-xs font-bold text-[#EDEDED] hover:text-[#00FF41] transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                  className={`px-3 py-1.5 border text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50 clip-badge-poly ${
+                    isLight
+                      ? 'bg-white hover:bg-slate-100 border-slate-300 text-slate-800'
+                      : isMix
+                      ? 'bg-[#ECE5D6] hover:bg-[#E2DAC8] border-[#D8CEBF] text-[#231E19]'
+                      : 'bg-black hover:bg-[#141414] border-[#262626] hover:border-[#00FF41] text-[#EDEDED] hover:text-[#00FF41]'
+                  }`}
                 >
                   <Mic className="w-3 h-3 text-[#00FF41]" />
                   <span>Record Voice</span>
@@ -353,8 +441,8 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4 font-mono">
           {/* Title Input */}
-          <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-[#A1A1AA] uppercase tracking-wider">
+          <div className="space-y-1.5">
+            <label className={`block text-[11px] font-bold uppercase tracking-wider ${textSecondaryClass}`}>
               Note Title (Optional)
             </label>
             <input
@@ -363,15 +451,15 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Today's learnings, project planning, morning reflection..."
               disabled={isSubmitting}
-              className="w-full px-3.5 py-2.5 bg-black border border-[#262626] text-[#EDEDED] text-sm placeholder-[#525252] focus:outline-none focus:border-[#00FF41] transition-all font-sans"
+              className={`w-full px-3.5 py-2.5 border text-sm transition-all font-sans clip-badge-poly outline-none ${inputBgClass}`}
             />
           </div>
 
           {/* Main Content Textarea */}
-          <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-[#A1A1AA] uppercase tracking-wider flex items-center justify-between">
+          <div className="space-y-1.5">
+            <label className={`block text-[11px] font-bold uppercase tracking-wider flex items-center justify-between ${textSecondaryClass}`}>
               <span>Your Thoughts & Notes</span>
-              <span className="text-[#737373] text-[10px]">Tip: Press Ctrl+Enter to save</span>
+              <span className={`text-[10px] ${textMutedClass}`}>Tip: Press Ctrl+Enter to save</span>
             </label>
             <textarea
               rows={8}
@@ -380,13 +468,13 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
               onKeyDown={handleKeyDown}
               placeholder="Write what happened today, ideas you're thinking about, or challenges you're facing..."
               disabled={isSubmitting}
-              className="w-full px-3.5 py-3 bg-black border border-[#262626] text-[#EDEDED] text-sm placeholder-[#525252] focus:outline-none focus:border-[#00FF41] transition-all font-sans resize-y leading-relaxed"
+              className={`w-full px-3.5 py-3 border text-sm transition-all font-sans resize-y leading-relaxed clip-badge-poly outline-none ${inputBgClass}`}
             />
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="p-3 bg-rose-950/40 border border-rose-800/80 text-rose-300 text-xs flex items-center space-x-2">
+            <div className="p-3 bg-rose-950/40 border border-rose-800/80 text-rose-300 text-xs flex items-center space-x-2 clip-badge-poly">
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
               <span>{error}</span>
             </div>
@@ -394,28 +482,38 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
 
           {/* Submitting Loading Status Banner */}
           {isSubmitting && (
-            <div className="p-4 bg-black border border-[#00FF41] shadow-[0_0_15px_rgba(0,255,65,0.2)] flex items-center space-x-3">
+            <div className={`p-4 border flex items-center space-x-3 clip-badge-poly ${
+              isLight ? 'bg-emerald-50 border-emerald-500' : isMix ? 'bg-amber-50 border-amber-500' : 'bg-black border-[#00FF41] shadow-[0_0_15px_rgba(0,255,65,0.2)]'
+            }`}>
               <Loader2 className="w-5 h-5 text-[#00FF41] animate-spin shrink-0" />
               <div className="font-mono text-xs">
                 <p className="text-[#00FF41] font-bold">{loadingMessages[loadingStep]}</p>
-                <p className="text-[#737373] text-[10px]">Processing note with Somotoz AI...</p>
+                <p className={`text-[10px] ${textMutedClass}`}>Processing note with Somotoz AI...</p>
               </div>
             </div>
           )}
 
           {/* Action Buttons */}
-          <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-[#262626]">
+          <div className={`pt-3 flex flex-wrap items-center justify-between gap-3 border-t ${
+            isLight ? 'border-[#E2E8F0]' : isMix ? 'border-[#E2D9CA]' : 'border-[#262626]'
+          }`}>
             {isEditMode && onCancelEdit ? (
               <button
                 type="button"
                 onClick={onCancelEdit}
                 disabled={isSubmitting}
-                className="px-4 py-2 bg-black hover:bg-[#141414] border border-[#262626] text-xs font-bold text-[#A1A1AA] hover:text-[#EDEDED] transition-colors cursor-pointer"
+                className={`px-4 py-2 border text-xs font-bold transition-colors cursor-pointer clip-badge-poly ${
+                  isLight
+                    ? 'bg-slate-100 border-slate-300 text-slate-700 hover:text-slate-900'
+                    : isMix
+                    ? 'bg-[#ECE5D6] border-[#D8CEBF] text-[#231E19] hover:text-black'
+                    : 'bg-black hover:bg-[#141414] border-[#262626] text-[#A1A1AA] hover:text-[#EDEDED]'
+                }`}
               >
                 CANCEL EDIT
               </button>
             ) : (
-              <div className="text-[11px] text-[#737373] font-mono">
+              <div className={`text-[11px] font-mono ${textMutedClass}`}>
                 Saved securely to your private cloud storage
               </div>
             )}
@@ -423,7 +521,7 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
             <button
               type="submit"
               disabled={isSubmitting || !content.trim()}
-              className="px-5 py-2.5 bg-[#00FF41] hover:bg-[#00E038] text-black font-mono font-bold text-xs tracking-wider border border-[#00FF41] shadow-[2px_2px_0px_0px_#262626] hover:shadow-[3px_3px_0px_0px_#00FF41] active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center space-x-2 cursor-pointer disabled:opacity-50"
+              className="px-6 py-3 bg-[#00FF41] hover:bg-[#00E038] text-black font-mono font-bold text-xs tracking-wider border border-[#00FF41] clip-badge-poly shadow-[0_0_20px_rgba(0,255,65,0.4)] active:scale-95 transition-all flex items-center space-x-2 cursor-pointer disabled:opacity-50"
             >
               {isSubmitting ? (
                 <>
