@@ -521,7 +521,7 @@ export default function App() {
 
   // Render Authenticated Dashboard & Engineering Workspace
   return (
-    <div className="min-h-screen bg-[#000000] text-[#EDEDED] flex flex-col h-screen overflow-hidden font-sans selection:bg-[#00FF41] selection:text-black">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col h-screen overflow-hidden font-sans selection:bg-[#00FF41] selection:text-black transition-colors duration-300">
       
       {/* Top Navbar */}
       <Navbar
@@ -587,7 +587,7 @@ export default function App() {
         )}
 
         {/* Right Main Content Area */}
-        <main className="flex-1 overflow-y-auto bg-[#000000] relative p-4 sm:p-6">
+        <main className="flex-1 overflow-y-auto bg-[var(--bg-primary)] relative p-4 sm:p-6 transition-colors duration-300">
           
           {/* 1. COMMAND DASHBOARD VIEW */}
           {viewMode === 'dashboard' && (
