@@ -302,13 +302,18 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
       {/* Footer Theme Switcher & Watermark Credit */}
       <div className="p-3 border-t border-[#262626] bg-black space-y-2">
         <ThemeSwitcher compact={true} showLabels={false} className="w-full justify-center" />
-        <div className="flex items-center justify-between text-xs text-[#737373] pt-1">
-          <div className="flex items-center space-x-1.5">
-            <Terminal className="w-3.5 h-3.5 text-[#00FF41]" />
-            <span className="text-[11px]">Somotoz Core v2.5</span>
+        <div className="flex flex-col space-y-1 text-xs text-[#737373] pt-1">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-1.5">
+              <Terminal className="w-3.5 h-3.5 text-[#00FF41]" />
+              <span className="text-[11px]">Somotoz Core v2.5</span>
+            </div>
+            <span className="text-[11px] text-[#00FF41] font-bold">
+              Som Maurya
+            </span>
           </div>
-          <span className="text-[11px] text-[#00FF41] font-bold">
-            Dev: Som Maurya
+          <span className="text-[9px] text-[#737373] text-center">
+            Data Science & Computational Thinking
           </span>
         </div>
       </div>

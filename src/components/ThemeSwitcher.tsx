@@ -1,5 +1,5 @@
 import React from 'react';
-import { Moon, Sun, Eye, Sparkles, Check } from 'lucide-react';
+import { Moon, Sun, Eye, Clock, Check, Zap } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { AppTheme } from '../types';
 
@@ -14,7 +14,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
   className = '',
   showLabels = true,
 }) => {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, isAutoMode, setIsAutoMode, autoThemeReason } = useTheme();
 
   const themes: Array<{
     id: AppTheme;
@@ -22,40 +22,57 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
     shortLabel: string;
     icon: React.ComponentType<{ className?: string }>;
     accentColor: string;
+    activeBorder: string;
     description: string;
   }> = [
     {
       id: 'black',
-      label: 'Black (Night)',
+      label: 'Night Mode',
       shortLabel: 'Night',
       icon: Moon,
-      accentColor: '#00FF41',
-      description: 'Pure Black + Neon Green',
+      accentColor: '#00F0FF',
+      activeBorder: 'border-[#00F0FF]',
+      description: 'Obsidian Black & Multi-Color Neon Glow',
     },
     {
       id: 'white',
-      label: 'White (Day)',
+      label: 'Day Mode',
       shortLabel: 'Day',
       icon: Sun,
-      accentColor: '#009633',
-      description: 'Clean Off-White + High Contrast',
+      accentColor: '#0284C7',
+      activeBorder: 'border-[#0284C7]',
+      description: 'Platinum Surface & Jewel-Toned Accents',
     },
     {
       id: 'mix',
-      label: 'Mix (Eye-Care)',
-      shortLabel: 'Eye-Care',
+      label: 'Eye-Comfort',
+      shortLabel: 'Comfort',
       icon: Eye,
-      accentColor: '#2C6E49',
-      description: 'Soft Warm Sepia / Reduced Strain',
+      accentColor: '#D97706',
+      activeBorder: 'border-[#D97706]',
+      description: 'Warm Sepia Cream & Gentle Amber Glow',
     },
   ];
 
   if (compact) {
     return (
-      <div
-        className={`inline-flex items-center p-1 bg-black/60 dark:bg-black border border-[#262626] ${className}`}
-        style={{ borderRadius: '2px' }}
-      >
+      <div className={`inline-flex items-center gap-1 p-1 bg-[#0A0A12]/90 border border-[#2D2D45] clip-slant ${className}`}>
+        {/* Realtime Auto Toggle */}
+        <button
+          onClick={() => setIsAutoMode(!isAutoMode)}
+          className={`px-2 py-1 text-[9px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1 ${
+            isAutoMode
+              ? 'bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/40'
+              : 'text-[#737373] hover:text-[#EDEDED] border border-transparent'
+          }`}
+          title={isAutoMode ? `Real-Time Auto Active: ${autoThemeReason}` : 'Click to enable Real-Time Auto Sync'}
+        >
+          <Zap className={`w-3 h-3 ${isAutoMode ? 'text-[#00F0FF] animate-pulse' : 'text-[#737373]'}`} />
+          <span>AUTO</span>
+        </button>
+
+        <div className="w-[1px] h-3.5 bg-[#2D2D45]" />
+
         {themes.map((t) => {
           const Icon = t.icon;
           const isActive = theme === t.id;
@@ -65,13 +82,13 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
               onClick={() => setTheme(t.id)}
               className={`p-1.5 transition-all cursor-pointer relative group flex items-center justify-center ${
                 isActive
-                  ? 'bg-[#141414] text-[#00FF41] border border-[#00FF41] shadow-[1px_1px_0px_0px_#00FF41]'
-                  : 'text-[#737373] hover:text-[#EDEDED] border border-transparent hover:border-[#333333]'
+                  ? `bg-[#141424] text-white border ${t.activeBorder} shadow-[0_0_8px_rgba(0,240,255,0.2)]`
+                  : 'text-[#737373] hover:text-[#EDEDED] border border-transparent hover:border-[#3F3F5A]'
               }`}
-              title={`${t.label} - ${t.description}`}
+              title={`${t.label} - ${t.description} (Click to manually set for this tab session)`}
               aria-label={`Switch to ${t.label}`}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className="w-3.5 h-3.5" style={{ color: isActive ? t.accentColor : undefined }} />
             </button>
           );
         })}
@@ -80,17 +97,29 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
   }
 
   return (
-    <div className={`space-y-1.5 ${className}`}>
+    <div className={`space-y-2 ${className}`}>
       {showLabels && (
-        <div className="flex items-center justify-between text-[10px] uppercase font-bold text-[#737373] tracking-wider px-1 font-mono">
-          <span>THEME MODE</span>
-          <span className="text-[9px] text-[#00FF41]">
-            {theme.toUpperCase()}
+        <div className="flex items-center justify-between text-[10px] uppercase font-bold text-[#A1A1AA] tracking-wider px-1 font-mono">
+          <span className="flex items-center gap-1.5">
+            <Clock className="w-3 h-3 text-[#00F0FF]" />
+            THEME MODE
           </span>
+          <button
+            onClick={() => setIsAutoMode(!isAutoMode)}
+            className={`px-1.5 py-0.5 text-[9px] font-mono font-bold flex items-center gap-1 transition-all cursor-pointer ${
+              isAutoMode
+                ? 'text-[#00F0FF] bg-[#00F0FF]/10 border border-[#00F0FF]/30'
+                : 'text-[#737373] bg-[#141424] border border-[#2D2D45] hover:text-[#EDEDED]'
+            }`}
+            title="Toggle between Real-Time Clock Sync vs Manual Tab Session Lock"
+          >
+            <Zap className={`w-2.5 h-2.5 ${isAutoMode ? 'text-[#00F0FF] animate-pulse' : 'text-[#737373]'}`} />
+            {isAutoMode ? 'REAL-TIME AUTO' : 'MANUAL LOCK'}
+          </button>
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-1.5 p-1 bg-black/40 border border-[#262626] font-mono">
+      <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#0A0A12]/80 border border-[#2D2D45] font-mono clip-slant">
         {themes.map((t) => {
           const Icon = t.icon;
           const isActive = theme === t.id;
@@ -100,14 +129,14 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
               onClick={() => setTheme(t.id)}
               className={`p-2 transition-all cursor-pointer flex flex-col items-center justify-center text-center space-y-1 border ${
                 isActive
-                  ? 'bg-black border-[#00FF41] text-[#00FF41] shadow-[2px_2px_0px_0px_#00FF41]'
-                  : 'bg-[#0D0D0D] border-[#262626] text-[#A1A1AA] hover:border-[#404040] hover:text-[#EDEDED]'
+                  ? `bg-[#141424] ${t.activeBorder} text-white shadow-[0_0_10px_rgba(0,240,255,0.15)]`
+                  : 'bg-[#080811] border-[#1F1F35] text-[#A1A1AA] hover:border-[#3F3F5A] hover:text-white'
               }`}
-              title={t.description}
+              title={`${t.description} (Session locked)`}
             >
               <div className="flex items-center space-x-1">
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#00FF41]' : 'text-[#737373]'}`} />
-                {isActive && <Check className="w-2.5 h-2.5 text-[#00FF41]" />}
+                <Icon className="w-3.5 h-3.5" style={{ color: isActive ? t.accentColor : '#737373' }} />
+                {isActive && <Check className="w-2.5 h-2.5" style={{ color: t.accentColor }} />}
               </div>
               <span className="text-[10px] font-bold leading-tight truncate w-full">
                 {t.shortLabel}
@@ -116,6 +145,13 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
           );
         })}
       </div>
+      
+      {isAutoMode && (
+        <div className="text-[9px] text-[#00F0FF]/80 font-mono flex items-center gap-1 px-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#00F0FF] animate-pulse" />
+          <span>Synced: {autoThemeReason}</span>
+        </div>
+      )}
     </div>
   );
 };

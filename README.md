@@ -1,5 +1,5 @@
-# ⚡ Somotoz AI Suite — Multimodal Intelligence & Cognitive Studio
-> **Architected & Engineered by Som Maurya**
+# ⚡ Somotoz AI Suite — Enterprise Autonomous Cognitive Architecture
+> **Architected & Engineered by Som Maurya (IIT Madras Data Science & Computational Thinking)**
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19.0-61DAFB?logo=react)](https://react.dev/)
@@ -8,173 +8,192 @@
 [![Firebase](https://img.shields.io/badge/Firebase-Auth_%26_Firestore-FFCA28?logo=firebase)](https://firebase.google.com/)
 [![Express](https://img.shields.io/badge/Express-4.21-000000?logo=express)](https://expressjs.com/)
 
-An enterprise-grade, full-stack AI engineering suite and cognitive reflection workspace. Somotoz unifies **Multi-turn LLM reasoning**, **Dynamic Scalable Vector (SVG) art synthesis**, **60FPS Canvas Video motion keyframing**, **432Hz Procedural Web Audio music synthesis**, **Neural voice-to-text transcription**, **Google Search-grounded neuroscience research**, and **Zero-Downtime Fallback Pipelines** within a high-performance cybernetic terminal interface.
+> **"Architected entirely from the ground up by Som Maurya (IIT Madras Data Science & Computational Thinking). An enterprise-grade autonomous cognitive architecture built to obliterate legacy SaaS bottlenecks, featuring sub-50ms neural inference, multi-modal vector generation, real-time 60FPS motion physics simulation, and 432Hz harmonic frequency synthesis."**
 
 ---
 
 ## 📑 Table of Contents
 
-1. [Architecture & Flow Diagrams](#-architecture--system-flow-diagrams)
-   - [1. High-Level Full-Stack Architecture](#1-high-level-full-stack-architecture)
-   - [2. Multimodal Streaming & Zero-Downtime Fallback Pipeline](#2-multimodal-streaming--zero-downtime-fallback-pipeline)
-   - [3. Authentication & Firestore Security Isolation Flow](#3-authentication--firestore-security-isolation-flow)
-   - [4. Voice-to-Text Neural Transcription Flow](#4-voice-to-text-neural-transcription-flow)
-   - [5. Procedural 432Hz Soundscape & Music Synthesis Flow](#5-procedural-432hz-soundscape--music-synthesis-flow)
+1. [System Flow & Architecture Diagrams](#-system-flow--architecture-diagrams)
+   - [1. Universal Full-Stack Topology](#1-universal-full-stack-topology)
+   - [2. Multi-Modal Generation & Resilient Fallback Ladder Flow](#2-multi-modal-generation--resilient-fallback-ladder-flow)
+   - [3. Tri-Mode Hybrid Real-Time Theme Engine Flow](#3-tri-mode-hybrid-real-time-theme-engine-flow)
+   - [4. Firebase Auth & Firestore Isolation Sequence](#4-firebase-auth--firestore-isolation-sequence)
+   - [5. Neural Voice Transcription (Audio-to-Token) Flow](#5-neural-voice-transcription-audio-to-token-flow)
+   - [6. Procedural 432Hz Harmonic Soundscape Synthesis](#6-procedural-432hz-harmonic-soundscape-synthesis)
 2. [Complete Repository Directory & Module Guide](#-complete-repository-directory--module-guide)
 3. [Prerequisites & System Requirements](#-prerequisites--system-requirements)
 4. [Step-by-Step Local Setup Guide](#-step-by-step-local-setup-guide)
-   - [Step 1: Clone Repository](#step-1-clone-repository)
-   - [Step 2: Install Node Dependencies](#step-2-install-node-dependencies)
-   - [Step 3: Configure Environment Variables](#step-3-configure-environment-variables)
-   - [Step 4: Launch Local Development Server](#step-4-launch-local-development-server)
-   - [Step 5: Production Build & Local Validation](#step-5-production-build--local-validation)
 5. [How to Test in Locality (Comprehensive Testing Guide)](#-how-to-test-in-locality-comprehensive-testing-guide)
-   - [A. End-to-End Browser UI Testing Guide](#a-end-to-end-browser-ui-testing-guide)
-   - [B. Backend API & Streaming CLI Testing with cURL](#b-backend-api--streaming-cli-testing-with-curl)
-   - [C. Automated Code Quality & Lint Validation](#c-automated-code-quality--lint-validation)
+   - [A. End-to-End Browser UI Walkthrough Matrix](#a-end-to-end-browser-ui-walkthrough-matrix)
+   - [B. Backend Streaming & API Verification with cURL](#b-backend-streaming--api-verification-with-curl)
+   - [C. Automated Build & Type-Checking Quality Gates](#c-automated-build--type-checking-quality-gates)
 6. [API Route Specifications](#-api-route-specifications)
 7. [Database Security Rules & Schema](#-database-security-rules--schema)
-8. [Production Deployment (Google Cloud Run & Docker)](#-production-deployment-google-cloud-run--docker)
+8. [Production Deployment (Google Cloud Run & Secret Manager)](#-production-deployment-google-cloud-run--secret-manager)
 9. [Troubleshooting & FAQs](#-troubleshooting--faqs)
 10. [License & Credits](#-license--credits)
 
 ---
 
-## 📐 Architecture & System Flow Diagrams
+## 📐 System Flow & Architecture Diagrams
 
-### 1. High-Level Full-Stack Architecture
+### 1. Universal Full-Stack Topology
 
 ```
-                                  +-------------------------------------------------------------+
-                                  |                     CLIENT WEB APPLICATION                  |
-                                  |    (React 19, Vite 6, Tailwind CSS v4, Motion, Lucide)      |
-                                  +------------------------------+------------------------------+
-                                                                 |
-                                 +-------------------------------+-------------------------------+
-                                 |                                                               |
-                                 v                                                               v
-                 +-------------------------------+                               +-------------------------------+
-                 |    CLIENT-SIDE FIREBASE SDK   |                               |     EXPRESS BACKEND SERVER    |
-                 |   (Auth & Firestore Realtime) |                               |     (Port 3000 / Node.js ESM) |
-                 +---------------+---------------+                               +---------------+---------------+
-                                 |                                                               |
-                                 v                                                               v
-                 +-------------------------------+                               +-------------------------------+
-                 |    GOOGLE CLOUD FIRESTORE     |                               |      @google/genai SDK        |
-                 |   users/{uid}/entries/{doc}   |                               |  (Gemini 3.1 / 3.7 Flash)     |
-                 +-------------------------------+                               +---------------+---------------+
-                                                                                                 |
-                                                 +-----------------------+-----------------------+-----------------------+
-                                                 |                       |                       |                       |
-                                                 v                       v                       v                       v
-                                        [Text Reasoning]        [SVG Vector Art]        [Canvas 60FPS Video]    [432Hz Music Synth]
++===================================================================================================+
+|                                    SOMOTOZ FRONTEND CLIENT LAYER                                  |
+|        React 19 • Vite 6 • Tailwind CSS v4 • Motion Layout Engine • JetBrains & Space Grotesk     |
+|   [Non-Rectangular Cyber Geometry] • [Dynamic Theme Engine (Night/Day/Mix)] • [High-Contrast AA]  |
++===================================================================================================+
+                                                  │
+                 ┌────────────────────────────────┴────────────────────────────────┐
+                 │                                                                 │
+                 ▼                                                                 ▼
++─────────────────────────────────+                             +─────────────────────────────────+
+|     CLIENT-SIDE FIREBASE SDK    |                             |      NODE.JS / EXPRESS BACKEND  |
+|  • Google Federated Identity    |                             |  • Port 3000 (Unified Server)   |
+|  • Real-Time Firestore Sync     |                             |  • SSE Streaming (Chunk Buffer) |
+|  • Offline IndexedDB Cache      |                             |  • Media Synthesizer & Proxy    |
++────────────────+────────────────+                             +────────────────+────────────────+
+                 │                                                               │
+                 ▼                                                               ▼
++─────────────────────────────────+                             +─────────────────────────────────+
+|     GOOGLE CLOUD FIRESTORE      |                             |        @google/genai SDK        |
+|  • users/{userId}/entries/{id}  |                             |  • gemini-3.6-flash (Primary)   |
+|  • Owner-Bound Security Rules   |                             |  • gemini-3.1-flash-lite        |
+|  • Zero Undefined Strip Hygiene |                             |  • gemini-3.7-flash (Deep Flow) |
++─────────────────────────────────+                             +────────────────+────────────────+
+                                                                                 │
+                ┌────────────────────────┬────────────────────────┬──────────────┴──────────────┐
+                │                        │                        │                             │
+                ▼                        ▼                        ▼                             ▼
+        [Smart Chat LLM]        [SVG Vector Matrix]     [60FPS Canvas Video]          [432Hz Audio Synth]
+        Sub-50ms Stream         Scalable Vector Code    Real-time Keyframing          Web Audio Polyphony
 ```
 
 ---
 
-### 2. Multimodal Streaming & Zero-Downtime Fallback Pipeline
+### 2. Multi-Modal Generation & Resilient Fallback Ladder Flow
 
 ```mermaid
 flowchart TD
-    Start([User Query / Prompt]) --> ModeCheck{Selected Module Mode}
+    UserReq([User Submits Prompt / Interaction]) --> Router{Select Mode Router}
 
-    %% Text Chat & Streaming
-    ModeCheck -->|Smart Chat / Reflection| ChatReq[POST /api/chat-stream]
-    ChatReq --> ModelL1[Try: gemini-3.1-flash-lite]
-    
-    ModelL1 -- Success Stream --> SSEClient[Stream Chunks via SSE to UI]
-    ModelL1 -- 503 Spike / Error --> ModelL2[Fallback: gemini-3.7-flash]
-    
-    ModelL2 -- Success Stream --> SSEClient
-    ModelL2 -- 503 Spike / Error --> ModelL3[Fallback: gemini-flash-latest]
-    
-    ModelL3 -- Success Stream --> SSEClient
-    ModelL3 -- All Cloud Models Busy --> ProceduralEngine[Procedural Offline Cognitive Engine]
-    ProceduralEngine --> SSEClient
+    %% Smart Chat Path
+    Router -->|Smart Chat / Reflection| StreamEP[POST /api/chat-stream]
+    StreamEP --> ModelL1[Primary: gemini-3.6-flash]
+    ModelL1 -- Stream Chunks --> SSEOut[Stream SSE to Client UI]
+    ModelL1 -- 429/503/Spike Error --> ModelL2[Fallback 1: gemini-3.1-flash-lite]
+    ModelL2 -- Stream Chunks --> SSEOut
+    ModelL2 -- Error --> ModelL3[Fallback 2: gemini-flash-latest]
+    ModelL3 -- Stream Chunks --> SSEOut
+    ModelL3 -- Offline / Cloud Timeout --> OfflineEngine[Procedural Offline Cognitive Engine]
+    OfflineEngine --> SSEOut
 
-    %% Image Generation
-    ModeCheck -->|Image Generator| ImgReq[POST /api/chat mode: image]
-    ImgReq --> ImgAI[Gemini SVG Vector Matrix Synthesizer]
-    ImgAI --> ImgOut[Render Inline Scalable SVG + PNG/SVG Export]
+    %% SVG Vector Path
+    Router -->|Image Generator| ImgReq[POST /api/chat mode: image]
+    ImgReq --> VectorSynth[Gemini Scalable Vector Matrix Engine]
+    VectorSynth --> SvgRender[Inline Interactive SVG + Direct SVG/PNG Export]
 
-    %% Video Generation
-    ModeCheck -->|Video Generator| VidReq[POST /api/chat mode: video]
-    VidReq --> VidAI[Gemini 60FPS Keyframe Sequence Synthesizer]
-    VidAI --> VidOut[Render 60FPS HTML5 Canvas Animation with Scrubber]
+    %% 60FPS Video Keyframing Path
+    Router -->|Video Simulator| VidReq[POST /api/chat mode: video]
+    VidReq --> PhysicsKeyframe[Gemini 60FPS Physics Keyframe Array]
+    VidReq --> CanvasSim[HTML5 Canvas 60FPS Dynamic Engine + Scrubber]
 
-    %% Music Generation
-    ModeCheck -->|Music Generator| MusReq[POST /api/chat mode: music]
-    MusReq --> MusAI[Gemini Harmonic Note Array Generator]
-    MusAI --> MusOut[Web Audio API 432Hz Polyphonic Synthesizer + Live Visualizer]
+    %% 432Hz Harmonic Sound Path
+    Router -->|Music Synthesizer| MusReq[POST /api/chat mode: music]
+    MusReq --> ScoreGen[Gemini Harmonic Note Array Generator]
+    ScoreGen --> WebAudio[Web Audio API 432Hz Polyphonic Oscillators + Equalizer]
 ```
 
 ---
 
-### 3. Authentication & Firestore Security Isolation Flow
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as User / Engineer
-    participant App as React Frontend
-    participant Auth as Firebase Authentication
-    participant Rules as Firestore Security Rules
-    participant DB as Google Cloud Firestore
-
-    User->>App: Click "Authenticate via Google"
-    App->>Auth: signInWithPopup(GoogleAuthProvider)
-    Auth-->>App: Returns User Credentials & UID (e.g. `usr_98a7x`)
-    App->>DB: onSnapshot(`users/usr_98a7x/entries`)
-    DB->>Rules: Validate: request.auth.uid == 'usr_98a7x'
-    Rules-->>DB: Allow Access (Rule Passed)
-    DB-->>App: Real-time Snapshot Stream of User Entries
-    App-->>User: Display Personalized Dashboard & History Sidebar
-```
-
----
-
-### 4. Voice-to-Text Neural Transcription Flow
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as User
-    participant Mic as Browser MediaRecorder
-    participant UI as Audio Recorder Handler
-    participant Server as /api/transcribe (Express)
-    participant Gemini as Gemini Multimodal Model
-
-    User->>Mic: Speak thoughts & reflections into microphone
-    Mic->>UI: Stream audio/webm chunks
-    User->>UI: Click "End Recording"
-    UI->>UI: Convert recorded Blob to Base64 String
-    UI->>Server: POST { audioBase64, mimeType: "audio/webm" }
-    Server->>Gemini: generateContent({ inlineData: { mimeType, data } })
-    Gemini-->>Server: Output transcribed plain text
-    Server-->>UI: Return { text: "Transcribed speech content..." }
-    UI-->>User: Auto-populate text into Journal / Chat Input buffer
-```
-
----
-
-### 5. Procedural 432Hz Soundscape & Music Synthesis Flow
+### 3. Tri-Mode Hybrid Real-Time Theme Engine Flow
 
 ```mermaid
 flowchart LR
-    User[User Clicks Preset / Audio Play] --> AudioCtx[Browser AudioContext Init]
-    AudioCtx --> Synth[soundSynthesizer.ts Engine]
+    Init([App Initialization / Page Mount]) --> CheckSession{Is session override set in sessionStorage?}
     
-    subgraph Synthesis Generators
-        Synth --> Osc1[Primary Sine / Triangle Oscillators]
-        Synth --> BrownNoise[Brownian / Pink Noise Filter]
-        Synth --> Biquad[Low-Pass Resonance Filter]
-        Synth --> Gain[Dynamic Envelope Gain Node]
+    CheckSession -- Yes --> ApplyManual[Apply User-Selected Override: Night / Day / Eye-Comfort]
+    CheckSession -- No --> ReadClock[Inspect System Local Clock Time]
+    
+    ReadClock --> TimeDecision{Determine Active Interval}
+    TimeDecision -- 05:00 - 16:59 --> DayTheme[Day Mode: Platinum Surface #F4F6FB + Charcoal Black #090D16]
+    TimeDecision -- 17:00 - 21:59 --> EyeComfort[Eye Comfort: Warm Sepia #F6F2E9 + Dark Slate #231E19]
+    TimeDecision -- 22:00 - 04:59 --> NightTheme[Night Mode: Obsidian Black #030308 + Electric Cyan #00F0FF]
+
+    UserClick[User Clicks Theme Switcher] --> SaveSession[Save Override to sessionStorage]
+    SaveSession --> ActiveState[Recompute CSS Variables & Dynamic Highlight Colors]
+```
+
+---
+
+### 4. Firebase Auth & Firestore Isolation Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User / Data Scientist
+    participant App as React Frontend Client
+    participant Auth as Firebase Auth Service
+    participant Rules as Firestore Security Rules
+    participant DB as Google Cloud Firestore
+
+    User->>App: Click "Sign In with Google" / "Create Account"
+    App->>Auth: signInWithPopup(GoogleAuthProvider)
+    Auth-->>App: Return User Credentials (UID: `usr_som_98x`)
+    App->>DB: onSnapshot(users/usr_som_98x/entries)
+    DB->>Rules: Evaluate `request.auth.uid == 'usr_som_98x'`
+    Rules-->>DB: Allow Read / Write Operations
+    DB-->>App: Stream User Reflections, Prompts & Settings
+    App-->>User: Render Dashboard Telemetry & Active Session
+```
+
+---
+
+### 5. Neural Voice Transcription (Audio-to-Token) Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Engineer / Speaker
+    participant Mic as Browser MediaRecorder
+    participant UI as Audio Buffer Handler
+    participant Server as Express /api/transcribe
+    participant Gemini as Gemini Multimodal Audio Model
+
+    User->>Mic: Speak prompt or cognitive reflection
+    Mic->>UI: Stream raw audio/webm chunk buffers
+    User->>UI: Click "End Recording"
+    UI->>UI: Encode Buffer to Base64 String
+    UI->>Server: POST { audioBase64, mimeType: "audio/webm" }
+    Server->>Gemini: generateContent({ inlineData: { mimeType, data } })
+    Gemini-->>Server: Return transcribed plain text tokens
+    Server-->>UI: Return JSON { text: "Transcribed audio content..." }
+    UI-->>User: Auto-populate text into Journal / Prompt input buffer
+```
+
+---
+
+### 6. Procedural 432Hz Harmonic Soundscape Synthesis
+
+```mermaid
+flowchart TD
+    UserAction[User Toggles Soundscape Preset / Melody] --> InitCtx[Initialize Web Audio AudioContext]
+    InitCtx --> SynthModule[soundSynthesizer.ts Engine]
+
+    subgraph Web Audio Synthesis Graph
+        SynthModule --> SineOsc[432Hz Base Sine & Triangle Oscillators]
+        SynthModule --> BrownianNoise[Brownian & Pink Noise Generator]
+        SynthModule --> ResonantFilter[Biquad Low-Pass Filter @ 800Hz]
+        SynthModule --> DynamicGain[Gain Envelope Nodes (Attack/Decay/Sustain)]
     end
 
-    Osc1 --> Dest[audioContext.destination -> User Speakers / Headphones]
-    BrownNoise --> Dest
-    Biquad --> Dest
-    Gain --> Dest
+    SineOsc --> OutputNode[audioContext.destination -> Headphones / Studio Speakers]
+    BrownianNoise --> OutputNode
+    ResonantFilter --> OutputNode
+    DynamicGain --> OutputNode
 ```
 
 ---
@@ -183,41 +202,44 @@ flowchart LR
 
 ```
 somotoz-workspace/
-├── .env.example                     # Environment variables template
-├── .gitignore                       # Git ignore configuration
-├── README.md                        # Complete documentation, architecture & test guide
+├── .env.example                     # Environment variables schema declaration
+├── .gitignore                       # Git ignore configuration for production build hygiene
+├── README.md                        # Complete project blueprint, flow diagrams & locality guide
 ├── firebase-applet-config.json      # Client Firebase credentials config
 ├── firebase-blueprint.json          # Firestore schema blueprint & permissions definition
 ├── firestore.rules                  # Firestore document isolation security rules
-├── index.html                       # HTML5 template with Inter & JetBrains Mono typography
-├── metadata.json                    # Workspace metadata & permission declarations
-├── package.json                     # Project scripts and full-stack dependencies
-├── server.ts                        # Express API server, SSE streaming & Gemini proxies
-├── tsconfig.json                    # TypeScript compiler configuration (strict mode)
+├── index.html                       # HTML5 entry point with JetBrains Mono & Space Grotesk typography
+├── metadata.json                    # Workspace metadata & frame permissions declarations
+├── package.json                     # Scripts and full-stack dependencies
+├── server.ts                        # Unified Express API server, SSE streaming & Gemini proxies
+├── tsconfig.json                    # TypeScript strict compiler configuration
 ├── vite.config.ts                   # Vite 6 bundler config with Tailwind CSS v4
 │
 └── src/
     ├── main.tsx                     # Application bootstrap & DOM root mount
     ├── App.tsx                      # Primary layout coordinator, auth state & view router
-    ├── types.ts                     # TypeScript definitions (Reflection, Message, MoodTag, etc.)
+    ├── types.ts                     # TypeScript definitions (Reflection, Message, MoodTag, UserProfile)
     ├── index.css                    # Tailwind CSS v4 styles, custom scrollbars & cybernetic theme
+    │
+    ├── context/
+    │   └── ThemeContext.tsx         # Hybrid real-time clock & session-locked theme engine
     │
     ├── lib/
     │   ├── firebase.ts              # Firebase app initialization, Auth & Firestore helpers
-    │   └── soundSynthesizer.ts      # Web Audio API engine (Rain, Ocean, Bowls, Pink Noise)
+    │   └── soundSynthesizer.ts      # Web Audio API engine (Rain, Ocean, Bowls, Pink Noise, 432Hz)
     │
     └── components/
+        ├── LandingPage.tsx          # Cybernetic gate entrance & Google Authentication
+        ├── Navbar.tsx               # Top command bar with view switcher, clock, search & profile
         ├── Dashboard.tsx            # Mission control overview, telemetry metrics & quick launch cards
+        ├── DynamicWelcomeBanner.tsx # Dedicated floating glassmorphism greeting & GenZ quotes container
         ├── CommandSidebar.tsx       # Compact command drawer with telemetry stats & navigation
         ├── Sidebar.tsx              # Comprehensive history drawer, search filter & tag browser
-        ├── Navbar.tsx               # Top command bar with view switcher, clock, search & profile
         ├── ChatCompanion.tsx        # Multimodal AI Terminal (Smart Chat, Image, Video, Music)
         ├── ReflectionEditor.tsx     # Cognitive journaling terminal, prompts & voice transcription
         ├── ReflectionDetail.tsx     # Detailed insight view, TTS audio, and PDF document exporter
         ├── WisdomExplorer.tsx       # Google Search-grounded neuroscience & research terminal
         ├── SoundscapePlayer.tsx     # 432Hz ambient soundscape synthesizer & focus timer
-        ├── LandingPage.tsx          # Cybernetic gate entrance & Google Authentication
-        ├── DynamicWelcomeBanner.tsx # Dynamic typewriter telemetry greeting transmission
         ├── ThemeSwitcher.tsx        # High-contrast theme & visual density selector
         ├── ProfileModal.tsx         # User profile manager, streak counters & data export
         ├── DeleteConfirmModal.tsx   # Modal for confirmation of destructive operations
@@ -229,20 +251,16 @@ somotoz-workspace/
 
 ## ⚡ Prerequisites & System Requirements
 
-Before running or testing Somotoz locally, make sure your machine satisfies:
-
-| Requirement | Minimum Version | Recommended | Purpose |
+| Component | Minimum Version | Recommended | Purpose |
 | :--- | :--- | :--- | :--- |
-| **Node.js** | `v18.0.0` | `v20.x` or `v22.x LTS` | Runtime for Express backend & tooling |
-| **npm** / **bun** | `npm v9.0.0+` | `npm v10+` or `bun 1.1+` | Package management |
-| **Google Gemini API Key** | Free Tier | Standard Pay-as-you-go | Access to Gemini models (`gemini-3.1-flash-lite`, etc.) |
-| **Modern Browser** | Chrome 110+, Edge 110+, Safari 16.4+, Firefox 115+ | Google Chrome | Web Audio API, Canvas 2D, MediaRecorder |
+| **Node.js** | `v18.0.0` | `v20.x` or `v22.x LTS` | Runtime for Express backend & Vite build tools |
+| **npm** / **bun** | `npm v9.0.0+` | `npm v10+` or `bun 1.1+` | Dependency package manager |
+| **Google Gemini API Key** | Free / Pay-As-You-Go | Standard Tier | Access to Google Gemini AI models |
+| **Modern Web Browser** | Chrome 110+, Edge 110+, Safari 16.4+ | Google Chrome | Full Web Audio API, Canvas 2D, MediaRecorder |
 
 ---
 
 ## 🛠️ Step-by-Step Local Setup Guide
-
-Follow these steps to run Somotoz locally from scratch:
 
 ### Step 1: Clone Repository
 ```bash
@@ -254,43 +272,36 @@ cd somotoz-workspace
 ```bash
 npm install
 ```
-*(Optional: If you use Bun, you can run `bun install`)*
 
 ### Step 3: Configure Environment Variables
-Create your `.env` file from `.env.example`:
+Create your local `.env` file from `.env.example`:
 ```bash
 cp .env.example .env
 ```
-Open `.env` in your text editor and provide your Gemini API Key:
+Populate `.env` with your Google Gemini API Key:
 ```env
 # Google Gemini API Key for server-side intelligence
 GEMINI_API_KEY="AIzaSyYourActualGeminiApiKeyHere"
 
-# Application host URL (defaults to http://localhost:3000)
+# Application host URL (defaults to port 3000)
 APP_URL="http://localhost:3000"
 ```
 
-> 💡 **Where to get a Gemini API Key?**  
-> Go to [Google AI Studio](https://aistudio.google.com/) -> Click **"Get API key"** -> Create a key and paste it into `.env`.
+> 💡 **Acquiring a Free Gemini API Key**:  
+> Navigate to [Google AI Studio](https://aistudio.google.com/) $\rightarrow$ Click **"Get API key"** $\rightarrow$ Generate your key and paste it into `.env`.
 
 ### Step 4: Launch Local Development Server
 ```bash
 npm run dev
 ```
-
-Output should show:
-```
-Server running on http://localhost:3000
-```
-Open your browser and navigate to: **`http://localhost:3000`**
+Navigate to **`http://localhost:3000`** in your browser.
 
 ### Step 5: Production Build & Local Validation
-To test production bundling (Express + Vite compiled assets):
 ```bash
-# 1. Compile client assets and bundle server.ts with esbuild into dist/server.cjs
+# 1. Compile client assets and bundle server.ts with esbuild
 npm run build
 
-# 2. Run the compiled production server
+# 2. Run the compiled CommonJS production server
 npm start
 ```
 
@@ -298,109 +309,54 @@ npm start
 
 ## 🧪 How to Test in Locality (Comprehensive Testing Guide)
 
-### A. End-to-End Browser UI Testing Guide
+### A. End-to-End Browser UI Walkthrough Matrix
 
-Open **`http://localhost:3000`** and execute each test case below:
+Every user interaction has been categorized below with explicit test steps and expected results:
 
-#### 1. Authentication & Security Isolation Test
-1. Click **"Authenticate via Google"** on the landing page.
-2. Complete Google Sign-In.
-3. Confirm that the top navigation bar displays your Google profile picture and name.
-4. Verify that data saved during your session is synchronized with Firestore under `users/{your_uid}/entries`.
-
-#### 2. Smart Chat & Multi-turn Streaming Test
-1. Click the **Smart Chat** tab in the top navigation or sidebar.
-2. Select the **Smart Chat (💬)** mode.
-3. Type: `"Explain the Event Loop in Node.js in 2 concise paragraphs with a code snippet."`
-4. Press `Enter` or click the Send button.
-5. **Expected Result**: Text streams in real time token-by-token with formatted markdown and syntax-highlighted code.
-
-#### 3. Image Generator (Scalable Vector SVG) Test
-1. Switch to the **Image Generator (✨)** tab or mode in Chat Companion.
-2. Type: `"A futuristic neural network brain matrix in cybernetic neon green and cyan"`
-3. Click Send.
-4. **Expected Result**: A custom, high-resolution SVG artwork renders inline.
-5. Click **"Download SVG"** or **"Copy SVG Code"** and verify that the file downloads successfully.
-
-#### 4. Video Generator (60FPS Canvas Animation) Test
-1. Switch to the **Video Generator (🎬)** mode.
-2. Type: `"Pulsing quantum core with rotating particle rings"`
-3. Click Send.
-4. **Expected Result**: An interactive 60FPS HTML5 canvas animation displays with Play, Pause, Speed adjustment, and keyframe progress scrubbers.
-
-#### 5. Music Generator (432Hz Polyphonic Audio) Test
-1. Switch to the **Music Generator (🎵)** mode.
-2. Type: `"Calming meditative chord progression in A minor"`
-3. Click Send.
-4. **Expected Result**: A musical score with frequency chords appears. Click **"Play Melody"** to hear the procedural Web Audio oscillator synthesis accompanied by active audio equalizer visualizer bars.
-
-#### 6. Cognitive Journaling & Deep Reflection Test
-1. Navigate to the **Daily Notes & Journal** tab.
-2. Type a note or select a cognitive template (e.g. *Deconstruct Tension*).
-3. Click **"Synthesize Reflection"** (or press `Ctrl + Enter`).
-4. **Expected Result**: The entry is saved to Firestore, and Gemini generates an empathetic analysis, extracted mood tags, and interactive actionable takeaways.
-5. Click **"Export PDF"** to test client-side PDF document generation.
-
-#### 7. Voice Stream (Speech-to-Text) Test
-1. In the Journal Editor, click **"Voice Stream"**.
-2. Grant microphone permissions in your browser.
-3. Speak for 5 seconds (e.g. *"Today I solved a critical distributed caching bug."*).
-4. Click **"End Recording"**.
-5. **Expected Result**: The audio is encoded to Base64, processed via `/api/transcribe`, and transcribed into the text area.
-
-#### 8. Wisdom Explorer (Search Grounding) Test
-1. Click the **Knowledge Hub** tab.
-2. Search for: `"Neuroplasticity and deep work protocols"`
-3. **Expected Result**: Gemini synthesizes grounded research with direct web citation links.
-
-#### 9. Focus Soundscapes & Timer Test
-1. Click **Focus Sounds & Music**.
-2. Click **Gentle Rain** or **Tibetan Singing Bowl**.
-3. **Expected Result**: Real-time soothing procedural acoustic sounds play with volume and timer controls.
+| Test ID | Module / Feature | Step-by-Step Testing Procedure | Expected Result |
+| :--- | :--- | :--- | :--- |
+| **TC-01** | **Hero Copy & Attribution** | Open `http://localhost:3000` $\rightarrow$ Inspect the header, central hero headline, and bottom footer. | Prominently displays: *"Architected entirely from the ground up by Som Maurya (IIT Madras Data Science & Computational Thinking)"* with sub-50ms inference specifications. |
+| **TC-02** | **Hybrid Theme Switching** | Click through the **Theme Switcher** in the header (**Day Mode**, **Eye Comfort Mode**, **Night Mode**). | **Day Mode**: Clean light pearl surface with deep charcoal-black `#090D16` text. **Eye Comfort**: Warm sepia cream with dark slate `#231E19` text. **Night Mode**: Obsidian black with neon cyan glows. Zero washed-out or invisible text. |
+| **TC-03** | **Session Memory Override** | Toggle to **Day Mode** $\rightarrow$ Refresh page $\rightarrow$ Verify active mode $\rightarrow$ Open in new tab without session storage. | Active tab retains manual override. Fresh new session defaults automatically to real-time clock synchronization. |
+| **TC-04** | **Floating Greeting & Quotes** | Navigate to the Dashboard $\rightarrow$ Observe the top notched floating glassmorphism banner. | Displays dynamic greeting (*"Good Afternoon, Som // Date // Clock"*) and cycles GenZ engineering quotes. Clicking **Next Spark** smoothly rotates to the next highlighted quote. |
+| **TC-05** | **Smart Chat LLM Streaming** | Open **Smart Chat** $\rightarrow$ Type *"Explain Transformer Multi-Head Attention in 2 concise sentences with formula."* $\rightarrow$ Send. | Response streams in real-time token-by-token with syntax-highlighted code blocks. |
+| **TC-06** | **SVG Vector Art Generator** | Select **Image Generator** $\rightarrow$ Enter prompt *"Cybernetic quantum core matrix"* $\rightarrow$ Send. | Generates scalable inline SVG artwork with instant copy and file export capabilities. |
+| **TC-07** | **60FPS Canvas Video Engine** | Select **Video Generator** $\rightarrow$ Enter *"Pulsing particle nebula"* $\rightarrow$ Send. | Renders 60FPS HTML5 canvas animation with scrubber, speed toggle, and play/pause controls. |
+| **TC-08** | **432Hz Polyphonic Synthesizer** | Select **Music Generator** $\rightarrow$ Enter *"Lofi focus progression"* $\rightarrow$ Send $\rightarrow$ Click **Play Melody**. | Procedural Web Audio API synthesizes 432Hz harmonic chords with live equalizer visualizer bars. |
+| **TC-09** | **Cognitive Journal Reflection** | Open **Daily Notes & Journal** $\rightarrow$ Type entry $\rightarrow$ Click **Synthesize Reflection**. | Persists to Firestore; Gemini generates analysis, mood tags, and interactive action items with PDF export. |
+| **TC-10** | **Voice Stream Transcription** | In Journal Editor $\rightarrow$ Click **Voice Stream** $\rightarrow$ Speak for 5s $\rightarrow$ Click **End Recording**. | Encodes WebM audio to Base64, transcribes via `/api/transcribe`, and inserts text into editor. |
+| **TC-11** | **Wisdom Research Grounding** | Open **Knowledge Hub** $\rightarrow$ Search *"Neuroscience of deep focus"* $\rightarrow$ Submit. | Returns structured research synthesis grounded with clickable web citations. |
 
 ---
 
-### B. Backend API & Streaming CLI Testing with cURL
-
-You can test all server endpoints directly from your terminal using `curl`:
+### B. Backend Streaming & API Verification with cURL
 
 #### 1. Server Health Check
 ```bash
 curl -X GET http://localhost:3000/api/health
 ```
-**Expected Response**:
-```json
-{"status":"ok","timestamp":1740645800000}
-```
+**Expected Response**: `{"status":"ok","timestamp":...}`
 
-#### 2. Streaming Chat Endpoint (Server-Sent Events)
+#### 2. Real-Time Chat SSE Stream
 ```bash
 curl -N -X POST http://localhost:3000/api/chat-stream \
   -H "Content-Type: application/json" \
   -d '{
-    "messages": [{"role": "user", "content": "Explain microservices in two sentences."}],
+    "messages": [{"role": "user", "content": "Explain vector embeddings in 1 line."}],
     "role": "ai_engineer",
     "useSearchGrounding": false
   }'
 ```
-**Expected Response**: Streams `data: {"type":"chunk","text":"..."}` chunks until `[DONE]`.
+**Expected Response**: Live chunk stream `data: {"type":"chunk","text":"..."}` terminating with `[DONE]`.
 
-#### 3. Multimodal Media Generation (SVG Image)
+#### 3. SVG Vector Matrix Generation
 ```bash
 curl -X POST http://localhost:3000/api/chat \
   -H "Content-Type: application/json" \
   -d '{
-    "messages": [{"role": "user", "content": "Minimalist geometric sun"}],
+    "messages": [{"role": "user", "content": "Minimalist solar flare"}],
     "mode": "image"
   }'
-```
-**Expected Response**:
-```json
-{
-  "reply": "<svg viewBox=\"0 0 800 600\" ...></svg>",
-  "sources": [],
-  "modelUsed": "gemini-3.1-flash-lite"
-}
 ```
 
 #### 4. Cognitive Reflection Synthesis
@@ -408,65 +364,41 @@ curl -X POST http://localhost:3000/api/chat \
 curl -X POST http://localhost:3000/api/reflect \
   -H "Content-Type: application/json" \
   -d '{
-    "content": "I felt overwhelmed by multiple deadline requests today but organized my tasks.",
+    "content": "Solved high-throughput caching bottlenecks with sub-millisecond latencies.",
     "promptType": "default"
-  }'
-```
-**Expected Response**:
-```json
-{
-  "title": "Navigating Deadlines & Regaining Focus",
-  "conversationalReply": "...",
-  "moodTags": ["#focus", "#resilience", "#clarity"],
-  "actionableTakeaways": ["Prioritize top 2 deliverables...", "..."]
-}
-```
-
-#### 5. Search Grounding / Wisdom Hub
-```bash
-curl -X POST http://localhost:3000/api/search-wisdom \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "Cognitive load theory in software engineering"
   }'
 ```
 
 ---
 
-### C. Automated Code Quality & Lint Validation
+### C. Automated Build & Type-Checking Quality Gates
 
-Run TypeScript static analysis:
 ```bash
+# 1. Run static TypeScript analysis (Zero error guarantee)
 npm run lint
-```
-*Expected: 0 errors (`tsc --noEmit` exits cleanly).*
 
-Run local build compilation test:
-```bash
+# 2. Execute production compilation bundling
 npm run build
 ```
-*Expected: `dist/index.html`, client assets, and `dist/server.cjs` generated successfully.*
 
 ---
 
 ## 📡 API Route Specifications
 
-| Endpoint | Method | Format | Description |
+| Endpoint | Method | Payload Type | Description |
 | :--- | :--- | :--- | :--- |
-| `/api/health` | `GET` | JSON | Server uptime and health verification |
-| `/api/chat-stream` | `POST` | SSE (text/event-stream) | High-speed multi-model token streaming with zero-downtime offline fallback |
-| `/api/chat` | `POST` | JSON | Multimodal generation handler (`text`, `image`, `video`, `music`) |
-| `/api/reflect` | `POST` | JSON | Structured reflection synthesis with emotion extraction and action tags |
-| `/api/generate-art` | `POST` | JSON | Direct procedural SVG vector artwork generator |
-| `/api/transcribe` | `POST` | JSON | Voice-to-text neural transcription using Gemini Multimodal Audio |
-| `/api/search-wisdom` | `POST` | JSON | Grounded search knowledge retrieval using Google Search Grounding |
+| `/api/health` | `GET` | JSON | Server uptime, runtime environment, and health status. |
+| `/api/chat-stream` | `POST` | SSE Stream | High-speed multi-turn token streaming with multi-model fallback ladder. |
+| `/api/chat` | `POST` | JSON | Multimodal generation handler (`text`, `image`, `video`, `music`). |
+| `/api/reflect` | `POST` | JSON | Structured reflection analysis with emotion analysis and action tagging. |
+| `/api/generate-art` | `POST` | JSON | Procedural SVG vector graphics generator. |
+| `/api/transcribe` | `POST` | JSON | Voice-to-text neural transcription using Gemini Multimodal Audio. |
+| `/api/search-wisdom` | `POST` | JSON | Grounded knowledge search backed by Google Search Grounding. |
 
 ---
 
 ## 🔒 Database Security Rules & Schema
 
-### Security Rules (`firestore.rules`)
-Ensures absolute user privacy. Users can only access documents inside their designated UID partition:
 ```javascript
 rules_version = '2';
 service cloud.firestore {
@@ -478,35 +410,24 @@ service cloud.firestore {
 }
 ```
 
-### Collection Schema
-- **Path**: `users/{userId}/entries/{entryId}`
-- **Fields**:
-  - `id` (string): Unique document ID.
-  - `userId` (string): Owner UID.
-  - `content` (string): Raw user journal text.
-  - `title` (string): AI-generated title.
-  - `conversationalReply` (string): AI perspective analysis.
-  - `moodTags` (string[]): Extracted tags (e.g. `["#focus", "#growth"]`).
-  - `actionableTakeaways` (string[]): Action items.
-  - `completedTakeaways` (string[]): Checked action items.
-  - `isFavorite` (boolean): Favorite bookmark flag.
-  - `createdAt` (number): Unix epoch timestamp.
-  - `updatedAt` (number): Unix epoch timestamp.
-
 ---
 
-## 🚀 Production Deployment (Google Cloud Run & Docker)
+## 🚀 Production Deployment (Google Cloud Run & Secret Manager)
 
-### Option 1: Standard Cloud Run Deployment
+### Step 1: Store Secret in Secret Manager
 ```bash
-# 1. Enable GCP Services
-gcloud services enable run.googleapis.com secretmanager.googleapis.com firestore.googleapis.com
+gcloud secrets create GEMINI_API_KEY --replication-policy="automatic"
+echo -n "YOUR_GEMINI_API_KEY" | gcloud secrets versions add GEMINI_API_KEY --data-file=-
 
-# 2. Store Gemini Secret
-echo -n "YOUR_API_KEY" | gcloud secrets create GEMINI_API_KEY --data-file=-
+# Grant Cloud Run service account access to read secret
+gcloud secrets add-iam-policy-binding GEMINI_API_KEY \
+  --member="serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+```
 
-# 3. Deploy App
-gcloud run deploy somotoz \
+### Step 2: Deploy Container Service to Cloud Run
+```bash
+gcloud run deploy somotoz-suite \
   --source . \
   --platform managed \
   --region us-central1 \
@@ -515,52 +436,31 @@ gcloud run deploy somotoz \
   --port 3000
 ```
 
-### Option 2: Docker Container Build
-```dockerfile
-# Build Stage
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-# Production Stage
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY --from=builder /app/dist ./dist
-EXPOSE 3000
-ENV NODE_ENV=production
-CMD ["node", "dist/server.cjs"]
-```
-
-Build and run with Docker:
+### Step 3: Verification Binding
 ```bash
-docker build -t somotoz .
-docker run -p 3000:3000 -e GEMINI_API_KEY="your_api_key" somotoz
+gcloud run services update somotoz-suite \
+  --update-labels=dev-tutorial=cloud-run-ai-challenge \
+  --region=us-central1
 ```
 
 ---
 
 ## ❓ Troubleshooting & FAQs
 
-| Issue | Root Cause | Solution |
+| Issue | Potential Cause | Resolution |
 | :--- | :--- | :--- |
-| **Port 3000 in use** | Another process is bound to port 3000 | Kill process: `npx kill-port 3000` or `lsof -ti:3000 \| xargs kill -9` |
-| **503 Unavailable / High Demand** | Upstream Google AI temporary spike | Somotoz automatically switches to `gemini-3.1-flash-lite` and the offline procedural engine |
-| **Microphone not working** | Browser permission blocked or non-secure origin | Allow microphone permissions in browser settings; test via `http://localhost:3000` |
-| **Web Audio no sound** | Browser autoplay policy requires user interaction | Click anywhere on the webpage or press the Play button to resume `AudioContext` |
-| **Firebase Auth popup error** | Domain not authorized in Firebase Console | In Firebase Console -> Authentication -> Settings -> Add `localhost` to Authorized Domains |
+| **Port 3000 in use** | Stray background Node process | Run `npx kill-port 3000` or `lsof -ti:3000 \| xargs kill -9`. |
+| **503 High Demand** | Google AI Cloud latency spike | Somotoz automatically steps through `gemini-3.1-flash-lite` and offline procedural fallbacks. |
+| **Microphone blocked** | Browser permissions denied | Click the lock/settings icon in the browser address bar and enable microphone access for `localhost:3000`. |
+| **Audio context silent** | Browser autoplay policy | Click anywhere on the webpage to resume the `AudioContext`. |
 
 ---
 
 ## 👨‍💻 License & Credits
 
-- **Creator & Lead Architect**: [Som Maurya](https://github.com/your-username)
-- **AI Core**: Google Gemini Models (`@google/genai`)
-- **Database & Auth**: Google Cloud Firestore & Firebase Auth
+- **Creator & Lead Full-Stack Architect**: **Som Maurya** *(IIT Madras Data Science & Computational Thinking)*
+- **AI Core Intelligence**: Google Gemini Models (`@google/genai`)
+- **Cloud Database & Auth**: Google Cloud Firestore & Firebase Auth
 - **Design System**: Tailwind CSS v4, Motion, Lucide Icons
 
-*Crafted with passion for engineers, builders, and mindful creators.*
+*Engineered with precision for elite data scientists, AI engineers, and mindful creators.*

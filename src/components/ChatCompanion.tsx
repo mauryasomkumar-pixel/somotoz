@@ -29,7 +29,9 @@ import {
   Video,
   Code,
   Languages,
-  ArrowDown
+  ArrowDown,
+  Eye,
+  BookOpen
 } from 'lucide-react';
 import { ChatMessage, ChatRole, GenerationMode, ChatMediaData, JournalEntry } from '../types';
 import { EmojiPicker } from './EmojiPicker';
@@ -199,8 +201,8 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
       id: 'welcome',
       role: 'model',
       content: initialReflection
-        ? `⚡ **Somotoz AI Suite Initialized**.\n\nLoaded note context: **"${initialReflection.title}"**.\n\nYou can ask any question, or select dedicated modules above (**Smart Chat**, **Image Generator**, **Video Generator**, **Music Generator**) to generate media and insights with sub-second streaming!`
-        : `⚡ **Welcome to Somotoz AI Suite**.\n\nI am your intelligent companion. Navigate our dedicated modules using the tabs above or the quick switcher buttons below:\n\n• **💬 Smart Chat**: Multi-turn reasoning, architecture, coding & conversation in English, Hindi, or Hinglish\n• **✨ Image Generator**: Scalable vector SVG matrix artwork synthesis\n• **🎬 Video Generator**: 60FPS motion keyframe sequences & storyboard rendering\n• **🎵 Music Generator**: 432Hz procedural harmonic synthesis & melodic composition\n\nClick any module tab, use the quick switcher buttons in the input bar, or type your prompt below!`,
+        ? `⚡ **Somotoz Master AI Core Initialized**.\n\nLoaded note context: **"${initialReflection.title}"**.\n\nI am ready to execute all multimodal tasks end-to-end with strict adherence to your instructions.`
+        : `⚡ **Welcome to Somotoz AI Suite**.\n\nI am your Master AI Core and autonomous intelligence engine. I execute all user requests end-to-end with zero manual intervention required:\n\n• **📸 Real-World Photography & Imagination**: Hyper-realistic 1K cinematic visual synthesis with true-to-life lighting and textures.\n• **📖 Accessible Reading Mode**: Clean bullet points, short paragraphs, and simple language for effortless dyslexia-friendly reading.\n• **🏷️ Brand Watermark**: Minimalist "Somotoz" watermark embedded across all generated media outputs.\n• **⚡ Multimodal Execution**: Seamless Smart Chat reasoning, 60FPS Video motion sequences, and 432Hz harmonic Music synthesis.\n\nEnter any prompt or command below to begin!`,
       timestamp: Date.now(),
       mode: 'text',
     },
@@ -208,6 +210,24 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
 
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [accessibleReadingMode, setAccessibleReadingMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('somotoz_accessible_mode') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleAccessibleMode = useCallback(() => {
+    setAccessibleReadingMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('somotoz_accessible_mode', String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
   const [activeStreamingText, setActiveStreamingText] = useState<string>('');
   const [activeStreamingId, setActiveStreamingId] = useState<string | null>(null);
   const [useSearchGrounding, setUseSearchGrounding] = useState(false);
@@ -536,6 +556,8 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
         activeLanguageStyle={activeLanguageStyle}
         useSearchGrounding={useSearchGrounding}
         onToggleGrounding={() => setUseSearchGrounding(!useSearchGrounding)}
+        accessibleReadingMode={accessibleReadingMode}
+        onToggleAccessibleMode={toggleAccessibleMode}
         onExportFullSession={handleExportFullSession}
         onReset={handleReset}
         onSelectMode={(m) => setSelectedMode(m)}
@@ -543,11 +565,11 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
         onSelectRole={(r) => setSelectedRole(r)}
       />
 
-      {/* Messages Scroll Area */}
+      {/* Messages Scroll Area with Glassmorphism and Corner Chamfers */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 bg-[#0A0A0A] border border-[#262626] shadow-[4px_4px_0px_0px_#141414] p-3 sm:p-4 overflow-y-auto space-y-4 font-sans relative"
+        className="flex-1 bg-gradient-to-b from-[#0A0A16] to-[#04040A] border border-[#2D2D45] clip-cyber-card shadow-[0_0_30px_rgba(0,240,255,0.06)] p-3 sm:p-5 overflow-y-auto space-y-4 font-sans relative"
       >
         {messages.map((msg, index) => {
           let priorPrompt = '';
@@ -562,6 +584,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
               message={msg}
               isSpeaking={speakingMsgId === msg.id}
               isPdfExplicitlyRequested={isPdfExplicitlyRequested}
+              accessibleReadingMode={accessibleReadingMode}
               onToggleSpeak={handleToggleSpeak}
               onExportSingleMessage={handleExportSingleMessage}
               onSaveToJournal={onSaveToJournal}
@@ -572,34 +595,34 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
         {/* ACTIVE STREAMING ASSISTANT BUBBLE (Instant Visual Feedback) */}
         {isLoading && (
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 shrink-0 bg-black border border-[#00FF41] text-[#00FF41] flex items-center justify-center shadow-[2px_2px_0px_0px_#00FF41]">
-              <Bot className="w-4 h-4 text-[#00FF41] animate-spin" />
+            <div className="w-9 h-9 shrink-0 bg-black/80 border border-[#00F0FF] text-[#00F0FF] flex items-center justify-center clip-badge-poly shadow-[0_0_15px_rgba(0,240,255,0.4)]">
+              <Bot className="w-4 h-4 text-[#00F0FF] animate-spin" />
             </div>
 
-            <div className="max-w-[92%] sm:max-w-[82%] p-3.5 sm:p-4 bg-black border border-[#00FF41] text-[#EDEDED] shadow-[3px_3px_0px_0px_#00FF41] space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-mono text-[#00FF41] border-b border-[#1A1A1A] pb-1.5">
+            <div className="max-w-[92%] sm:max-w-[82%] p-4 bg-gradient-to-br from-[#0F0F22] to-[#060610] border border-[#00F0FF]/80 text-[#EDEDED] clip-cyber-card shadow-[0_0_20px_rgba(0,240,255,0.15)] space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-mono text-[#00F0FF] border-b border-[#252540] pb-1.5">
                 <span className="flex items-center gap-1.5 font-bold">
-                  <Zap className="w-3.5 h-3.5 animate-pulse text-[#00FF41]" />
+                  <Zap className="w-3.5 h-3.5 animate-pulse text-[#00F0FF]" />
                   STREAMING REAL-TIME RESPONSE
                 </span>
-                <span className="text-[#737373] uppercase">{selectedMode} MODE</span>
+                <span className="text-[#A1A1AA] uppercase px-1.5 py-0.2 bg-black/60 border border-[#2D2D45] clip-badge-poly text-[9px]">{selectedMode} MODE</span>
               </div>
 
-              <div className="text-[#EDEDED] whitespace-pre-wrap leading-relaxed min-h-[24px]">
+              <div className={`text-[#EDEDED] whitespace-pre-wrap ${accessibleReadingMode ? 'leading-loose tracking-wide text-[15px]' : 'leading-relaxed'} min-h-[24px]`}>
                 {activeStreamingText || (
-                  <span className="text-[#737373] italic font-mono flex items-center gap-1.5">
-                    <span className="w-2 h-2 bg-[#00FF41] rounded-full animate-ping" />
+                  <span className="text-[#A1A1AA] italic font-mono flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-[#00F0FF] rounded-full animate-ping" />
                     Thinking & generating in {activeLanguageStyle}...
                   </span>
                 )}
-                <span className="inline-block w-2 h-4 bg-[#00FF41] ml-1 animate-pulse align-middle" />
+                <span className="inline-block w-2 h-4 bg-[#00F0FF] ml-1 animate-pulse align-middle" />
               </div>
             </div>
           </div>
         )}
 
         {errorMsg && (
-          <div className="p-3 bg-rose-950/40 border border-rose-800 text-rose-300 text-xs font-mono">
+          <div className="p-3 bg-rose-950/40 border border-rose-800 text-rose-300 text-xs font-mono clip-badge-poly">
             {errorMsg}
           </div>
         )}
@@ -615,15 +638,15 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
 
         {/* Slash Command Autocomplete Dropdown Popup */}
         {filteredCommandSuggestions.length > 0 && (
-          <div className="absolute bottom-full left-0 right-0 mb-2 bg-[#0A0A0A] border-2 border-[#00FF41] shadow-[0_-4px_20px_rgba(0,255,65,0.15)] z-40 max-h-60 overflow-y-auto font-mono">
-            <div className="px-3 py-1.5 bg-[#00FF41]/10 border-b border-[#00FF41]/40 flex items-center justify-between text-[11px] text-[#00FF41]">
+          <div className="absolute bottom-full left-0 right-0 mb-2 bg-[#0C0C18] border-2 border-[#00F0FF] clip-cyber-card shadow-[0_-4px_25px_rgba(0,240,255,0.2)] z-40 max-h-60 overflow-y-auto font-mono">
+            <div className="px-3 py-1.5 bg-[#00F0FF]/10 border-b border-[#00F0FF]/40 flex items-center justify-between text-[11px] text-[#00F0FF]">
               <span className="font-bold flex items-center gap-1.5">
                 <Code className="w-3.5 h-3.5" />
                 AVAILABLE COMMANDS
               </span>
-              <span className="text-[10px] text-[#737373]">Click or type to select</span>
+              <span className="text-[10px] text-[#A1A1AA]">Click or type to select</span>
             </div>
-            <div className="divide-y divide-[#1F1F1F]">
+            <div className="divide-y divide-[#222238]">
               {filteredCommandSuggestions.map((cmd, idx) => (
                 <button
                   key={cmd.command}
@@ -631,21 +654,21 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
                   onClick={() => handleApplyCommand(cmd.command)}
                   className={`w-full p-2.5 text-left flex items-start justify-between gap-2 transition-colors cursor-pointer ${
                     idx === selectedSuggestionIndex
-                      ? 'bg-[#141414] text-[#EDEDED]'
-                      : 'hover:bg-[#121212] text-[#A1A1AA]'
+                      ? 'bg-[#18182E] text-[#EDEDED]'
+                      : 'hover:bg-[#121222] text-[#A1A1AA]'
                   }`}
                 >
                   <div className="flex items-center space-x-2.5">
                     <span className="text-base">{cmd.icon}</span>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[#00FF41]">{cmd.command}</span>
+                        <span className="text-xs font-bold text-[#00F0FF]">{cmd.command}</span>
                         <span className="text-[11px] text-[#EDEDED]">{cmd.label}</span>
                       </div>
                       <p className="text-[11px] text-[#737373] font-sans mt-0.5">{cmd.desc}</p>
                     </div>
                   </div>
-                  <span className="text-[10px] text-[#525252] bg-black px-1.5 py-0.5 border border-[#262626] shrink-0">
+                  <span className="text-[10px] text-[#A1A1AA] bg-black px-2 py-0.5 border border-[#2D2D45] clip-badge-poly shrink-0">
                     {cmd.syntax}
                   </span>
                 </button>
@@ -656,17 +679,17 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
 
         {/* Quick Slash Action Chips Bar */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
-          <span className="text-[#737373] text-[10px] uppercase font-bold shrink-0 mr-1 flex items-center gap-1">
-            <Zap className="w-3 h-3 text-[#00FF41]" /> Commands:
+          <span className="text-[#A1A1AA] text-[10px] uppercase font-bold shrink-0 mr-1 flex items-center gap-1">
+            <Zap className="w-3 h-3 text-[#00F0FF]" /> Commands:
           </span>
 
           <button
             type="button"
             onClick={() => handleApplyCommand('/image')}
-            className={`px-2 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly ${
               detectedIntent.mode === 'image'
-                ? 'bg-[#00FF41] text-black font-bold border-[#00FF41] shadow-[2px_2px_0px_0px_#000000]'
-                : 'bg-black text-[#A1A1AA] hover:text-[#00FF41] border-[#262626] hover:border-[#00FF41]'
+                ? 'bg-[#A855F7] text-black font-bold border-[#A855F7] shadow-[0_0_12px_rgba(168,85,247,0.4)]'
+                : 'bg-black/80 text-[#A1A1AA] hover:text-[#A855F7] border-[#2D2D45] hover:border-[#A855F7]'
             }`}
             title="Render visual artwork"
           >
@@ -677,10 +700,10 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
           <button
             type="button"
             onClick={() => handleApplyCommand('/video')}
-            className={`px-2 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly ${
               detectedIntent.mode === 'video'
-                ? 'bg-[#00FF41] text-black font-bold border-[#00FF41] shadow-[2px_2px_0px_0px_#000000]'
-                : 'bg-black text-[#A1A1AA] hover:text-[#00FF41] border-[#262626] hover:border-[#00FF41]'
+                ? 'bg-[#FF007A] text-white font-bold border-[#FF007A] shadow-[0_0_12px_rgba(255,0,122,0.4)]'
+                : 'bg-black/80 text-[#A1A1AA] hover:text-[#FF007A] border-[#2D2D45] hover:border-[#FF007A]'
             }`}
             title="Synthesize 60FPS motion sequence"
           >
@@ -691,10 +714,10 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
           <button
             type="button"
             onClick={() => handleApplyCommand('/music')}
-            className={`px-2 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly ${
               detectedIntent.mode === 'music'
-                ? 'bg-[#00FF41] text-black font-bold border-[#00FF41] shadow-[2px_2px_0px_0px_#000000]'
-                : 'bg-black text-[#A1A1AA] hover:text-[#00FF41] border-[#262626] hover:border-[#00FF41]'
+                ? 'bg-[#FFB800] text-black font-bold border-[#FFB800] shadow-[0_0_12px_rgba(255,184,0,0.4)]'
+                : 'bg-black/80 text-[#A1A1AA] hover:text-[#FFB800] border-[#2D2D45] hover:border-[#FFB800]'
             }`}
             title="Compose 432Hz procedural audio"
           >
@@ -705,7 +728,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
           <button
             type="button"
             onClick={() => handleApplyCommand('/pdf')}
-            className="px-2 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer bg-black text-[#A1A1AA] hover:text-[#00FF41] border-[#262626] hover:border-[#00FF41]"
+            className="px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly bg-black/80 text-[#A1A1AA] hover:text-[#00F0FF] border-[#2D2D45] hover:border-[#00F0FF]"
             title="Format response for instant PDF download"
           >
             <span>📄</span>
@@ -715,7 +738,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
           <button
             type="button"
             onClick={() => handleApplyCommand('/search')}
-            className="px-2 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer bg-black text-[#A1A1AA] hover:text-[#00FF41] border-[#262626] hover:border-[#00FF41]"
+            className="px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly bg-black/80 text-[#A1A1AA] hover:text-[#00F0FF] border-[#2D2D45] hover:border-[#00F0FF]"
             title="Ground with live Google search"
           >
             <span>🌐</span>
@@ -723,17 +746,17 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
           </button>
         </div>
 
-        {/* Unified Input Box with Real-Time Intent Pill */}
-        <div className="relative flex items-center bg-[#0A0A0A] border-2 border-[#262626] focus-within:border-[#00FF41] shadow-[4px_4px_0px_0px_#141414] transition-all">
-          <div className="hidden sm:flex items-center pl-3 pr-1 text-xs text-[#00FF41] shrink-0">
+        {/* Unified Input Box with Real-Time Intent Pill & Chamfered Polygon Border */}
+        <div className="relative flex items-center bg-gradient-to-r from-[#0C0C18] to-[#070710] border-2 border-[#2D2D48] focus-within:border-[#00F0FF] clip-cyber-card shadow-[0_0_20px_rgba(0,240,255,0.08)] transition-all">
+          <div className="hidden sm:flex items-center pl-3 pr-1 text-xs text-[#00F0FF] shrink-0">
             <span
-              className={`px-2 py-1 bg-black border text-[10px] uppercase font-bold flex items-center gap-1 transition-colors ${
+              className={`px-2.5 py-1 bg-black/80 border text-[10px] uppercase font-bold flex items-center gap-1 clip-badge-poly transition-colors ${
                 detectedIntent.mode !== 'text' || detectedIntent.isExplicitSlash
-                  ? 'border-[#00FF41] text-[#00FF41] shadow-[1px_1px_0px_0px_#00FF41]'
-                  : 'border-[#262626] text-[#737373]'
+                  ? 'border-[#00F0FF] text-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.3)]'
+                  : 'border-[#2D2D45] text-[#A1A1AA]'
               }`}
             >
-              <Zap className={`w-3 h-3 ${detectedIntent.mode !== 'text' ? 'text-[#00FF41] animate-pulse' : 'text-[#737373]'}`} />
+              <Zap className={`w-3 h-3 ${detectedIntent.mode !== 'text' ? 'text-[#00F0FF] animate-pulse' : 'text-[#A1A1AA]'}`} />
               {detectedIntent.badgeLabel}
             </span>
           </div>
@@ -756,28 +779,28 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
             className="flex-1 px-3 sm:px-4 py-3.5 bg-transparent text-sm text-[#EDEDED] placeholder-[#525252] focus:outline-none font-sans"
           />
 
-          <div className="flex items-center space-x-1 pr-2">
+          <div className="flex items-center space-x-1.5 pr-2">
             <button
               type="button"
               onClick={() => setShowEmojiPicker((prev) => !prev)}
-              className={`p-2 border transition-all cursor-pointer ${
+              className={`p-2 border transition-all cursor-pointer clip-badge-poly ${
                 showEmojiPicker
-                  ? 'bg-[#00FF41] text-black border-[#00FF41] shadow-[2px_2px_0px_0px_#00FF41]'
-                  : 'bg-black text-[#737373] hover:text-[#00FF41] border-[#262626] hover:border-[#00FF41]'
+                  ? 'bg-[#00F0FF] text-black border-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.4)]'
+                  : 'bg-black/80 text-[#A1A1AA] hover:text-[#00F0FF] border-[#2D2D45] hover:border-[#00F0FF]'
               }`}
               title="Open Emoji Picker"
             >
               <Smile className="w-4 h-4" />
             </button>
 
-            {/* Direct Module Switcher Buttons */}
+            {/* Direct Module Switcher Buttons with Polygon Clips */}
             <button
               type="button"
               onClick={() => setSelectedMode('text')}
-              className={`p-2 border transition-all cursor-pointer hidden md:flex ${
+              className={`p-2 border transition-all cursor-pointer hidden md:flex clip-badge-poly ${
                 selectedMode === 'text'
-                  ? 'bg-[#00FF41] text-black border-[#00FF41]'
-                  : 'bg-black text-[#737373] hover:text-[#EDEDED] border-[#262626]'
+                  ? 'bg-[#00F0FF] text-black border-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.4)]'
+                  : 'bg-black/80 text-[#737373] hover:text-[#EDEDED] border-[#2D2D45]'
               }`}
               title="Switch to Smart Chat"
             >
@@ -787,10 +810,10 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
             <button
               type="button"
               onClick={() => setSelectedMode('image')}
-              className={`p-2 border transition-all cursor-pointer hidden md:flex ${
+              className={`p-2 border transition-all cursor-pointer hidden md:flex clip-badge-poly ${
                 selectedMode === 'image'
-                  ? 'bg-[#00FF41] text-black border-[#00FF41]'
-                  : 'bg-black text-[#737373] hover:text-[#EDEDED] border-[#262626]'
+                  ? 'bg-[#A855F7] text-black border-[#A855F7] shadow-[0_0_10px_rgba(168,85,247,0.4)]'
+                  : 'bg-black/80 text-[#737373] hover:text-[#EDEDED] border-[#2D2D45]'
               }`}
               title="Switch to Image Generator"
             >
@@ -800,10 +823,10 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
             <button
               type="button"
               onClick={() => setSelectedMode('video')}
-              className={`p-2 border transition-all cursor-pointer hidden md:flex ${
+              className={`p-2 border transition-all cursor-pointer hidden md:flex clip-badge-poly ${
                 selectedMode === 'video'
-                  ? 'bg-[#00FF41] text-black border-[#00FF41]'
-                  : 'bg-black text-[#737373] hover:text-[#EDEDED] border-[#262626]'
+                  ? 'bg-[#FF007A] text-white border-[#FF007A] shadow-[0_0_10px_rgba(255,0,122,0.4)]'
+                  : 'bg-black/80 text-[#737373] hover:text-[#EDEDED] border-[#2D2D45]'
               }`}
               title="Switch to Video Generator"
             >
@@ -813,10 +836,10 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
             <button
               type="button"
               onClick={() => setSelectedMode('music')}
-              className={`p-2 border transition-all cursor-pointer hidden md:flex ${
+              className={`p-2 border transition-all cursor-pointer hidden md:flex clip-badge-poly ${
                 selectedMode === 'music'
-                  ? 'bg-[#00FF41] text-black border-[#00FF41]'
-                  : 'bg-black text-[#737373] hover:text-[#EDEDED] border-[#262626]'
+                  ? 'bg-[#FFB800] text-black border-[#FFB800] shadow-[0_0_10px_rgba(255,184,0,0.4)]'
+                  : 'bg-black/80 text-[#737373] hover:text-[#EDEDED] border-[#2D2D45]'
               }`}
               title="Switch to Music Generator"
             >
@@ -826,7 +849,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
             <button
               type="submit"
               disabled={isLoading || !inputText.trim()}
-              className="ml-1 px-3 sm:px-4 py-2.5 bg-[#00FF41] hover:bg-[#00E038] disabled:opacity-40 text-black text-xs font-mono font-bold border border-[#00FF41] shadow-[2px_2px_0px_0px_#262626] hover:shadow-[3px_3px_0px_0px_#00FF41] active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center space-x-1.5 cursor-pointer"
+              className="ml-1 px-4 py-2.5 bg-gradient-to-r from-[#00F0FF] to-[#A855F7] hover:brightness-110 disabled:opacity-40 text-black text-xs font-mono font-bold border border-[#00F0FF] clip-badge-poly shadow-[0_0_15px_rgba(0,240,255,0.3)] active:scale-95 transition-all flex items-center space-x-1.5 cursor-pointer"
             >
               <Send className="w-3.5 h-3.5 text-black" />
               <span className="hidden sm:inline">Send</span>
@@ -846,6 +869,8 @@ const HeaderBar = memo<{
   activeLanguageStyle: string;
   useSearchGrounding: boolean;
   onToggleGrounding: () => void;
+  accessibleReadingMode: boolean;
+  onToggleAccessibleMode: () => void;
   onExportFullSession: () => void;
   onReset: () => void;
   onSelectMode: (mode: GenerationMode) => void;
@@ -856,6 +881,8 @@ const HeaderBar = memo<{
   activeLanguageStyle,
   useSearchGrounding,
   onToggleGrounding,
+  accessibleReadingMode,
+  onToggleAccessibleMode,
   onExportFullSession,
   onReset,
   onSelectMode,
@@ -863,58 +890,71 @@ const HeaderBar = memo<{
   onSelectRole,
 }) => {
   return (
-    <div className="bg-[#0A0A0A] p-3 sm:p-4 border border-[#262626] shadow-[4px_4px_0px_0px_#141414] flex flex-col gap-3 font-mono">
+    <div className="bg-gradient-to-br from-[#0E0E1C] via-[#090914] to-[#04040A] p-3 sm:p-4 border border-[#2D2D45] clip-stealth-notch shadow-[0_0_25px_rgba(0,240,255,0.06)] flex flex-col gap-3 font-mono">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 bg-black border border-[#00FF41] text-[#00FF41] flex items-center justify-center shadow-[2px_2px_0px_0px_#00FF41]">
-            <Zap className="w-5 h-5 text-[#00FF41] animate-pulse" />
+          <div className="w-10 h-10 bg-black/80 border border-[#00F0FF] text-[#00F0FF] flex items-center justify-center clip-badge-poly shadow-[0_0_15px_rgba(0,240,255,0.4)]">
+            <Zap className="w-5 h-5 text-[#00F0FF] animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base sm:text-lg font-bold text-[#EDEDED] tracking-tight">
                 Somotoz AI Suite
               </h1>
-              <span className="text-[10px] px-2 py-0.5 bg-black text-[#00FF41] border border-[#262626] flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-[#00FF41] rounded-full animate-ping" />
+              <span className="text-[10px] px-2 py-0.5 bg-black/80 text-[#00F0FF] border border-[#00F0FF]/40 clip-badge-poly flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-[#00F0FF] rounded-full animate-ping" />
                 ULTRA-FAST
               </span>
-              <span className="text-[10px] px-2 py-0.5 bg-[#141414] text-[#A1A1AA] border border-[#262626] hidden md:flex items-center gap-1">
-                <Languages className="w-3 h-3 text-[#00FF41]" />
+              <span className="text-[10px] px-2 py-0.5 bg-[#141424] text-[#A1A1AA] border border-[#2D2D45] clip-badge-poly hidden md:flex items-center gap-1">
+                <Languages className="w-3 h-3 text-[#00F0FF]" />
                 {activeLanguageStyle}
               </span>
             </div>
             <p className="text-xs text-[#737373] font-sans">
-              Instant real-time token streaming across Chat, Image, Video & Music generators.
+              Autonomous Master AI Core • Real-World Photography, 60FPS Video & 432Hz Music Engine.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 flex-wrap">
+          <button
+            onClick={onToggleAccessibleMode}
+            className={`px-2.5 py-1.5 text-xs font-mono font-medium border flex items-center space-x-1.5 transition-all cursor-pointer clip-badge-poly ${
+              accessibleReadingMode
+                ? 'bg-black text-[#00F0FF] border-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.3)]'
+                : 'bg-black/80 hover:bg-[#121222] text-[#A1A1AA] hover:text-[#00F0FF] border-[#2D2D45]'
+            }`}
+            title="Toggle Accessible Dyslexia-Friendly Reading Mode"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-[#00F0FF]" />
+            <span>{accessibleReadingMode ? 'Accessible (ON)' : 'Accessible Mode'}</span>
+          </button>
+
           <button
             onClick={onExportFullSession}
-            className="px-2.5 py-1.5 text-xs font-mono font-medium border flex items-center space-x-1.5 bg-black hover:bg-[#121212] text-[#A1A1AA] hover:text-[#00FF41] border-[#262626] hover:border-[#00FF41] transition-all cursor-pointer shadow-[2px_2px_0px_0px_#171717]"
+            className="px-2.5 py-1.5 text-xs font-mono font-medium border flex items-center space-x-1.5 bg-black/80 hover:bg-[#121222] text-[#A1A1AA] hover:text-[#00F0FF] border-[#2D2D45] hover:border-[#00F0FF] transition-all cursor-pointer clip-badge-poly"
             title="Download full conversation transcript as PDF document"
           >
-            <FileDown className="w-3.5 h-3.5 text-[#00FF41]" />
+            <FileDown className="w-3.5 h-3.5 text-[#00F0FF]" />
             <span className="hidden sm:inline">Export PDF</span>
           </button>
 
           <button
             onClick={onToggleGrounding}
-            className={`px-2.5 py-1.5 text-xs font-mono font-medium border flex items-center space-x-1.5 transition-all cursor-pointer ${
+            className={`px-2.5 py-1.5 text-xs font-mono font-medium border flex items-center space-x-1.5 transition-all cursor-pointer clip-badge-poly ${
               useSearchGrounding
-                ? 'bg-black text-[#00FF41] border-[#00FF41] shadow-[2px_2px_0px_0px_#00FF41]'
-                : 'bg-black text-[#737373] border-[#262626] hover:text-[#EDEDED]'
+                ? 'bg-black text-[#00F0FF] border-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.3)]'
+                : 'bg-black/80 text-[#737373] border-[#2D2D45] hover:text-[#EDEDED]'
             }`}
             title="Ground response with live web research"
           >
-            <Globe className="w-3.5 h-3.5 text-[#00FF41]" />
+            <Globe className="w-3.5 h-3.5 text-[#00F0FF]" />
             <span>{useSearchGrounding ? 'Web (ON)' : 'Web'}</span>
           </button>
 
           <button
             onClick={onReset}
-            className="p-1.5 bg-black border border-[#262626] hover:border-[#00FF41] text-[#737373] hover:text-[#00FF41] transition-colors cursor-pointer"
+            className="p-1.5 bg-black/80 border border-[#2D2D45] hover:border-[#00F0FF] text-[#737373] hover:text-[#00F0FF] clip-badge-poly transition-colors cursor-pointer"
             title="Reset conversation"
           >
             <RefreshCw className="w-4 h-4" />
@@ -922,27 +962,35 @@ const HeaderBar = memo<{
         </div>
       </div>
 
-      {/* Multimodal Mode Selector Chips */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[#262626]">
+      {/* Multimodal Mode Selector Chips with Polygon Cuts and Multi-Hue Accents */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[#25253D]">
         {MODES.map((mode) => {
           const isSelected = selectedMode === mode.id;
           const Icon = mode.icon;
+          const colorMap = {
+            text: { active: 'bg-black/90 border-[#00F0FF] text-[#00F0FF] shadow-[0_0_15px_rgba(0,240,255,0.25)]', icon: 'text-[#00F0FF]', hover: 'hover:border-[#00F0FF]' },
+            image: { active: 'bg-black/90 border-[#A855F7] text-[#A855F7] shadow-[0_0_15px_rgba(168,85,247,0.25)]', icon: 'text-[#A855F7]', hover: 'hover:border-[#A855F7]' },
+            video: { active: 'bg-black/90 border-[#FF007A] text-[#FF007A] shadow-[0_0_15px_rgba(255,0,122,0.25)]', icon: 'text-[#FF007A]', hover: 'hover:border-[#FF007A]' },
+            music: { active: 'bg-black/90 border-[#FFB800] text-[#FFB800] shadow-[0_0_15px_rgba(255,184,0,0.25)]', icon: 'text-[#FFB800]', hover: 'hover:border-[#FFB800]' },
+          };
+          const style = colorMap[mode.id];
+
           return (
             <button
               key={mode.id}
               onClick={() => onSelectMode(mode.id)}
-              className={`p-2.5 text-left border transition-all cursor-pointer flex flex-col justify-between group ${
+              className={`p-2.5 text-left border transition-all cursor-pointer flex flex-col justify-between group clip-cyber-card ${
                 isSelected
-                  ? 'bg-black border-[#00FF41] text-[#00FF41] shadow-[2px_2px_0px_0px_#00FF41]'
-                  : 'bg-[#0D0D0D] hover:bg-[#141414] border-[#262626] hover:border-[#00FF41] text-[#737373]'
+                  ? style.active
+                  : `bg-[#0C0C18] hover:bg-[#121224] border-[#25253D] ${style.hover} text-[#737373]`
               }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Icon className={`w-4 h-4 ${isSelected ? 'text-[#00FF41]' : 'text-[#737373] group-hover:text-[#EDEDED]'}`} />
+                  <Icon className={`w-4 h-4 ${isSelected ? style.icon : 'text-[#737373] group-hover:text-[#EDEDED]'}`} />
                   <span className="text-xs font-semibold font-mono text-[#EDEDED]">{mode.label}</span>
                 </div>
-                <span className="text-[9px] font-mono px-1.5 py-0.2 bg-black text-[#A1A1AA] border border-[#262626]">
+                <span className="text-[9px] font-mono px-1.5 py-0.2 bg-black text-[#A1A1AA] border border-[#2D2D45] clip-badge-poly">
                   {mode.badge}
                 </span>
               </div>
@@ -955,17 +1003,17 @@ const HeaderBar = memo<{
       {/* Persona/Role Selector for Text Mode */}
       {selectedMode === 'text' && (
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar pt-1 font-mono">
-          <span className="text-[#737373] text-[11px] shrink-0 mr-1 flex items-center gap-1">
-            <Sliders className="w-3 h-3 text-[#00FF41]" /> Persona:
+          <span className="text-[#A1A1AA] text-[11px] shrink-0 mr-1 flex items-center gap-1">
+            <Sliders className="w-3 h-3 text-[#00F0FF]" /> Persona:
           </span>
           {ROLES.map((role) => (
             <button
               key={role.id}
               onClick={() => onSelectRole(role.id)}
-              className={`px-2.5 py-1 text-[11px] font-medium shrink-0 transition-colors cursor-pointer flex items-center space-x-1 border ${
+              className={`px-2.5 py-1 text-[11px] font-medium shrink-0 transition-colors cursor-pointer flex items-center space-x-1 border clip-badge-poly ${
                 selectedRole === role.id
-                  ? 'bg-[#00FF41] text-black font-bold border-[#00FF41]'
-                  : 'bg-black text-[#A1A1AA] hover:text-[#00FF41] border-[#262626] hover:border-[#00FF41]'
+                  ? 'bg-[#00F0FF] text-black font-bold border-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.3)]'
+                  : 'bg-black/80 text-[#A1A1AA] hover:text-[#00F0FF] border-[#2D2D45] hover:border-[#00F0FF]'
               }`}
             >
               <span>{role.icon}</span>
@@ -985,6 +1033,7 @@ const ChatMessageItem = memo<{
   message: ChatMessage;
   isSpeaking: boolean;
   isPdfExplicitlyRequested: boolean;
+  accessibleReadingMode?: boolean;
   onToggleSpeak: (id: string, text: string) => void;
   onExportSingleMessage: (msg: ChatMessage) => void;
   onSaveToJournal?: (content: string, title?: string) => void;
@@ -992,6 +1041,7 @@ const ChatMessageItem = memo<{
   message,
   isSpeaking,
   isPdfExplicitlyRequested,
+  accessibleReadingMode,
   onToggleSpeak,
   onExportSingleMessage,
   onSaveToJournal,
@@ -1001,37 +1051,50 @@ const ChatMessageItem = memo<{
   return (
     <div className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
       <div
-        className={`w-8 h-8 shrink-0 flex items-center justify-center text-xs font-semibold font-mono border ${
+        className={`w-8 h-8 shrink-0 flex items-center justify-center text-xs font-semibold font-mono border clip-badge-poly ${
           isUser
-            ? 'bg-[#00FF41] text-black border-[#00FF41]'
-            : 'bg-black border-[#262626] text-[#00FF41]'
+            ? 'bg-gradient-to-br from-[#00F0FF] to-[#A855F7] text-black border-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.4)]'
+            : 'bg-black/80 border-[#2D2D45] text-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.2)]'
         }`}
       >
-        {isUser ? <User className="w-4 h-4 text-black" /> : <Bot className="w-4 h-4 text-[#00FF41]" />}
+        {isUser ? <User className="w-4 h-4 text-black" /> : <Bot className="w-4 h-4 text-[#00F0FF]" />}
       </div>
 
       <div
-        className={`max-w-[92%] sm:max-w-[82%] p-3.5 sm:p-4 text-sm leading-relaxed border transition-all ${
+        className={`max-w-[92%] sm:max-w-[82%] p-3.5 sm:p-4 border transition-all ${
+          accessibleReadingMode ? 'text-[15px] leading-loose tracking-wide' : 'text-sm leading-relaxed'
+        } ${
           isUser
-            ? 'bg-black border-[#00FF41] text-[#EDEDED] shadow-[2px_2px_0px_0px_#00FF41]'
-            : 'bg-black border-[#262626] hover:border-[#383838] text-[#EDEDED]'
+            ? 'bg-gradient-to-br from-[#0E0E24] to-[#070714] border-[#00F0FF]/70 text-[#EDEDED] clip-cyber-corner shadow-[0_0_15px_rgba(0,240,255,0.12)]'
+            : 'bg-gradient-to-br from-[#0A0A18] to-[#05050E] border-[#2A2A42] hover:border-[#3D3D60] text-[#EDEDED] clip-cyber-card shadow-[0_0_15px_rgba(0,0,0,0.5)]'
         }`}
       >
+        {/* Accessible Mode Tag */}
+        {accessibleReadingMode && !isUser && (
+          <div className="mb-2 pb-1.5 border-b border-[#222238] flex items-center justify-between text-[11px] font-mono text-[#00F0FF]">
+            <span className="flex items-center gap-1">
+              <Eye className="w-3 h-3 text-[#00F0FF]" />
+              Accessible Dyslexia-Friendly Layout
+            </span>
+            <span className="text-[10px] text-[#A1A1AA]">Optimized Spacing</span>
+          </div>
+        )}
+
         {/* Text Content */}
-        <div className="text-[#EDEDED] whitespace-pre-wrap leading-relaxed font-sans">
+        <div className={`text-[#EDEDED] whitespace-pre-wrap ${accessibleReadingMode ? 'leading-loose tracking-wide font-sans text-[15px]' : 'leading-relaxed font-sans'}`}>
           {message.content}
         </div>
 
         {/* PROMPT-TRIGGERED CONDITIONAL PDF EXPORT ACTION PILL */}
         {isPdfExplicitlyRequested && (
-          <div className="mt-3 p-2.5 bg-[#00FF41]/10 border border-[#00FF41] flex flex-wrap items-center justify-between gap-2 font-mono">
-            <div className="flex items-center space-x-2 text-xs text-[#00FF41]">
-              <FileDown className="w-4 h-4 animate-bounce text-[#00FF41]" />
+          <div className="mt-3 p-2.5 bg-[#00F0FF]/10 border border-[#00F0FF] clip-badge-poly flex flex-wrap items-center justify-between gap-2 font-mono">
+            <div className="flex items-center space-x-2 text-xs text-[#00F0FF]">
+              <FileDown className="w-4 h-4 animate-bounce text-[#00F0FF]" />
               <span className="font-bold">PDF Format Requested by User</span>
             </div>
             <button
               onClick={() => onExportSingleMessage(message)}
-              className="px-3 py-1 bg-[#00FF41] hover:bg-[#00E038] text-black text-xs font-bold font-mono border border-[#00FF41] shadow-[2px_2px_0px_0px_#000000] flex items-center space-x-1.5 transition-all cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+              className="px-3 py-1 bg-[#00F0FF] hover:bg-[#00D0DF] text-black text-xs font-bold font-mono border border-[#00F0FF] clip-badge-poly shadow-[0_0_10px_rgba(0,240,255,0.4)] flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95"
             >
               <Download className="w-3.5 h-3.5 text-black" />
               <span>Download PDF Document</span>
@@ -1041,7 +1104,7 @@ const ChatMessageItem = memo<{
 
         {/* Inline Media Rendering for Image / Video / Music */}
         {message.media && (
-          <div className="mt-4 pt-3 border-t border-[#262626]">
+          <div className="mt-4 pt-3 border-t border-[#25253D]">
             {message.media.type === 'image' && <InlineImageViewer media={message.media} />}
             {message.media.type === 'video' && <InlineVideoSimulator media={message.media} />}
             {message.media.type === 'music' && <InlineAudioSynthesizer media={message.media} />}
@@ -1050,9 +1113,9 @@ const ChatMessageItem = memo<{
 
         {/* Grounding citations if present */}
         {message.sources && message.sources.length > 0 && (
-          <div className="mt-3 pt-2 border-t border-[#262626] text-xs text-[#737373] space-y-1 font-mono">
-            <p className="font-semibold text-[11px] text-[#00FF41] flex items-center gap-1">
-              <Globe className="w-3 h-3 text-[#00FF41]" />
+          <div className="mt-3 pt-2 border-t border-[#25253D] text-xs text-[#737373] space-y-1 font-mono">
+            <p className="font-semibold text-[11px] text-[#00F0FF] flex items-center gap-1">
+              <Globe className="w-3 h-3 text-[#00F0FF]" />
               Verified Sources:
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -1062,7 +1125,7 @@ const ChatMessageItem = memo<{
                   href={s.uri}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-2 py-0.5 bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#00FF41] text-[11px] truncate max-w-[240px]"
+                  className="px-2 py-0.5 bg-[#141424] border border-[#2D2D45] hover:border-[#00F0FF] text-[#A1A1AA] hover:text-[#00F0FF] text-[11px] truncate max-w-[240px] clip-badge-poly"
                 >
                   {s.title || s.uri}
                 </a>
@@ -1073,26 +1136,26 @@ const ChatMessageItem = memo<{
 
         {/* Bottom Actions on Model Messages */}
         {!isUser && message.id !== 'welcome' && (
-          <div className="mt-3 pt-2 border-t border-[#262626] flex flex-wrap items-center justify-between gap-2 font-mono">
+          <div className="mt-3 pt-2 border-t border-[#25253D] flex flex-wrap items-center justify-between gap-2 font-mono">
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => onExportSingleMessage(message)}
-                className="text-[11px] text-[#A1A1AA] hover:text-[#00FF41] flex items-center space-x-1 transition-colors cursor-pointer"
+                className="text-[11px] text-[#A1A1AA] hover:text-[#00F0FF] flex items-center space-x-1 transition-colors cursor-pointer"
                 title="Download this response as formatted PDF"
               >
-                <FileDown className="w-3.5 h-3.5 text-[#00FF41]" />
+                <FileDown className="w-3.5 h-3.5 text-[#00F0FF]" />
                 <span>Export PDF</span>
               </button>
 
               <button
                 onClick={() => onToggleSpeak(message.id, message.content)}
                 className={`text-[11px] flex items-center space-x-1 transition-colors cursor-pointer ${
-                  isSpeaking ? 'text-[#00FF41] font-bold' : 'text-[#A1A1AA] hover:text-[#00FF41]'
+                  isSpeaking ? 'text-[#00F0FF] font-bold' : 'text-[#A1A1AA] hover:text-[#00F0FF]'
                 }`}
                 title={isSpeaking ? 'Stop reading' : 'Read aloud with speech synthesis'}
               >
                 {isSpeaking ? (
-                  <VolumeX className="w-3.5 h-3.5 text-[#00FF41]" />
+                  <VolumeX className="w-3.5 h-3.5 text-[#00F0FF]" />
                 ) : (
                   <Volume2 className="w-3.5 h-3.5" />
                 )}
@@ -1104,7 +1167,7 @@ const ChatMessageItem = memo<{
               {onSaveToJournal && (
                 <button
                   onClick={() => onSaveToJournal(message.content, 'Somotoz AI Note')}
-                  className="text-[11px] font-medium text-[#00FF41] hover:text-[#00E038] flex items-center space-x-1 cursor-pointer"
+                  className="text-[11px] font-medium text-[#00F0FF] hover:text-[#00D0DF] flex items-center space-x-1 cursor-pointer"
                 >
                   <BookPlus className="w-3.5 h-3.5" />
                   <span>Save Note</span>
@@ -1119,97 +1182,120 @@ const ChatMessageItem = memo<{
 });
 
 /**
- * 1. Memoized Dynamic Inline Image / SVG Renderer
+ * 1. Memoized Dynamic Inline Image Renderer (Photorealistic & High-Fidelity)
  */
 const InlineImageViewer = memo<{ media: ChatMediaData }>(({ media }) => {
   const [copied, setCopied] = useState(false);
   const [isExportingPng, setIsExportingPng] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState<'fit' | '150'>('fit');
+  const [zoomLevel, setZoomLevel] = useState<'fit' | '100' | '150'>('fit');
   const [showCode, setShowCode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const handleCopySvg = () => {
-    if (!media.svgData) return;
-    navigator.clipboard.writeText(media.svgData);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const hasRasterImage = Boolean(media.imageUrl || media.url);
+  const imageSource = media.imageUrl || media.url || '';
+
+  const handleCopy = () => {
+    if (hasRasterImage && imageSource) {
+      navigator.clipboard.writeText(imageSource);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      return;
+    }
+    if (media.svgData) {
+      navigator.clipboard.writeText(media.svgData);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
-  const handleDownloadSvg = () => {
-    if (!media.svgData) return;
-    downloadSvgImage(media.svgData, media.prompt || 'artwork');
-  };
-
-  const handleDownloadPng = async () => {
-    if (!media.svgData || isExportingPng) return;
+  const handleDownloadImage = async () => {
+    if (isExportingPng) return;
     setIsExportingPng(true);
     try {
-      await downloadPngImage(media.svgData, media.prompt || 'artwork');
+      if (hasRasterImage && imageSource) {
+        const link = document.createElement('a');
+        link.href = imageSource;
+        link.download = `photorealistic-${(media.prompt || 'render').slice(0, 32).replace(/\s+/g, '_')}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else if (media.svgData) {
+        await downloadPngImage(media.svgData, media.prompt || 'photorealistic-artwork');
+      }
     } catch (e) {
-      console.error('PNG export error:', e);
+      console.error('Image export error:', e);
     } finally {
       setIsExportingPng(false);
     }
   };
 
+  const handleDownloadSvg = () => {
+    if (!media.svgData) return;
+    downloadSvgImage(media.svgData, media.prompt || 'photorealistic-artwork');
+  };
+
   return (
-    <div className={`bg-black border border-[#262626] overflow-hidden shadow-[2px_2px_0px_0px_#171717] font-mono ${isFullscreen ? 'fixed inset-4 z-50 flex flex-col bg-black border-[#00FF41] shadow-[0_0_30px_rgba(0,255,65,0.3)]' : ''}`}>
-      <div className="px-3 py-2 bg-[#0A0A0A] border-b border-[#262626] flex flex-wrap items-center justify-between gap-2 text-xs text-[#EDEDED]">
+    <div className={`bg-gradient-to-b from-[#0C0C1C] via-[#080814] to-[#04040A] border border-[#A855F7]/60 clip-cyber-card overflow-hidden shadow-[0_0_25px_rgba(168,85,247,0.15)] font-mono ${isFullscreen ? 'fixed inset-4 z-50 flex flex-col bg-black border-[#A855F7] shadow-[0_0_40px_rgba(168,85,247,0.4)]' : ''}`}>
+      <div className="px-3 py-2 bg-[#080814] border-b border-[#25253D] flex flex-wrap items-center justify-between gap-2 text-xs text-[#EDEDED]">
         <div className="flex items-center space-x-2">
-          <span className="flex items-center gap-1.5 text-[#00FF41] font-semibold">
-            <ImageIcon className="w-3.5 h-3.5 text-[#00FF41]" />
-            Vector Render (SVG)
+          <span className="flex items-center gap-1.5 text-[#A855F7] font-semibold">
+            <ImageIcon className="w-3.5 h-3.5 text-[#A855F7]" />
+            {hasRasterImage ? 'Photorealistic Image (1K)' : 'Photorealistic Scenic Render'}
           </span>
-          <span className="text-[10px] text-[#737373] hidden sm:inline">
-            • Scalable Neural Graphics
+          <span className="text-[10px] text-[#A1A1AA] bg-black/60 px-2 py-0.5 clip-badge-poly border border-[#2D2D45] hidden sm:inline">
+            {hasRasterImage ? 'HDR Cinematic Optics' : 'Multi-Layer Atmospheric'}
           </span>
         </div>
         
         <div className="flex items-center space-x-1.5 flex-wrap">
           <button
             onClick={() => setZoomLevel(prev => prev === 'fit' ? '150' : 'fit')}
-            className="px-2 py-1 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#00FF41] text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
+            className="px-2 py-1 bg-black/80 hover:bg-[#18182E] border border-[#2D2D45] hover:border-[#A855F7] text-[#A1A1AA] hover:text-[#A855F7] text-[10px] flex items-center gap-1 transition-colors cursor-pointer clip-badge-poly"
             title="Toggle zoom level"
           >
             <span>{zoomLevel === 'fit' ? 'Fit' : '150%'}</span>
           </button>
 
-          <button
-            onClick={() => setShowCode(!showCode)}
-            className={`px-2 py-1 border text-[10px] flex items-center gap-1 transition-colors cursor-pointer ${
-              showCode
-                ? 'bg-[#00FF41] text-black font-bold border-[#00FF41]'
-                : 'bg-black text-[#A1A1AA] hover:text-[#00FF41] border-[#262626] hover:border-[#00FF41]'
-            }`}
-            title="Inspect SVG XML Source"
-          >
-            <Code className="w-3 h-3" />
-            <span>XML</span>
-          </button>
+          {!hasRasterImage && media.svgData && (
+            <button
+              onClick={() => setShowCode(!showCode)}
+              className={`px-2 py-1 border text-[10px] flex items-center gap-1 transition-colors cursor-pointer clip-badge-poly ${
+                showCode
+                  ? 'bg-[#A855F7] text-black font-bold border-[#A855F7]'
+                  : 'bg-black/80 text-[#A1A1AA] hover:text-[#A855F7] border-[#2D2D45] hover:border-[#A855F7]'
+              }`}
+              title="Inspect SVG XML Source"
+            >
+              <Code className="w-3 h-3" />
+              <span>XML</span>
+            </button>
+          )}
 
           <button
-            onClick={handleCopySvg}
-            className="px-2.5 py-1 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#00FF41] text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
-            title="Copy SVG XML code to clipboard"
+            onClick={handleCopy}
+            className="px-2.5 py-1 bg-black/80 hover:bg-[#18182E] border border-[#2D2D45] hover:border-[#A855F7] text-[#A1A1AA] hover:text-[#A855F7] text-[11px] flex items-center gap-1 transition-colors cursor-pointer clip-badge-poly"
+            title={hasRasterImage ? 'Copy image data URL' : 'Copy SVG XML code'}
           >
-            {copied ? <Check className="w-3 h-3 text-[#00FF41]" /> : <Copy className="w-3 h-3" />}
+            {copied ? <Check className="w-3 h-3 text-[#A855F7]" /> : <Copy className="w-3 h-3" />}
             <span>{copied ? 'Copied' : 'Copy'}</span>
           </button>
 
-          <button
-            onClick={handleDownloadSvg}
-            className="px-2.5 py-1 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#00FF41] text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
-            title="Download vector SVG file"
-          >
-            <Download className="w-3 h-3 text-[#00FF41]" />
-            <span>SVG</span>
-          </button>
+          {!hasRasterImage && media.svgData && (
+            <button
+              onClick={handleDownloadSvg}
+              className="px-2.5 py-1 bg-black/80 hover:bg-[#18182E] border border-[#2D2D45] hover:border-[#A855F7] text-[#A1A1AA] hover:text-[#A855F7] text-[11px] flex items-center gap-1 transition-colors cursor-pointer clip-badge-poly"
+              title="Download vector SVG file"
+            >
+              <Download className="w-3 h-3 text-[#A855F7]" />
+              <span>SVG</span>
+            </button>
+          )}
 
           <button
-            onClick={handleDownloadPng}
+            onClick={handleDownloadImage}
             disabled={isExportingPng}
-            className="px-2.5 py-1 bg-[#00FF41] hover:bg-[#00E038] text-black font-bold text-[11px] border border-[#00FF41] shadow-[2px_2px_0px_0px_#262626] flex items-center gap-1 transition-all cursor-pointer"
-            title="Download high-resolution rasterized PNG"
+            className="px-3 py-1 bg-[#A855F7] hover:bg-[#9333EA] text-black font-bold text-[11px] border border-[#A855F7] clip-badge-poly shadow-[0_0_12px_rgba(168,85,247,0.4)] flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+            title="Download full resolution photorealistic PNG"
           >
             {isExportingPng ? <Loader2 className="w-3 h-3 animate-spin text-black" /> : <Download className="w-3 h-3 text-black" />}
             <span>{isExportingPng ? 'Saving...' : 'Download PNG'}</span>
@@ -1217,7 +1303,7 @@ const InlineImageViewer = memo<{ media: ChatMediaData }>(({ media }) => {
 
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-1 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-[#737373] hover:text-[#00FF41] cursor-pointer"
+            className="p-1 bg-black/80 hover:bg-[#18182E] border border-[#2D2D45] hover:border-[#A855F7] text-[#737373] hover:text-[#A855F7] clip-badge-poly cursor-pointer"
             title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
           >
             {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
@@ -1225,9 +1311,28 @@ const InlineImageViewer = memo<{ media: ChatMediaData }>(({ media }) => {
         </div>
       </div>
 
-      <div className={`p-4 bg-black flex items-center justify-center overflow-auto ${isFullscreen ? 'flex-1' : 'min-h-[220px]'}`}>
-        {showCode ? (
-          <pre className="w-full max-h-[350px] overflow-auto p-3 bg-[#080808] border border-[#262626] text-[11px] text-[#00FF41] leading-tight select-all">
+      <div className={`relative p-4 bg-[#030308] flex items-center justify-center overflow-auto ${isFullscreen ? 'flex-1' : 'min-h-[260px]'}`}>
+        {hasRasterImage ? (
+          <div
+            style={{
+              transform: zoomLevel === '150' ? 'scale(1.5)' : 'scale(1)',
+              transition: 'transform 0.2s ease',
+            }}
+            className="relative w-full flex items-center justify-center overflow-hidden"
+          >
+            <img
+              src={imageSource}
+              alt={media.prompt || 'Photorealistic AI Generation'}
+              className="max-h-[480px] w-auto object-contain border border-[#25253D] shadow-lg clip-cyber-card"
+              loading="lazy"
+            />
+            {/* Somotoz Minimalist Watermark */}
+            <div className="absolute bottom-3 right-3 px-2 py-0.5 bg-black/80 backdrop-blur-md border border-[#A855F7]/50 text-[10px] font-mono font-bold tracking-widest text-[#A855F7] pointer-events-none shadow-lg clip-badge-poly">
+              SOMOTOZ
+            </div>
+          </div>
+        ) : showCode && media.svgData ? (
+          <pre className="w-full max-h-[350px] overflow-auto p-3 bg-[#060610] border border-[#25253D] text-[11px] text-[#A855F7] leading-tight select-all clip-badge-poly">
             {media.svgData}
           </pre>
         ) : media.svgData ? (
@@ -1236,18 +1341,28 @@ const InlineImageViewer = memo<{ media: ChatMediaData }>(({ media }) => {
               transform: zoomLevel === '150' ? 'scale(1.5)' : 'scale(1)',
               transition: 'transform 0.2s ease',
             }}
-            className="w-full max-h-[420px] flex items-center justify-center overflow-hidden [&>svg]:w-full [&>svg]:h-auto [&>svg]:max-h-[380px]"
-            dangerouslySetInnerHTML={{ __html: media.svgData }}
-          />
+            className="relative w-full max-h-[440px] flex items-center justify-center overflow-hidden [&>svg]:w-full [&>svg]:h-auto [&>svg]:max-h-[400px]"
+          >
+            <div dangerouslySetInnerHTML={{ __html: media.svgData }} className="w-full h-full flex items-center justify-center" />
+            {/* Somotoz Minimalist Watermark */}
+            <div className="absolute bottom-3 right-3 px-2 py-0.5 bg-black/80 backdrop-blur-md border border-[#A855F7]/50 text-[10px] font-mono font-bold tracking-widest text-[#A855F7] pointer-events-none shadow-lg clip-badge-poly">
+              SOMOTOZ
+            </div>
+          </div>
         ) : (
           <div className="h-48 flex items-center justify-center text-[#737373] text-xs font-mono">
-            No SVG data available
+            No image data available
           </div>
         )}
       </div>
 
-      <div className="px-3 py-1.5 bg-[#0A0A0A] border-t border-[#262626] text-[11px] font-mono text-[#737373] truncate">
-        Prompt: <span className="text-[#EDEDED]">{media.prompt}</span>
+      <div className="px-3 py-2 bg-[#080814] border-t border-[#25253D] text-[11px] font-mono text-[#737373] flex items-center justify-between gap-2">
+        <div className="truncate">
+          Prompt: <span className="text-[#EDEDED]">{media.prompt}</span>
+        </div>
+        <span className="text-[10px] text-[#A855F7] shrink-0 font-bold px-2 py-0.5 bg-black/60 border border-[#2D2D45] clip-badge-poly">
+          [100% Photorealistic Engine]
+        </span>
       </div>
     </div>
   );
@@ -1279,68 +1394,178 @@ const InlineVideoSimulator = memo<{ media: ChatMediaData }>(({ media }) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const lowerPrompt = (media.prompt || '').toLowerCase();
+    const isOcean = /\b(ocean|sea|beach|water|wave|island)\b/i.test(lowerPrompt);
+    const isSpace = /\b(space|galaxy|cosmos|planet|star|nebula)\b/i.test(lowerPrompt);
+    const isCity = /\b(city|urban|building|skyline|tokyo|street)\b/i.test(lowerPrompt);
+
+    // Particle field initialization
+    const particles: Array<{ x: number; y: number; size: number; speed: number; opacity: number }> = [];
+    for (let p = 0; p < 45; p++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2.2 + 0.8,
+        speed: Math.random() * 0.8 + 0.3,
+        opacity: Math.random() * 0.7 + 0.3,
+      });
+    }
+
     const render = () => {
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const w = canvas.width;
+      const h = canvas.height;
+      const panOffset = isPlaying ? (tick * 0.6 * motionSpeed) % w : 0;
 
-      ctx.strokeStyle = 'rgba(0, 255, 65, 0.12)';
-      ctx.lineWidth = 1;
-      const gridSize = 24;
-      for (let x = 0; x < canvas.width; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
+      // 1. Sky & Atmospheric Background Gradient
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+      if (isSpace) {
+        skyGrad.addColorStop(0, '#030712');
+        skyGrad.addColorStop(0.5, '#1e1b4b');
+        skyGrad.addColorStop(1, '#0f172a');
+      } else if (isOcean) {
+        skyGrad.addColorStop(0, '#0284c7');
+        skyGrad.addColorStop(0.5, '#38bdf8');
+        skyGrad.addColorStop(1, '#fef08a');
+      } else if (isCity) {
+        skyGrad.addColorStop(0, '#090514');
+        skyGrad.addColorStop(0.6, '#2e1065');
+        skyGrad.addColorStop(1, '#db2777');
+      } else {
+        // Nature / Sunset Golden Hour Default
+        skyGrad.addColorStop(0, '#1e1b4b');
+        skyGrad.addColorStop(0.35, '#431407');
+        skyGrad.addColorStop(0.7, '#ea580c');
+        skyGrad.addColorStop(1, '#fbbf24');
       }
-      for (let y = 0; y < canvas.height; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-      }
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, w, h);
 
-      const waveOffset = isPlaying ? tick * 0.05 * motionSpeed : 0;
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = '#00FF41';
-      ctx.shadowColor = '#00FF41';
-      ctx.shadowBlur = 10;
-
+      // 2. Celestial Body & Volumetric Glow
+      const sunX = isSpace ? w * 0.4 : isOcean ? w * 0.75 : w * 0.5;
+      const sunY = h * 0.38;
+      const sunGlow = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 140);
+      sunGlow.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+      sunGlow.addColorStop(0.3, isSpace ? 'rgba(168, 85, 247, 0.5)' : 'rgba(251, 191, 36, 0.6)');
+      sunGlow.addColorStop(0.8, isSpace ? 'rgba(99, 102, 241, 0.2)' : 'rgba(234, 88, 12, 0.2)');
+      sunGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = sunGlow;
       ctx.beginPath();
-      for (let x = 0; x < canvas.width; x += 3) {
-        const y = canvas.height / 2 + Math.sin(x * 0.02 + waveOffset) * 45 + Math.cos(x * 0.01 - waveOffset * 0.6) * 22;
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+      ctx.arc(sunX, sunY, 140, 0, Math.PI * 2);
+      ctx.fill();
 
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = 'rgba(0, 255, 65, 0.4)';
+      // Core Sun / Planet
+      ctx.fillStyle = isSpace ? '#c084fc' : '#fffbeb';
       ctx.beginPath();
-      for (let x = 0; x < canvas.width; x += 4) {
-        const y = canvas.height / 2 - Math.sin(x * 0.025 - waveOffset * 0.8) * 35;
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
+      ctx.arc(sunX, sunY, isSpace ? 32 : 24, 0, Math.PI * 2);
+      ctx.fill();
 
-      for (let i = 0; i < frames.length; i++) {
-        const nodeX = (canvas.width / (frames.length + 1)) * (i + 1);
-        const nodeY = canvas.height / 2 + Math.sin(nodeX * 0.02 + waveOffset) * 45;
-        
-        ctx.fillStyle = activeFrameIndex === i ? '#00FF41' : '#00661A';
+      // 3. Parallax Midground Scenery
+      if (isSpace) {
+        ctx.strokeStyle = 'rgba(224, 231, 255, 0.4)';
+        ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.arc(nodeX, nodeY, activeFrameIndex === i ? 8 : 4.5, 0, Math.PI * 2);
+        ctx.ellipse(sunX, sunY, 80, 16, -0.3, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (isOcean) {
+        ctx.fillStyle = '#0369a1';
+        ctx.beginPath();
+        ctx.moveTo(0, h * 0.58);
+        for (let x = 0; x <= w; x += 10) {
+          const y = h * 0.58 + Math.sin((x + panOffset * 2) * 0.02) * 8;
+          ctx.lineTo(x, y);
+        }
+        ctx.lineTo(w, h);
+        ctx.lineTo(0, h);
         ctx.fill();
 
-        if (activeFrameIndex === i) {
-          ctx.strokeStyle = '#00FF41';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(nodeX, nodeY, 14, 0, Math.PI * 2);
-          ctx.stroke();
+        ctx.fillStyle = '#075985';
+        ctx.beginPath();
+        ctx.moveTo(0, h * 0.7);
+        for (let x = 0; x <= w; x += 10) {
+          const y = h * 0.7 + Math.sin((x - panOffset * 1.5) * 0.025) * 10;
+          ctx.lineTo(x, y);
         }
+        ctx.lineTo(w, h);
+        ctx.lineTo(0, h);
+        ctx.fill();
+      } else if (isCity) {
+        ctx.fillStyle = '#1e1035';
+        for (let i = -1; i < 12; i++) {
+          const bX = (i * 65 - (panOffset * 0.4) % 65);
+          const bH = 70 + (Math.sin(i * 3) + 1) * 35;
+          ctx.fillRect(bX, h * 0.65 - bH, 50, bH + 100);
+        }
+        ctx.fillStyle = '#0b0416';
+        for (let i = -1; i < 10; i++) {
+          const bX = (i * 85 - panOffset % 85);
+          const bH = 110 + (Math.sin(i * 5) + 1) * 45;
+          ctx.fillRect(bX, h * 0.7 - bH, 65, bH + 100);
+          ctx.fillStyle = '#fde047';
+          ctx.fillRect(bX + 10, h * 0.7 - bH + 15, 6, 6);
+          ctx.fillRect(bX + 24, h * 0.7 - bH + 15, 6, 6);
+          ctx.fillRect(bX + 10, h * 0.7 - bH + 35, 6, 6);
+          ctx.fillStyle = '#0b0416';
+        }
+      } else {
+        ctx.fillStyle = '#311042';
+        ctx.beginPath();
+        ctx.moveTo(0, h);
+        ctx.lineTo(0, h * 0.62);
+        ctx.lineTo(w * 0.25, h * 0.45);
+        ctx.lineTo(w * 0.55, h * 0.64);
+        ctx.lineTo(w * 0.8, h * 0.42);
+        ctx.lineTo(w, h * 0.58);
+        ctx.lineTo(w, h);
+        ctx.fill();
+
+        ctx.fillStyle = '#180720';
+        ctx.beginPath();
+        ctx.moveTo(0, h);
+        ctx.lineTo(0, h * 0.72);
+        ctx.lineTo(w * 0.35, h * 0.55);
+        ctx.lineTo(w * 0.7, h * 0.74);
+        ctx.lineTo(w, h * 0.62);
+        ctx.lineTo(w, h);
+        ctx.fill();
       }
+
+      // 4. Volumetric Light Particles
+      for (const pt of particles) {
+        pt.y -= pt.speed * (isPlaying ? motionSpeed : 0.2);
+        pt.x += Math.sin(tick * 0.02 + pt.y) * 0.4;
+        if (pt.y < 0) {
+          pt.y = h;
+          pt.x = Math.random() * w;
+        }
+
+        ctx.fillStyle = isSpace
+          ? `rgba(199, 210, 254, ${pt.opacity})`
+          : isOcean
+          ? `rgba(254, 240, 138, ${pt.opacity})`
+          : `rgba(251, 191, 36, ${pt.opacity})`;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 5. Cinematic Vignette & Letterbox
+      const vignette = ctx.createRadialGradient(w / 2, h / 2, h * 0.4, w / 2, h / 2, w * 0.7);
+      vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vignette.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, w, h);
+
+      // 6. HUD Active Timeline Indicator
+      const currentFrameText = frames[activeFrameIndex] || frames[0] || 'Scene Simulation';
+      ctx.fillStyle = 'rgba(10, 10, 24, 0.85)';
+      ctx.fillRect(12, h - 42, w - 24, 30);
+      ctx.strokeStyle = '#FF007A';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(12, h - 42, w - 24, 30);
+
+      ctx.fillStyle = '#FF007A';
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText(`REC [${isPlaying ? 'LIVE 60FPS' : 'PAUSED'}] | ${currentFrameText.slice(0, 52)}`, 22, h - 23);
 
       tick++;
       if (isPlaying) {
@@ -1353,7 +1578,7 @@ const InlineVideoSimulator = memo<{ media: ChatMediaData }>(({ media }) => {
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [isPlaying, activeFrameIndex, frames.length, motionSpeed]);
+  }, [isPlaying, activeFrameIndex, frames, motionSpeed, media.prompt]);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -1394,14 +1619,14 @@ const InlineVideoSimulator = memo<{ media: ChatMediaData }>(({ media }) => {
   };
 
   return (
-    <div className="bg-black border border-[#262626] overflow-hidden shadow-[2px_2px_0px_0px_#171717] font-mono">
-      <div className="px-3 py-2 bg-[#0A0A0A] border-b border-[#262626] flex flex-wrap items-center justify-between gap-2 text-xs text-[#EDEDED]">
+    <div className="bg-gradient-to-b from-[#0C0C1C] via-[#080814] to-[#04040A] border border-[#FF007A]/60 clip-cyber-card overflow-hidden shadow-[0_0_25px_rgba(255,0,122,0.15)] font-mono">
+      <div className="px-3 py-2 bg-[#080814] border-b border-[#25253D] flex flex-wrap items-center justify-between gap-2 text-xs text-[#EDEDED]">
         <div className="flex items-center space-x-2">
-          <span className="flex items-center gap-1.5 text-[#00FF41] font-semibold">
-            <Film className="w-3.5 h-3.5 text-[#00FF41]" />
+          <span className="flex items-center gap-1.5 text-[#FF007A] font-semibold">
+            <Film className="w-3.5 h-3.5 text-[#FF007A]" />
             Video Generator ({media.duration || '0:12'})
           </span>
-          <span className="text-[10px] text-[#737373] hidden sm:inline">
+          <span className="text-[10px] text-[#A1A1AA] bg-black/60 px-2 py-0.5 clip-badge-poly border border-[#2D2D45] hidden sm:inline">
             • 60 FPS Keyframe Engine
           </span>
         </div>
@@ -1409,7 +1634,7 @@ const InlineVideoSimulator = memo<{ media: ChatMediaData }>(({ media }) => {
         <div className="flex items-center space-x-1.5 flex-wrap">
           <button
             onClick={() => setMotionSpeed(prev => prev === 1 ? 1.5 : prev === 1.5 ? 2 : 1)}
-            className="px-2 py-1 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#00FF41] text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
+            className="px-2 py-1 bg-black/80 hover:bg-[#18182E] border border-[#2D2D45] hover:border-[#FF007A] text-[#A1A1AA] hover:text-[#FF007A] text-[10px] flex items-center gap-1 transition-colors cursor-pointer clip-badge-poly"
             title="Playback speed"
           >
             <span>{motionSpeed}x Speed</span>
@@ -1417,55 +1642,60 @@ const InlineVideoSimulator = memo<{ media: ChatMediaData }>(({ media }) => {
 
           <button
             onClick={handleDownloadFrame}
-            className="px-2.5 py-1 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#00FF41] text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+            className="px-2.5 py-1 bg-black/80 hover:bg-[#18182E] border border-[#2D2D45] hover:border-[#FF007A] text-[#A1A1AA] hover:text-[#FF007A] text-[11px] flex items-center gap-1 transition-colors cursor-pointer clip-badge-poly"
             title="Download active scene frame as PNG image"
           >
-            <Download className="w-3 h-3 text-[#00FF41]" />
+            <Download className="w-3 h-3 text-[#FF007A]" />
             <span>Frame (.png)</span>
           </button>
 
           <button
             onClick={handleDownloadStoryboard}
-            className="px-2.5 py-1 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#00FF41] text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+            className="px-2.5 py-1 bg-black/80 hover:bg-[#18182E] border border-[#2D2D45] hover:border-[#FF007A] text-[#A1A1AA] hover:text-[#FF007A] text-[11px] flex items-center gap-1 transition-colors cursor-pointer clip-badge-poly"
             title="Download keyframes script as text file"
           >
-            <FileText className="w-3 h-3 text-[#00FF41]" />
+            <FileText className="w-3 h-3 text-[#FF007A]" />
             <span>Script (.txt)</span>
           </button>
 
           <button
             onClick={handleDownloadVideo}
             disabled={isRecordingVideo}
-            className="px-2.5 py-1 bg-[#00FF41] hover:bg-[#00E038] text-black font-bold text-[11px] border border-[#00FF41] shadow-[2px_2px_0px_0px_#262626] flex items-center gap-1 transition-all cursor-pointer"
+            className="px-3 py-1 bg-[#FF007A] hover:bg-[#E0006A] text-white font-bold text-[11px] border border-[#FF007A] clip-badge-poly shadow-[0_0_12px_rgba(255,0,122,0.4)] flex items-center gap-1 transition-all cursor-pointer active:scale-95"
             title="Record and download motion animation as WebM video file"
           >
-            {isRecordingVideo ? <Loader2 className="w-3 h-3 animate-spin text-black" /> : <Video className="w-3 h-3 text-black" />}
+            {isRecordingVideo ? <Loader2 className="w-3 h-3 animate-spin text-white" /> : <Video className="w-3 h-3 text-white" />}
             <span>{isRecordingVideo ? recordProgressText || 'Recording...' : 'Download Video (.webm)'}</span>
           </button>
         </div>
       </div>
 
-      <div className="relative bg-black flex items-center justify-center overflow-hidden">
+      <div className="relative bg-[#030308] flex items-center justify-center overflow-hidden">
         <canvas ref={canvasRef} width={640} height={260} className="w-full h-auto max-h-[260px]" />
 
         <button
           onClick={() => setIsPlaying(!isPlaying)}
-          className="absolute inset-0 m-auto w-12 h-12 bg-[#00FF41] hover:bg-[#00E038] text-black flex items-center justify-center transition-transform hover:scale-105 shadow-[2px_2px_0px_0px_#000000] cursor-pointer"
+          className="absolute inset-0 m-auto w-12 h-12 bg-[#FF007A] hover:bg-[#E0006A] text-white flex items-center justify-center transition-transform hover:scale-110 shadow-[0_0_20px_rgba(255,0,122,0.6)] clip-badge-poly cursor-pointer"
           title={isPlaying ? 'Pause' : 'Play'}
         >
-          {isPlaying ? <Pause className="w-5 h-5 text-black" /> : <Play className="w-5 h-5 ml-0.5 text-black" />}
+          {isPlaying ? <Pause className="w-5 h-5 text-white" /> : <Play className="w-5 h-5 ml-0.5 text-white" />}
         </button>
 
-        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/90 border border-[#262626] text-[10px] text-[#00FF41] flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 bg-[#00FF41] rounded-full animate-ping" />
+        <div className="absolute bottom-2 left-2 px-2.5 py-1 bg-black/90 border border-[#FF007A]/50 text-[10px] text-[#FF007A] clip-badge-poly flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 bg-[#FF007A] rounded-full animate-ping" />
           Scene {activeFrameIndex + 1}/{frames.length}
+        </div>
+
+        {/* Minimalist Somotoz Watermark */}
+        <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/80 backdrop-blur-md border border-[#FF007A]/50 text-[10px] font-mono font-bold tracking-widest text-[#FF007A] pointer-events-none shadow-lg clip-badge-poly">
+          SOMOTOZ
         </div>
       </div>
 
-      <div className="p-2.5 bg-[#0A0A0A] border-t border-[#262626] space-y-1.5">
+      <div className="p-2.5 bg-[#080814] border-t border-[#25253D] space-y-1.5">
         <div className="text-[11px] text-[#A1A1AA] font-semibold flex items-center justify-between">
           <span>Keyframe Breakdown Timeline</span>
-          <span className="text-[#00FF41] text-[10px]">{isPlaying ? 'PLAYING (60FPS)' : 'PAUSED'}</span>
+          <span className="text-[#FF007A] text-[10px]">{isPlaying ? 'PLAYING (60FPS)' : 'PAUSED'}</span>
         </div>
         <div className="space-y-1">
           {frames.map((kf, idx) => (
@@ -1475,13 +1705,13 @@ const InlineVideoSimulator = memo<{ media: ChatMediaData }>(({ media }) => {
                 setActiveFrameIndex(idx);
                 setIsPlaying(true);
               }}
-              className={`px-2.5 py-1 text-[11px] transition-colors cursor-pointer flex items-center gap-2 border ${
+              className={`px-2.5 py-1 text-[11px] transition-colors cursor-pointer flex items-center gap-2 border clip-badge-poly ${
                 activeFrameIndex === idx
-                  ? 'bg-black text-[#00FF41] border-[#00FF41]'
-                  : 'bg-[#0F0F0F] text-[#A1A1AA] border-[#1F1F1F] hover:border-[#00FF41]'
+                  ? 'bg-black text-[#FF007A] border-[#FF007A] shadow-[0_0_10px_rgba(255,0,122,0.25)]'
+                  : 'bg-[#0E0E20] text-[#A1A1AA] border-[#222238] hover:border-[#FF007A]'
               }`}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00FF41]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF007A]" />
               <span className="truncate">{kf}</span>
             </div>
           ))}
@@ -1578,14 +1808,14 @@ const InlineAudioSynthesizer = memo<{ media: ChatMediaData }>(({ media }) => {
   };
 
   return (
-    <div className="bg-black border border-[#262626] overflow-hidden shadow-[2px_2px_0px_0px_#171717] font-mono">
-      <div className="px-3 py-2 bg-[#0A0A0A] border-b border-[#262626] flex flex-wrap items-center justify-between gap-2 text-xs text-[#EDEDED]">
+    <div className="bg-gradient-to-b from-[#0C0C1C] via-[#080814] to-[#04040A] border border-[#FFB800]/60 clip-cyber-card overflow-hidden shadow-[0_0_25px_rgba(255,184,0,0.15)] font-mono">
+      <div className="px-3 py-2 bg-[#080814] border-b border-[#25253D] flex flex-wrap items-center justify-between gap-2 text-xs text-[#EDEDED]">
         <div className="flex items-center space-x-2">
-          <span className="flex items-center gap-1.5 text-[#00FF41] font-semibold">
-            <Music className="w-3.5 h-3.5 text-[#00FF41]" />
+          <span className="flex items-center gap-1.5 text-[#FFB800] font-semibold">
+            <Music className="w-3.5 h-3.5 text-[#FFB800]" />
             Music Synthesizer ({media.genre || 'Cyber Synth'})
           </span>
-          <span className="text-[10px] text-[#737373] hidden sm:inline">
+          <span className="text-[10px] text-[#A1A1AA] bg-black/60 px-2 py-0.5 clip-badge-poly border border-[#2D2D45] hidden sm:inline">
             • 432Hz Harmonic Engine
           </span>
         </div>
@@ -1594,7 +1824,7 @@ const InlineAudioSynthesizer = memo<{ media: ChatMediaData }>(({ media }) => {
           <select
             value={oscType}
             onChange={(e) => setOscType(e.target.value as OscillatorType)}
-            className="px-2 py-1 bg-black border border-[#262626] text-[#A1A1AA] hover:text-[#00FF41] text-[10px] outline-none cursor-pointer"
+            className="px-2 py-1 bg-black/80 border border-[#2D2D45] text-[#A1A1AA] hover:text-[#FFB800] text-[10px] outline-none cursor-pointer clip-badge-poly"
             title="Oscillator Waveform"
           >
             <option value="sine">Sine Wave</option>
@@ -1605,7 +1835,7 @@ const InlineAudioSynthesizer = memo<{ media: ChatMediaData }>(({ media }) => {
 
           <button
             onClick={() => setTempo(prev => prev === 120 ? 140 : prev === 140 ? 90 : 120)}
-            className="px-2 py-1 bg-black hover:bg-[#141414] border border-[#262626] hover:border-[#00FF41] text-[#A1A1AA] hover:text-[#00FF41] text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
+            className="px-2 py-1 bg-black/80 hover:bg-[#18182E] border border-[#2D2D45] hover:border-[#FFB800] text-[#A1A1AA] hover:text-[#FFB800] text-[10px] flex items-center gap-1 transition-colors cursor-pointer clip-badge-poly"
             title="Adjust tempo BPM"
           >
             <span>{tempo} BPM</span>
@@ -1613,7 +1843,7 @@ const InlineAudioSynthesizer = memo<{ media: ChatMediaData }>(({ media }) => {
 
           <button
             onClick={handleDownloadWav}
-            className="px-2.5 py-1 bg-[#00FF41] hover:bg-[#00E038] text-black font-bold text-[11px] border border-[#00FF41] shadow-[2px_2px_0px_0px_#262626] flex items-center gap-1 transition-all cursor-pointer"
+            className="px-3 py-1 bg-[#FFB800] hover:bg-[#E6A600] text-black font-bold text-[11px] border border-[#FFB800] clip-badge-poly shadow-[0_0_12px_rgba(255,184,0,0.4)] flex items-center gap-1 transition-all cursor-pointer active:scale-95"
             title="Synthesize and download standard 16-bit PCM WAV audio file"
           >
             <Download className="w-3 h-3 text-black" />
@@ -1622,7 +1852,7 @@ const InlineAudioSynthesizer = memo<{ media: ChatMediaData }>(({ media }) => {
         </div>
       </div>
 
-      <div className="p-4 bg-black flex flex-col items-center justify-center gap-3">
+      <div className="p-4 bg-[#030308] flex flex-col items-center justify-center gap-3">
         <div className="flex items-end justify-center gap-1.5 h-16 w-full max-w-sm px-4">
           {notes.map((n, i) => {
             const isActive = activeNoteIdx === i;
@@ -1631,10 +1861,10 @@ const InlineAudioSynthesizer = memo<{ media: ChatMediaData }>(({ media }) => {
               <div
                 key={i}
                 style={{ height: `${heightPercent}%` }}
-                className={`flex-1 transition-all duration-75 border ${
+                className={`flex-1 transition-all duration-75 border clip-badge-poly ${
                   isActive
-                    ? 'bg-[#00FF41] border-[#00FF41] shadow-[0_0_12px_#00FF41]'
-                    : 'bg-[#141414] border-[#262626]'
+                    ? 'bg-[#FFB800] border-[#FFB800] shadow-[0_0_12px_#FFB800]'
+                    : 'bg-[#141424] border-[#25253D]'
                 }`}
                 title={`Note: ${n.freq.toFixed(1)} Hz (${n.duration}s)`}
               />
@@ -1644,10 +1874,10 @@ const InlineAudioSynthesizer = memo<{ media: ChatMediaData }>(({ media }) => {
 
         <button
           onClick={playSequence}
-          className={`px-5 py-2.5 font-bold text-xs flex items-center space-x-2 border transition-all cursor-pointer shadow-[2px_2px_0px_0px_#000000] active:translate-x-0.5 active:translate-y-0.5 ${
+          className={`px-5 py-2.5 font-bold text-xs flex items-center space-x-2 border transition-all cursor-pointer clip-badge-poly shadow-[0_0_15px_rgba(255,184,0,0.3)] active:scale-95 ${
             isPlaying
               ? 'bg-rose-500 hover:bg-rose-400 text-black border-rose-500'
-              : 'bg-[#00FF41] hover:bg-[#00E038] text-black border-[#00FF41]'
+              : 'bg-[#FFB800] hover:bg-[#E6A600] text-black border-[#FFB800]'
           }`}
         >
           {isPlaying ? (
@@ -1664,9 +1894,12 @@ const InlineAudioSynthesizer = memo<{ media: ChatMediaData }>(({ media }) => {
         </button>
       </div>
 
-      <div className="px-3 py-1.5 bg-[#0A0A0A] border-t border-[#262626] text-[11px] font-mono text-[#737373] flex justify-between items-center">
-        <span>Prompt: <span className="text-[#EDEDED]">{media.prompt}</span></span>
-        <span className="text-[#00FF41]">{notes.length} Harmonics Rendered</span>
+      <div className="px-3 py-1.5 bg-[#080814] border-t border-[#25253D] text-[11px] font-mono text-[#737373] flex justify-between items-center gap-2">
+        <span className="truncate">Prompt: <span className="text-[#EDEDED]">{media.prompt}</span></span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[#FFB800]">{notes.length} Harmonics</span>
+          <span className="px-2 py-0.5 bg-black border border-[#2D2D45] text-[9px] text-[#FFB800] font-bold clip-badge-poly">SOMOTOZ</span>
+        </div>
       </div>
     </div>
   );

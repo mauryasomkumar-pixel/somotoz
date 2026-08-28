@@ -10,6 +10,7 @@ export type GenerationMode = 'text' | 'image' | 'video' | 'music';
 export interface ChatMediaData {
   type: GenerationMode;
   url?: string;
+  imageUrl?: string;
   svgData?: string;
   prompt?: string;
   aspectRatio?: string;
@@ -18,7 +19,7 @@ export interface ChatMediaData {
   tempo?: number;
   genre?: string;
   videoFrames?: string[];
-  animationType?: 'ambient_pulse' | 'cyber_wave' | 'neural_mesh' | 'cosmic_drift';
+  animationType?: 'ambient_pulse' | 'cyber_wave' | 'neural_mesh' | 'cosmic_drift' | 'cinematic_motion' | string;
 }
 
 export interface ChatMessage {
