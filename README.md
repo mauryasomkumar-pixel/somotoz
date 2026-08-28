@@ -178,23 +178,21 @@ sequenceDiagram
 
 ### 6. Procedural 432Hz Harmonic Soundscape Synthesis
 
-```mermaid
 flowchart TD
-    UserAction[User Toggles Soundscape Preset / Melody] --> InitCtx[Initialize Web Audio AudioContext]
-    InitCtx --> SynthModule[soundSynthesizer.ts Engine]
+    UserAction["User Toggles Soundscape Preset / Melody"] --> InitCtx["Initialize Web Audio AudioContext"]
+    InitCtx --> SynthModule["soundSynthesizer.ts Engine"]
 
     subgraph Web Audio Synthesis Graph
-        SynthModule --> SineOsc[432Hz Base Sine & Triangle Oscillators]
-        SynthModule --> BrownianNoise[Brownian & Pink Noise Generator]
-        SynthModule --> ResonantFilter[Biquad Low-Pass Filter @ 800Hz]
-        SynthModule --> DynamicGain[Gain Envelope Nodes (Attack/Decay/Sustain)]
+        SynthModule --> SineOsc["432Hz Base Sine & Triangle Oscillators"]
+        SynthModule --> BrownianNoise["Brownian & Pink Noise Generator"]
+        SynthModule --> ResonantFilter["Biquad Low-Pass Filter @ 800Hz"]
+        SynthModule --> DynamicGain["Gain Envelope Nodes (Attack/Decay/Sustain)"]
     end
 
-    SineOsc --> OutputNode[audioContext.destination -> Headphones / Studio Speakers]
+    SineOsc --> OutputNode["audioContext.destination -> Headphones / Studio Speakers"]
     BrownianNoise --> OutputNode
     ResonantFilter --> OutputNode
     DynamicGain --> OutputNode
-```
 
 ---
 
