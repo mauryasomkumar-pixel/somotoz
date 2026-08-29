@@ -30,6 +30,7 @@ import {
 import { exportJournalEntryToPdf } from '../utils/pdfExport';
 import { downloadSvgImage, downloadPngImage } from '../utils/mediaExport';
 import { useTheme } from '../context/ThemeContext';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface ReflectionDetailProps {
   entry: JournalEntry;
@@ -428,14 +429,14 @@ export const ReflectionDetail: React.FC<ReflectionDetailProps> = ({
 
           {/* AI Conversational Feedback Box */}
           {entry.aiResponse.conversationalReply && (
-            <div className={`text-sm leading-relaxed font-sans p-5 clip-badge-poly border transition-colors ${
+            <div className={`p-5 clip-badge-poly border transition-colors ${
               isLight
                 ? 'bg-[#F8FAFC] text-[#090D16] border-[#CBD5E1]'
                 : isMix
                 ? 'bg-[#F4EFE6] text-[#231E19] border-[#D8CEBF]'
                 : 'bg-black text-[#EDEDED] border-[#262626]'
             }`}>
-              {entry.aiResponse.conversationalReply}
+              <MarkdownRenderer content={entry.aiResponse.conversationalReply} />
             </div>
           )}
 

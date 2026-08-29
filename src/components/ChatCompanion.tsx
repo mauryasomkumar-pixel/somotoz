@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { ChatMessage, ChatRole, GenerationMode, ChatMediaData, JournalEntry } from '../types';
 import { EmojiPicker } from './EmojiPicker';
+import { MarkdownRenderer } from './MarkdownRenderer';
 import { exportMessageToPdf, exportConversationToPdf } from '../utils/pdfExport';
 import { downloadMelodyWav } from '../utils/audioExport';
 import {
@@ -554,7 +555,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
   }, [lastUserMessage]);
 
   return (
-    <div className="w-full max-w-6xl mx-auto h-full flex-1 p-1 sm:p-2 flex flex-col gap-2 font-sans overflow-hidden min-h-0">
+    <div className="w-full max-w-5xl mx-auto h-full flex-1 flex flex-col font-sans overflow-hidden min-h-0 relative px-2 sm:px-4 pt-1 sm:pt-2 pb-6 sm:pb-8 gap-3">
       {/* Streamlined Top Status Bar - Zero Redundant Sub-Generator Bar */}
       <TopStatusBar
         selectedMode={selectedMode}
@@ -571,7 +572,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 min-h-0 bg-[var(--bg-card)] border border-[var(--border-color)] clip-cyber-card shadow-sm p-3 sm:p-5 overflow-y-auto space-y-4 font-sans relative text-[var(--text-primary)]"
+        className="flex-1 min-h-0 bg-[var(--bg-card)]/90 backdrop-blur-xs border border-[var(--border-color)] clip-cyber-card shadow-sm p-4 sm:p-6 overflow-y-auto space-y-4 font-sans relative text-[var(--text-primary)] scroll-smooth rounded-xl"
       >
         {messages.map((msg, index) => {
           let priorPrompt = '';
@@ -594,7 +595,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
           );
         })}
 
-        {/* ACTIVE STREAMING ASSISTANT BUBBLE (Instant Visual Feedback) */}
+        {/* ACTIVE STREAMING ASSISTANT BUBBLE (Instant Visual Feedback & Clean Markdown) */}
         {isLoading && (
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 shrink-0 bg-[var(--bg-secondary)] border border-[var(--border-active)] text-[var(--border-active)] flex items-center justify-center clip-badge-poly shadow-sm">
@@ -610,14 +611,21 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
                 <span className="text-[var(--text-secondary)] uppercase px-1.5 py-0.2 bg-[var(--bg-elevated)] border border-[var(--border-color)] clip-badge-poly text-[9px]">{selectedMode} MODE</span>
               </div>
 
-              <div className={`text-[var(--text-primary)] whitespace-pre-wrap ${accessibleReadingMode ? 'leading-loose tracking-wide text-[15px]' : 'leading-relaxed'} min-h-[24px]`}>
-                {activeStreamingText || (
-                  <span className="text-[var(--text-muted)] italic font-mono flex items-center gap-1.5">
+              <div className="min-h-[24px]">
+                {activeStreamingText ? (
+                  <div className="relative">
+                    <MarkdownRenderer
+                      content={activeStreamingText}
+                      accessibleReadingMode={accessibleReadingMode}
+                    />
+                    <span className="inline-block w-2 h-4 bg-[var(--border-active)] ml-1 animate-pulse align-middle" />
+                  </div>
+                ) : (
+                  <div className="text-[var(--text-muted)] italic font-mono text-xs flex items-center gap-2 py-1">
                     <span className="w-2 h-2 bg-[var(--border-active)] rounded-full animate-ping" />
-                    Thinking & generating in {activeLanguageStyle}...
-                  </span>
+                    <span>Thinking & generating in {activeLanguageStyle}...</span>
+                  </div>
                 )}
-                <span className="inline-block w-2 h-4 bg-[var(--border-active)] ml-1 animate-pulse align-middle" />
               </div>
             </div>
           </div>
@@ -630,235 +638,240 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
         )}
       </div>
 
-      {/* Input Form with Emoji Picker, Dynamic Intent Routing & Quick Slash Chips */}
-      <form onSubmit={handleSendMessage} className="relative flex flex-col gap-2 font-mono">
-        <EmojiPicker
-          isOpen={showEmojiPicker}
-          onClose={() => setShowEmojiPicker(false)}
-          onSelectEmoji={handleInsertEmoji}
-        />
-
-        {/* Slash Command Autocomplete Dropdown Popup */}
-        {filteredCommandSuggestions.length > 0 && (
-          <div className="absolute bottom-full left-0 right-0 mb-2 bg-[var(--bg-card)] border-2 border-[var(--border-active)] clip-cyber-card shadow-xl z-40 max-h-60 overflow-y-auto font-mono text-[var(--text-primary)]">
-            <div className="px-3 py-1.5 bg-[var(--bg-elevated)] border-b border-[var(--border-color)] flex items-center justify-between text-[11px] text-[var(--border-active)]">
-              <span className="font-bold flex items-center gap-1.5">
-                <Code className="w-3.5 h-3.5" />
-                AVAILABLE COMMANDS
-              </span>
-              <span className="text-[10px] text-[var(--text-secondary)]">Click or type to select</span>
-            </div>
-            <div className="divide-y divide-[var(--border-color)]">
-              {filteredCommandSuggestions.map((cmd, idx) => (
-                <button
-                  key={cmd.command}
-                  type="button"
-                  onClick={() => handleApplyCommand(cmd.command)}
-                  className={`w-full p-2.5 text-left flex items-start justify-between gap-2 transition-colors cursor-pointer ${
-                    idx === selectedSuggestionIndex
-                      ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]'
-                      : 'hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)]'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <span className="text-base">{cmd.icon}</span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[var(--border-active)]">{cmd.command}</span>
-                        <span className="text-[11px] text-[var(--text-primary)]">{cmd.label}</span>
-                      </div>
-                      <p className="text-[11px] text-[var(--text-muted)] font-sans mt-0.5">{cmd.desc}</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-[var(--text-secondary)] bg-[var(--bg-input)] px-2 py-0.5 border border-[var(--border-color)] clip-badge-poly shrink-0">
-                    {cmd.syntax}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Quick Slash Action Chips Bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
-          <span className="text-[var(--text-muted)] text-[10px] uppercase font-bold shrink-0 mr-1 flex items-center gap-1">
-            <Zap className="w-3 h-3 text-[var(--border-active)]" /> Commands:
-          </span>
-
-          <button
-            type="button"
-            onClick={() => handleApplyCommand('/image')}
-            className={`px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly ${
-              detectedIntent.mode === 'image'
-                ? 'bg-[#A855F7] text-black font-bold border-[#A855F7] shadow-[0_0_12px_rgba(168,85,247,0.4)]'
-                : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[#A855F7] border-[var(--border-color)] hover:border-[#A855F7]'
-            }`}
-            title="Render visual artwork"
-          >
-            <span>✨</span>
-            <span>/image [prompt]</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleApplyCommand('/video')}
-            className={`px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly ${
-              detectedIntent.mode === 'video'
-                ? 'bg-[#FF007A] text-white font-bold border-[#FF007A] shadow-[0_0_12px_rgba(255,0,122,0.4)]'
-                : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[#FF007A] border-[var(--border-color)] hover:border-[#FF007A]'
-            }`}
-            title="Synthesize 60FPS motion sequence"
-          >
-            <span>🎬</span>
-            <span>/video [prompt]</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleApplyCommand('/music')}
-            className={`px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly ${
-              detectedIntent.mode === 'music'
-                ? 'bg-[#FFB800] text-black font-bold border-[#FFB800] shadow-[0_0_12px_rgba(255,184,0,0.4)]'
-                : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[#FFB800] border-[var(--border-color)] hover:border-[#FFB800]'
-            }`}
-            title="Compose 432Hz procedural audio"
-          >
-            <span>🎵</span>
-            <span>/music [prompt]</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleApplyCommand('/pdf')}
-            className="px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--border-active)] border-[var(--border-color)] hover:border-[var(--border-active)]"
-            title="Format response for instant PDF download"
-          >
-            <span>📄</span>
-            <span>/pdf [topic]</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleApplyCommand('/search')}
-            className="px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--border-active)] border-[var(--border-color)] hover:border-[var(--border-active)]"
-            title="Ground with live Google search"
-          >
-            <span>🌐</span>
-            <span>/search [query]</span>
-          </button>
-        </div>
-
-        {/* Unified Input Box with Real-Time Intent Pill & Chamfered Polygon Border */}
-        <div className="relative flex items-center bg-[var(--bg-input)] border-2 border-[var(--border-color)] focus-within:border-[var(--border-active)] clip-cyber-card shadow-sm transition-all">
-          <div className="hidden sm:flex items-center pl-3 pr-1 text-xs text-[var(--border-active)] shrink-0">
-            <span
-              className={`px-2.5 py-1 bg-[var(--bg-secondary)] border text-[10px] uppercase font-bold flex items-center gap-1 clip-badge-poly transition-colors ${
-                detectedIntent.mode !== 'text' || detectedIntent.isExplicitSlash
-                  ? 'border-[var(--border-active)] text-[var(--border-active)] shadow-sm'
-                  : 'border-[var(--border-color)] text-[var(--text-secondary)]'
-              }`}
-            >
-              <Zap className={`w-3 h-3 ${detectedIntent.mode !== 'text' ? 'text-[var(--border-active)] animate-pulse' : 'text-[var(--text-muted)]'}`} />
-              {detectedIntent.badgeLabel}
-            </span>
-          </div>
-
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder={
-              selectedMode === 'image'
-                ? "Describe the visual illustration (e.g. 'Futuristic AI neural network matrix')..."
-                : selectedMode === 'video'
-                ? "Describe the motion sequence (e.g. 'Cyberpunk neon flight over metropolis')..."
-                : selectedMode === 'music'
-                ? "Describe the melody (e.g. 'Calming 432Hz ambient focus synthesizer')..."
-                : "Ask anything in any language (English, Hindi, Hinglish, etc.)..."
-            }
-            disabled={isLoading}
-            className="flex-1 px-3 sm:px-4 py-3.5 bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none font-sans"
+      {/* FLOATING GLASSMORPHISM CHAT INPUT DOCK */}
+      <div className="relative shrink-0 z-20">
+        <form
+          onSubmit={handleSendMessage}
+          className="relative flex flex-col gap-2 p-3 sm:p-4 bg-[var(--glass-bg)] backdrop-blur-xl border-2 border-[var(--border-color)] focus-within:border-[var(--border-active)] focus-within:shadow-[0_0_24px_rgba(0,240,255,0.18)] clip-cyber-card rounded-xl sm:rounded-2xl transition-all duration-300 font-mono"
+        >
+          <EmojiPicker
+            isOpen={showEmojiPicker}
+            onClose={() => setShowEmojiPicker(false)}
+            onSelectEmoji={handleInsertEmoji}
           />
 
-          <div className="flex items-center space-x-1.5 pr-2">
-            <button
-              type="button"
-              onClick={() => setShowEmojiPicker((prev) => !prev)}
-              className={`p-2 border transition-all cursor-pointer clip-badge-poly ${
-                showEmojiPicker
-                  ? 'bg-[var(--border-active)] text-black border-[var(--border-active)] shadow-sm'
-                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--border-active)] border-[var(--border-color)] hover:border-[var(--border-active)]'
-              }`}
-              title="Open Emoji Picker"
-            >
-              <Smile className="w-4 h-4" />
-            </button>
+          {/* Slash Command Autocomplete Dropdown Popup */}
+          {filteredCommandSuggestions.length > 0 && (
+            <div className="absolute bottom-full left-0 right-0 mb-3 bg-[var(--bg-card)] border-2 border-[var(--border-active)] clip-cyber-card shadow-2xl z-40 max-h-60 overflow-y-auto font-mono text-[var(--text-primary)] rounded-lg">
+              <div className="px-3.5 py-2 bg-[var(--bg-elevated)] border-b border-[var(--border-color)] flex items-center justify-between text-[11px] text-[var(--border-active)]">
+                <span className="font-bold flex items-center gap-1.5">
+                  <Code className="w-3.5 h-3.5" />
+                  AVAILABLE COMMANDS
+                </span>
+                <span className="text-[10px] text-[var(--text-secondary)]">Click or type to select</span>
+              </div>
+              <div className="divide-y divide-[var(--border-color)]">
+                {filteredCommandSuggestions.map((cmd, idx) => (
+                  <button
+                    key={cmd.command}
+                    type="button"
+                    onClick={() => handleApplyCommand(cmd.command)}
+                    className={`w-full p-2.5 text-left flex items-start justify-between gap-2 transition-colors cursor-pointer ${
+                      idx === selectedSuggestionIndex
+                        ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]'
+                        : 'hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <span className="text-base">{cmd.icon}</span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-[var(--border-active)]">{cmd.command}</span>
+                          <span className="text-[11px] text-[var(--text-primary)]">{cmd.label}</span>
+                        </div>
+                        <p className="text-[11px] text-[var(--text-muted)] font-sans mt-0.5">{cmd.desc}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-[var(--text-secondary)] bg-[var(--bg-input)] px-2 py-0.5 border border-[var(--border-color)] clip-badge-poly shrink-0">
+                      {cmd.syntax}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-            {/* Direct Module Switcher Buttons with Polygon Clips */}
-            <button
-              type="button"
-              onClick={() => setSelectedMode('text')}
-              className={`p-2 border transition-all cursor-pointer hidden md:flex clip-badge-poly ${
-                selectedMode === 'text'
-                  ? 'bg-[#00F0FF] text-black border-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.4)]'
-                  : 'bg-black/80 text-[#737373] hover:text-[#EDEDED] border-[#2D2D45]'
-              }`}
-              title="Switch to Smart Chat"
-            >
-              <MessageSquare className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedMode('image')}
-              className={`p-2 border transition-all cursor-pointer hidden md:flex clip-badge-poly ${
-                selectedMode === 'image'
-                  ? 'bg-[#A855F7] text-black border-[#A855F7] shadow-[0_0_10px_rgba(168,85,247,0.4)]'
-                  : 'bg-black/80 text-[#737373] hover:text-[#EDEDED] border-[#2D2D45]'
-              }`}
-              title="Switch to Image Generator"
-            >
-              <ImageIcon className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedMode('video')}
-              className={`p-2 border transition-all cursor-pointer hidden md:flex clip-badge-poly ${
-                selectedMode === 'video'
-                  ? 'bg-[#FF007A] text-white border-[#FF007A] shadow-[0_0_10px_rgba(255,0,122,0.4)]'
-                  : 'bg-black/80 text-[#737373] hover:text-[#EDEDED] border-[#2D2D45]'
-              }`}
-              title="Switch to Video Generator"
-            >
-              <Film className="w-4 h-4" />
-            </button>
+          {/* Quick Slash Action Chips Bar */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-xs no-scrollbar">
+            <span className="text-[var(--text-muted)] text-[10px] uppercase font-bold shrink-0 mr-1 flex items-center gap-1">
+              <Zap className="w-3 h-3 text-[var(--border-active)]" /> Commands:
+            </span>
 
             <button
               type="button"
-              onClick={() => setSelectedMode('music')}
-              className={`p-2 border transition-all cursor-pointer hidden md:flex clip-badge-poly ${
-                selectedMode === 'music'
-                  ? 'bg-[#FFB800] text-black border-[#FFB800] shadow-[0_0_10px_rgba(255,184,0,0.4)]'
-                  : 'bg-black/80 text-[#737373] hover:text-[#EDEDED] border-[#2D2D45]'
+              onClick={() => handleApplyCommand('/image')}
+              className={`px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly ${
+                detectedIntent.mode === 'image'
+                  ? 'bg-[#A855F7] text-black font-bold border-[#A855F7] shadow-[0_0_12px_rgba(168,85,247,0.4)]'
+                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[#A855F7] border-[var(--border-color)] hover:border-[#A855F7]'
               }`}
-              title="Switch to Music Generator"
+              title="Render visual artwork"
             >
-              <Music className="w-4 h-4" />
+              <span>✨</span>
+              <span>/image [prompt]</span>
             </button>
 
             <button
-              type="submit"
-              disabled={isLoading || !inputText.trim()}
-              className="ml-1 px-4 py-2.5 bg-gradient-to-r from-[#00F0FF] to-[#A855F7] hover:brightness-110 disabled:opacity-40 text-black text-xs font-mono font-bold border border-[#00F0FF] clip-badge-poly shadow-[0_0_15px_rgba(0,240,255,0.3)] active:scale-95 transition-all flex items-center space-x-1.5 cursor-pointer"
+              type="button"
+              onClick={() => handleApplyCommand('/video')}
+              className={`px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly ${
+                detectedIntent.mode === 'video'
+                  ? 'bg-[#FF007A] text-white font-bold border-[#FF007A] shadow-[0_0_12px_rgba(255,0,122,0.4)]'
+                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[#FF007A] border-[var(--border-color)] hover:border-[#FF007A]'
+              }`}
+              title="Synthesize 60FPS motion sequence"
             >
-              <Send className="w-3.5 h-3.5 text-black" />
-              <span className="hidden sm:inline">Send</span>
+              <span>🎬</span>
+              <span>/video [prompt]</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleApplyCommand('/music')}
+              className={`px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly ${
+                detectedIntent.mode === 'music'
+                  ? 'bg-[#FFB800] text-black font-bold border-[#FFB800] shadow-[0_0_12px_rgba(255,184,0,0.4)]'
+                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[#FFB800] border-[var(--border-color)] hover:border-[#FFB800]'
+              }`}
+              title="Compose 432Hz procedural audio"
+            >
+              <span>🎵</span>
+              <span>/music [prompt]</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleApplyCommand('/pdf')}
+              className="px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--border-active)] border-[var(--border-color)] hover:border-[var(--border-active)]"
+              title="Format response for instant PDF download"
+            >
+              <span>📄</span>
+              <span>/pdf [topic]</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleApplyCommand('/search')}
+              className="px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--border-active)] border-[var(--border-color)] hover:border-[var(--border-active)]"
+              title="Ground with live Google search"
+            >
+              <span>🌐</span>
+              <span>/search [query]</span>
             </button>
           </div>
-        </div>
-      </form>
+
+          {/* Unified Input Box with Real-Time Intent Pill & Chamfered Border */}
+          <div className="relative flex items-center bg-[var(--bg-input)] border border-[var(--border-color)] focus-within:border-[var(--border-active)] clip-cyber-card shadow-sm transition-all rounded-lg">
+            <div className="hidden sm:flex items-center pl-3 pr-1 text-xs text-[var(--border-active)] shrink-0">
+              <span
+                className={`px-2.5 py-1 bg-[var(--bg-secondary)] border text-[10px] uppercase font-bold flex items-center gap-1 clip-badge-poly transition-colors ${
+                  detectedIntent.mode !== 'text' || detectedIntent.isExplicitSlash
+                    ? 'border-[var(--border-active)] text-[var(--border-active)] shadow-sm'
+                    : 'border-[var(--border-color)] text-[var(--text-secondary)]'
+                }`}
+              >
+                <Zap className={`w-3 h-3 ${detectedIntent.mode !== 'text' ? 'text-[var(--border-active)] animate-pulse' : 'text-[var(--text-muted)]'}`} />
+                {detectedIntent.badgeLabel}
+              </span>
+            </div>
+
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder={
+                selectedMode === 'image'
+                  ? "Describe the visual illustration (e.g. 'Futuristic AI neural network matrix')..."
+                  : selectedMode === 'video'
+                  ? "Describe the motion sequence (e.g. 'Cyberpunk neon flight over metropolis')..."
+                  : selectedMode === 'music'
+                  ? "Describe the melody (e.g. 'Calming 432Hz ambient focus synthesizer')..."
+                  : "Ask anything in any language (English, Hindi, Hinglish, etc.)..."
+              }
+              disabled={isLoading}
+              className="flex-1 px-3 sm:px-4 py-3 bg-transparent text-sm sm:text-base text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none font-sans"
+            />
+
+            <div className="flex items-center space-x-1.5 pr-2">
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker((prev) => !prev)}
+                className={`p-2 border transition-all cursor-pointer clip-badge-poly ${
+                  showEmojiPicker
+                    ? 'bg-[var(--border-active)] text-black border-[var(--border-active)] shadow-sm'
+                    : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--border-active)] border-[var(--border-color)] hover:border-[var(--border-active)]'
+                }`}
+                title="Open Emoji Picker"
+              >
+                <Smile className="w-4 h-4" />
+              </button>
+
+              {/* Direct Module Switcher Buttons with Polygon Clips */}
+              <button
+                type="button"
+                onClick={() => setSelectedMode('text')}
+                className={`p-2 border transition-all cursor-pointer hidden md:flex clip-badge-poly ${
+                  selectedMode === 'text'
+                    ? 'bg-[var(--border-active)] text-black border-[var(--border-active)] shadow-sm font-bold'
+                    : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border-color)]'
+                }`}
+                title="Switch to Smart Chat"
+              >
+                <MessageSquare className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedMode('image')}
+                className={`p-2 border transition-all cursor-pointer hidden md:flex clip-badge-poly ${
+                  selectedMode === 'image'
+                    ? 'bg-[#A855F7] text-black border-[#A855F7] shadow-sm font-bold'
+                    : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[#A855F7] border-[var(--border-color)]'
+                }`}
+                title="Switch to Image Generator"
+              >
+                <ImageIcon className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedMode('video')}
+                className={`p-2 border transition-all cursor-pointer hidden md:flex clip-badge-poly ${
+                  selectedMode === 'video'
+                    ? 'bg-[#FF007A] text-white border-[#FF007A] shadow-sm font-bold'
+                    : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[#FF007A] border-[var(--border-color)]'
+                }`}
+                title="Switch to Video Generator"
+              >
+                <Film className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedMode('music')}
+                className={`p-2 border transition-all cursor-pointer hidden md:flex clip-badge-poly ${
+                  selectedMode === 'music'
+                    ? 'bg-[#FFB800] text-black border-[#FFB800] shadow-sm font-bold'
+                    : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[#FFB800] border-[var(--border-color)]'
+                }`}
+                title="Switch to Music Generator"
+              >
+                <Music className="w-4 h-4" />
+              </button>
+
+              <button
+                type="submit"
+                disabled={isLoading || !inputText.trim()}
+                className="ml-1 px-4 py-2 bg-gradient-to-r from-[#00F0FF] to-[#A855F7] hover:brightness-110 disabled:opacity-40 text-black text-xs font-mono font-bold border border-[#00F0FF] clip-badge-poly shadow-sm active:scale-95 transition-all flex items-center space-x-1.5 cursor-pointer min-h-[38px]"
+              >
+                <Send className="w-3.5 h-3.5 text-black" />
+                <span className="hidden sm:inline">Send</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
@@ -1019,21 +1032,28 @@ const ChatMessageItem = memo<{
           </div>
         )}
 
-        {/* Text Content */}
-        <div className={`text-[var(--text-primary)] whitespace-pre-wrap ${accessibleReadingMode ? 'leading-loose tracking-wide font-sans text-[15px]' : 'leading-relaxed font-sans'}`}>
-          {message.content}
-        </div>
+        {/* Clean Markdown Parsed Content */}
+        {isUser ? (
+          <div className={`text-[var(--text-primary)] whitespace-pre-wrap ${accessibleReadingMode ? 'leading-loose tracking-wide font-sans text-[15px]' : 'leading-relaxed font-sans text-[14px] sm:text-[14.5px]'}`}>
+            {message.content}
+          </div>
+        ) : (
+          <MarkdownRenderer
+            content={message.content}
+            accessibleReadingMode={accessibleReadingMode}
+          />
+        )}
 
         {/* PROMPT-TRIGGERED CONDITIONAL PDF EXPORT ACTION PILL */}
         {isPdfExplicitlyRequested && (
-          <div className="mt-3 p-2.5 bg-[#00F0FF]/10 border border-[#00F0FF] clip-badge-poly flex flex-wrap items-center justify-between gap-2 font-mono">
-            <div className="flex items-center space-x-2 text-xs text-[#00F0FF]">
-              <FileDown className="w-4 h-4 animate-bounce text-[#00F0FF]" />
+          <div className="mt-3 p-2.5 bg-[var(--bg-elevated)] border border-[var(--border-active)] clip-badge-poly flex flex-wrap items-center justify-between gap-2 font-mono">
+            <div className="flex items-center space-x-2 text-xs text-[var(--border-active)]">
+              <FileDown className="w-4 h-4 animate-bounce text-[var(--border-active)]" />
               <span className="font-bold">PDF Format Requested by User</span>
             </div>
             <button
               onClick={() => onExportSingleMessage(message)}
-              className="px-3 py-1 bg-[#00F0FF] hover:bg-[#00D0DF] text-black text-xs font-bold font-mono border border-[#00F0FF] clip-badge-poly shadow-[0_0_10px_rgba(0,240,255,0.4)] flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95"
+              className="px-3 py-1 bg-[var(--border-active)] hover:brightness-110 text-black text-xs font-bold font-mono border border-[var(--border-active)] clip-badge-poly shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95"
             >
               <Download className="w-3.5 h-3.5 text-black" />
               <span>Download PDF Document</span>
@@ -1043,7 +1063,7 @@ const ChatMessageItem = memo<{
 
         {/* Inline Media Rendering for Image / Video / Music */}
         {message.media && (
-          <div className="mt-4 pt-3 border-t border-[#25253D]">
+          <div className="mt-4 pt-3 border-t border-[var(--border-color)]">
             {message.media.type === 'image' && <InlineImageViewer media={message.media} />}
             {message.media.type === 'video' && <InlineVideoSimulator media={message.media} />}
             {message.media.type === 'music' && <InlineAudioSynthesizer media={message.media} />}
@@ -1052,9 +1072,9 @@ const ChatMessageItem = memo<{
 
         {/* Grounding citations if present */}
         {message.sources && message.sources.length > 0 && (
-          <div className="mt-3 pt-2 border-t border-[#25253D] text-xs text-[#737373] space-y-1 font-mono">
-            <p className="font-semibold text-[11px] text-[#00F0FF] flex items-center gap-1">
-              <Globe className="w-3 h-3 text-[#00F0FF]" />
+          <div className="mt-3 pt-2 border-t border-[var(--border-color)] text-xs text-[var(--text-muted)] space-y-1 font-mono">
+            <p className="font-semibold text-[11px] text-[var(--border-active)] flex items-center gap-1">
+              <Globe className="w-3 h-3 text-[var(--border-active)]" />
               Verified Sources:
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -1064,7 +1084,7 @@ const ChatMessageItem = memo<{
                   href={s.uri}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-2 py-0.5 bg-[#141424] border border-[#2D2D45] hover:border-[#00F0FF] text-[#A1A1AA] hover:text-[#00F0FF] text-[11px] truncate max-w-[240px] clip-badge-poly"
+                  className="px-2 py-0.5 bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--border-active)] text-[var(--text-secondary)] hover:text-[var(--border-active)] text-[11px] truncate max-w-[240px] clip-badge-poly transition-colors"
                 >
                   {s.title || s.uri}
                 </a>
@@ -1075,26 +1095,26 @@ const ChatMessageItem = memo<{
 
         {/* Bottom Actions on Model Messages */}
         {!isUser && message.id !== 'welcome' && (
-          <div className="mt-3 pt-2 border-t border-[#25253D] flex flex-wrap items-center justify-between gap-2 font-mono">
+          <div className="mt-3 pt-2 border-t border-[var(--border-color)] flex flex-wrap items-center justify-between gap-2 font-mono">
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => onExportSingleMessage(message)}
-                className="text-[11px] text-[#A1A1AA] hover:text-[#00F0FF] flex items-center space-x-1 transition-colors cursor-pointer"
+                className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--border-active)] flex items-center space-x-1 transition-colors cursor-pointer"
                 title="Download this response as formatted PDF"
               >
-                <FileDown className="w-3.5 h-3.5 text-[#00F0FF]" />
+                <FileDown className="w-3.5 h-3.5 text-[var(--border-active)]" />
                 <span>Export PDF</span>
               </button>
 
               <button
                 onClick={() => onToggleSpeak(message.id, message.content)}
                 className={`text-[11px] flex items-center space-x-1 transition-colors cursor-pointer ${
-                  isSpeaking ? 'text-[#00F0FF] font-bold' : 'text-[#A1A1AA] hover:text-[#00F0FF]'
+                  isSpeaking ? 'text-[var(--border-active)] font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--border-active)]'
                 }`}
                 title={isSpeaking ? 'Stop reading' : 'Read aloud with speech synthesis'}
               >
                 {isSpeaking ? (
-                  <VolumeX className="w-3.5 h-3.5 text-[#00F0FF]" />
+                  <VolumeX className="w-3.5 h-3.5 text-[var(--border-active)]" />
                 ) : (
                   <Volume2 className="w-3.5 h-3.5" />
                 )}
@@ -1106,7 +1126,7 @@ const ChatMessageItem = memo<{
               {onSaveToJournal && (
                 <button
                   onClick={() => onSaveToJournal(message.content, 'Somotoz AI Note')}
-                  className="text-[11px] font-medium text-[#00F0FF] hover:text-[#00D0DF] flex items-center space-x-1 cursor-pointer"
+                  className="text-[11px] font-medium text-[var(--border-active)] hover:opacity-80 flex items-center space-x-1 cursor-pointer transition-opacity"
                 >
                   <BookPlus className="w-3.5 h-3.5" />
                   <span>Save Note</span>

@@ -20,7 +20,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
     id: AppTheme;
     label: string;
     shortLabel: string;
-    icon: React.ComponentType<{ className?: string }>;
+    icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
     accentColor: string;
     activeBorder: string;
     description: string;
