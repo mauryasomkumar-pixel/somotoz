@@ -248,29 +248,29 @@ export const SoundscapePlayer: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6 font-sans">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-[#0C0C1E] via-[#080816] to-[#04040D] border border-[#25253D] p-6 font-mono clip-stealth-notch shadow-[0_0_25px_rgba(0,240,255,0.15)] transition-all">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-6 font-mono clip-stealth-notch shadow-sm transition-all text-[var(--text-primary)]">
         <div className="flex items-center space-x-3 mb-2">
-          <div className="w-10 h-10 bg-black/90 border border-[#00F0FF] text-[#00F0FF] flex items-center justify-center clip-badge-poly shadow-[0_0_12px_rgba(0,240,255,0.4)]">
+          <div className="w-10 h-10 bg-[var(--bg-secondary)] border border-[var(--border-active)] text-[var(--border-active)] flex items-center justify-center clip-badge-poly shadow-sm">
             <Activity className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-base sm:text-lg font-bold text-[#EDEDED] tracking-tight flex items-center gap-2">
+            <h1 className="text-base sm:text-lg font-bold text-[var(--text-primary)] tracking-tight flex items-center gap-2">
               Focus Sounds & Synthesizer
-              <span className="text-[10px] px-2 py-0.5 bg-black/80 text-[#00F0FF] border border-[#00F0FF]/40 clip-badge-poly">
+              <span className="text-[10px] px-2 py-0.5 bg-[var(--bg-elevated)] text-[var(--border-active)] border border-[var(--border-active)]/40 clip-badge-poly font-bold">
                 432HZ / REAL-TIME
               </span>
             </h1>
-            <p className="text-xs text-[#A1A1AA] font-sans">
+            <p className="text-xs text-[var(--text-secondary)] font-sans mt-0.5">
               Calming background audio synthesizers and nature frequencies engineered for deep study and focus.
             </p>
           </div>
         </div>
 
         {/* Global Controls: Volume & Timer */}
-        <div className="mt-5 pt-4 border-t border-[#25253D] flex flex-wrap items-center justify-between gap-4 font-mono">
+        <div className="mt-5 pt-4 border-t border-[var(--border-color)] flex flex-wrap items-center justify-between gap-4 font-mono">
           {/* Master Volume */}
           <div className="flex items-center space-x-3">
-            <Volume2 className="w-4 h-4 text-[#00F0FF]" />
+            <Volume2 className="w-4 h-4 text-[var(--border-active)]" />
             <input
               type="range"
               min="0"
@@ -278,30 +278,30 @@ export const SoundscapePlayer: React.FC = () => {
               step="0.05"
               value={volume}
               onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-              className="w-32 sm:w-40 h-1.5 bg-[#25253D] accent-[#00F0FF] cursor-pointer"
+              className="w-32 sm:w-40 h-1.5 bg-[var(--border-color)] accent-[var(--border-active)] cursor-pointer"
             />
-            <span className="text-xs text-[#A1A1AA]">{Math.round(volume * 100)}%</span>
+            <span className="text-xs text-[var(--text-secondary)]">{Math.round(volume * 100)}%</span>
           </div>
 
           {/* Focus Timer */}
           <div className="flex items-center space-x-2 text-xs">
-            <Clock className="w-3.5 h-3.5 text-[#00F0FF]" />
-            <span className="text-[#A1A1AA]">Timer:</span>
+            <Clock className="w-3.5 h-3.5 text-[var(--border-active)]" />
+            <span className="text-[var(--text-secondary)]">Timer:</span>
             {[10, 25, 45].map((mins) => (
               <button
                 key={mins}
                 onClick={() => handleSetTimer(timerMinutes === mins ? null : mins)}
                 className={`px-2.5 py-1 border text-[11px] clip-badge-poly transition-all cursor-pointer ${
                   timerMinutes === mins
-                    ? 'bg-[#00F0FF] text-black font-bold border-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.4)]'
-                    : 'bg-black/80 text-[#A1A1AA] hover:text-[#00F0FF] border-[#25253D] hover:border-[#00F0FF]'
+                    ? 'bg-[var(--border-active)] text-black font-bold border-[var(--border-active)] shadow-xs'
+                    : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--border-active)] border-[var(--border-color)] hover:border-[var(--border-active)]'
                 }`}
               >
                 {mins}m
               </button>
             ))}
             {timeLeft !== null && (
-              <span className="ml-2 text-[#00F0FF] font-bold px-2 py-0.5 bg-black border border-[#00F0FF] clip-badge-poly shadow-[0_0_8px_rgba(0,240,255,0.3)]">
+              <span className="ml-2 text-[var(--border-active)] font-bold px-2 py-0.5 bg-[var(--bg-secondary)] border border-[var(--border-active)] clip-badge-poly shadow-xs">
                 {formatTimer(timeLeft)}
               </span>
             )}
@@ -320,10 +320,10 @@ export const SoundscapePlayer: React.FC = () => {
             <div
               key={track.id}
               onClick={() => togglePlay(track)}
-              className={`p-5 border transition-all duration-300 cursor-pointer flex items-center justify-between clip-cyber-card hover:translate-y-[-2px] ${
+              className={`p-5 border transition-all duration-300 cursor-pointer flex items-center justify-between clip-cyber-card hover:translate-y-[-2px] shadow-xs ${
                 isCurrentPlaying
-                  ? `bg-black/90 border-[${track.accent}] ${track.glow}`
-                  : 'bg-gradient-to-br from-[#0E0E1F] to-[#070712] hover:bg-[#121226] border-[#25253D] hover:border-[#3D3D65]'
+                  ? 'bg-[var(--bg-card)]'
+                  : 'bg-[var(--bg-card)] hover:bg-[var(--bg-secondary)] border-[var(--border-color)]'
               }`}
               style={{
                 borderColor: isCurrentPlaying ? track.accent : undefined,
@@ -333,17 +333,17 @@ export const SoundscapePlayer: React.FC = () => {
                 <div
                   className="w-10 h-10 border flex items-center justify-center shrink-0 clip-badge-poly transition-all"
                   style={{
-                    backgroundColor: isCurrentPlaying ? track.accent : 'rgba(0,0,0,0.8)',
+                    backgroundColor: isCurrentPlaying ? track.accent : 'var(--bg-secondary)',
                     color: isCurrentPlaying ? '#000000' : track.accent,
                     borderColor: track.accent,
-                    boxShadow: isCurrentPlaying ? `0 0 15px ${track.accent}66` : 'none',
+                    boxShadow: isCurrentPlaying ? `0 0 12px ${track.accent}55` : 'none',
                   }}
                 >
                   <Icon className="w-5 h-5" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center space-x-2">
-                    <h3 className="text-xs sm:text-sm font-bold text-[#EDEDED] truncate">
+                    <h3 className="text-xs sm:text-sm font-bold text-[var(--text-primary)] truncate">
                       {track.name}
                     </h3>
                     {isCurrentPlaying && (
@@ -354,7 +354,7 @@ export const SoundscapePlayer: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <p className="text-[11px] text-[#A1A1AA] mt-0.5 truncate font-sans">
+                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate font-sans">
                     {track.description}
                   </p>
                 </div>
@@ -364,7 +364,7 @@ export const SoundscapePlayer: React.FC = () => {
                 type="button"
                 className="p-2.5 border ml-3 clip-badge-poly transition-all cursor-pointer"
                 style={{
-                  backgroundColor: isCurrentPlaying ? track.accent : 'rgba(0,0,0,0.9)',
+                  backgroundColor: isCurrentPlaying ? track.accent : 'var(--bg-secondary)',
                   color: isCurrentPlaying ? '#000000' : track.accent,
                   borderColor: track.accent,
                 }}

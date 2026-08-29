@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Search, Globe, BookOpen, Sparkles, ExternalLink, Compass, ShieldCheck, HeartPulse, Brain, Moon, Terminal, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Search, Globe, BookOpen, Sparkles, ExternalLink, Compass, HeartPulse, Brain, Moon, ArrowRight } from 'lucide-react';
 import { GroundingSource } from '../types';
+import { useTheme } from '../context/ThemeContext';
 
 interface WisdomExplorerProps {
   onApplyTechnique?: (text: string) => void;
@@ -33,7 +34,8 @@ const FEATURED_TOPICS = [
   },
 ];
 
-export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique }) => {
+export const WisdomExplorer: React.FC<WisdomExplorerProps> = () => {
+  const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [answer, setAnswer] = useState<string | null>(null);
   const [sources, setSources] = useState<GroundingSource[]>([]);
@@ -73,19 +75,19 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6 font-sans">
       {/* Search Header */}
-      <div className="bg-gradient-to-r from-[#0C0C1E] via-[#080816] to-[#04040D] border border-[#25253D] p-6 font-mono clip-stealth-notch shadow-[0_0_25px_rgba(0,240,255,0.15)] transition-all">
+      <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-6 font-mono clip-stealth-notch shadow-sm transition-all text-[var(--text-primary)]">
         <div className="flex items-center space-x-3 mb-2">
-          <div className="w-10 h-10 bg-black/90 border border-[#00F0FF] text-[#00F0FF] flex items-center justify-center clip-badge-poly shadow-[0_0_12px_rgba(0,240,255,0.4)]">
+          <div className="w-10 h-10 bg-[var(--bg-secondary)] border border-[var(--border-active)] text-[var(--border-active)] flex items-center justify-center clip-badge-poly shadow-sm">
             <Globe className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-base sm:text-lg font-bold text-[#EDEDED] tracking-tight flex items-center gap-2">
+            <h1 className="text-base sm:text-lg font-bold text-[var(--text-primary)] tracking-tight flex items-center gap-2">
               Neural Knowledge & Grounding Hub
-              <span className="text-[10px] px-2 py-0.5 bg-black/80 text-[#00F0FF] border border-[#00F0FF]/40 clip-badge-poly">
+              <span className="text-[10px] px-2 py-0.5 bg-[var(--bg-elevated)] text-[var(--border-active)] border border-[var(--border-active)]/40 clip-badge-poly font-bold">
                 GOOGLE SEARCH GROUNDING
               </span>
             </h1>
-            <p className="text-xs text-[#A1A1AA] font-sans">
+            <p className="text-xs text-[var(--text-secondary)] font-sans mt-0.5">
               Real-time grounded knowledge exploration, cognitive heuristics, algorithmic research, and scientific wellness guides.
             </p>
           </div>
@@ -99,19 +101,19 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
           className="mt-4 flex gap-2"
         >
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-[#737373] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search cognitive techniques, algorithmic reasoning, stress relief, healthy habits..."
-              className="w-full pl-10 pr-4 py-3 bg-black/80 border border-[#25253D] text-sm text-[#EDEDED] placeholder-[#737373] focus:outline-none focus:border-[#00F0FF] transition-all font-sans clip-badge-poly"
+              className="w-full pl-10 pr-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-active)] transition-all font-sans clip-badge-poly"
             />
           </div>
           <button
             type="submit"
             disabled={isLoading || !searchQuery.trim()}
-            className="px-5 py-3 bg-gradient-to-r from-[#00F0FF] to-[#A855F7] hover:brightness-110 disabled:opacity-40 text-black font-mono font-bold text-xs tracking-wider border border-[#00F0FF] clip-badge-poly shadow-[0_0_15px_rgba(0,240,255,0.4)] active:scale-95 transition-all flex items-center space-x-1.5 cursor-pointer"
+            className="px-5 py-3 bg-[var(--border-active)] hover:brightness-110 disabled:opacity-40 text-black font-mono font-bold text-xs tracking-wider border border-[var(--border-active)] clip-badge-poly shadow-xs active:scale-95 transition-all flex items-center space-x-1.5 cursor-pointer"
           >
             <Search className="w-4 h-4 text-black" />
             <span>Search</span>
@@ -121,15 +123,15 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
 
       {/* Answer & Sources Display */}
       {isLoading ? (
-        <div className="bg-[#0B0B16] border border-[#00F0FF] shadow-[0_0_25px_rgba(0,240,255,0.25)] p-8 flex flex-col items-center justify-center text-center space-y-3 font-mono clip-cyber-card">
-          <div className="w-8 h-8 border-2 border-transparent border-t-[#00F0FF] border-r-[#A855F7] animate-spin clip-badge-poly" />
-          <p className="text-sm font-bold text-[#EDEDED]">[SEARCHING GROUNDED KNOWLEDGE BASE]</p>
-          <p className="text-xs text-[#A1A1AA] font-sans">Retrieving live real-time references and synthesizing insights...</p>
+        <div className="bg-[var(--bg-card)] border border-[var(--border-active)] shadow-sm p-8 flex flex-col items-center justify-center text-center space-y-3 font-mono clip-cyber-card">
+          <div className="w-8 h-8 border-2 border-transparent border-t-[var(--border-active)] border-r-[#A855F7] animate-spin clip-badge-poly" />
+          <p className="text-sm font-bold text-[var(--text-primary)]">[SEARCHING GROUNDED KNOWLEDGE BASE]</p>
+          <p className="text-xs text-[var(--text-secondary)] font-sans">Retrieving live real-time references and synthesizing insights...</p>
         </div>
       ) : answer ? (
-        <div className="bg-[#0A0A14] border border-[#25253D] hover:border-[#00F0FF] shadow-[0_0_25px_rgba(0,240,255,0.1)] p-6 sm:p-7 space-y-6 clip-cyber-card transition-all">
-          <div className="flex items-center justify-between border-b border-[#25253D] pb-4 font-mono">
-            <div className="flex items-center space-x-2 text-[#00F0FF]">
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--border-active)] shadow-sm p-6 sm:p-7 space-y-6 clip-cyber-card transition-all text-[var(--text-primary)]">
+          <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-4 font-mono">
+            <div className="flex items-center space-x-2 text-[var(--border-active)]">
               <Sparkles className="w-4 h-4" />
               <span className="text-xs font-bold uppercase tracking-wider">Synthesized Grounding Output</span>
             </div>
@@ -139,21 +141,21 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
                 setSources([]);
                 setSearchQuery('');
               }}
-              className="text-xs text-[#A1A1AA] hover:text-[#00F0FF] font-mono cursor-pointer transition-colors"
+              className="text-xs text-[var(--text-secondary)] hover:text-[var(--border-active)] font-mono cursor-pointer transition-colors"
             >
               [Clear Search]
             </button>
           </div>
 
-          <div className="text-sm sm:text-base leading-relaxed text-[#EDEDED] font-sans whitespace-pre-wrap">
+          <div className="text-sm sm:text-base leading-relaxed text-[var(--text-primary)] font-sans whitespace-pre-wrap">
             {answer}
           </div>
 
           {/* Sources List */}
           {sources.length > 0 && (
-            <div className="pt-4 border-t border-[#25253D] font-mono">
-              <h4 className="text-xs font-bold text-[#A1A1AA] uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-[#00F0FF]" />
+            <div className="pt-4 border-t border-[var(--border-color)] font-mono">
+              <h4 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-[var(--border-active)]" />
                 <span>Verified Reference Citations</span>
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -163,10 +165,10 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
                     href={src.uri}
                     target="_blank"
                     rel="noreferrer"
-                    className="p-2.5 bg-black/80 border border-[#25253D] hover:border-[#00F0FF] text-xs text-[#A1A1AA] hover:text-[#00F0FF] flex items-center justify-between transition-all clip-badge-poly group"
+                    className="p-2.5 bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--border-active)] text-xs text-[var(--text-secondary)] hover:text-[var(--border-active)] flex items-center justify-between transition-all clip-badge-poly group"
                   >
                     <span className="truncate pr-2">{src.title || src.uri}</span>
-                    <ExternalLink className="w-3.5 h-3.5 shrink-0 text-[#00F0FF] group-hover:scale-110 transition-transform" />
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0 text-[var(--border-active)] group-hover:scale-110 transition-transform" />
                   </a>
                 ))}
               </div>
@@ -184,7 +186,7 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
 
       {/* Featured Topics Section */}
       <div className="space-y-3 font-mono">
-        <h3 className="text-xs font-bold text-[#A1A1AA] uppercase tracking-wider flex items-center gap-2">
+        <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-2">
           <BookOpen className="w-3.5 h-3.5 text-[#A855F7]" />
           <span>Curated Cognitive Explorations</span>
         </h3>
@@ -199,34 +201,34 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = ({ onApplyTechnique
               <button
                 key={index}
                 onClick={() => handleSearch(topic.query)}
-                className="p-5 bg-gradient-to-br from-[#0C0C1C] to-[#06060E] border border-[#25253D] hover:border-[#00F0FF] text-left transition-all duration-300 cursor-pointer clip-cyber-card hover:translate-y-[-2px] group flex flex-col justify-between"
+                className="p-5 bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--border-active)] text-left transition-all duration-300 cursor-pointer clip-cyber-card hover:translate-y-[-2px] group flex flex-col justify-between shadow-xs"
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span
-                      className="text-[10px] font-mono px-2 py-0.5 bg-black/80 border clip-badge-poly font-bold"
-                      style={{ color: accentColor, borderColor: `${accentColor}40` }}
+                      className="text-[10px] font-mono px-2 py-0.5 bg-[var(--bg-secondary)] border clip-badge-poly font-bold"
+                      style={{ color: accentColor, borderColor: `${accentColor}60` }}
                     >
                       {topic.category}
                     </span>
                     <div
-                      className="p-1.5 bg-black/80 border text-[#EDEDED] transition-all clip-badge-poly group-hover:scale-110"
+                      className="p-1.5 bg-[var(--bg-secondary)] border text-[var(--text-primary)] transition-all clip-badge-poly group-hover:scale-110"
                       style={{ borderColor: accentColor, color: accentColor }}
                     >
                       <Icon className="w-3.5 h-3.5" />
                     </div>
                   </div>
-                  <h4 className="text-xs sm:text-sm font-bold text-[#EDEDED] group-hover:text-[#00F0FF] transition-colors font-mono">
+                  <h4 className="text-xs sm:text-sm font-bold text-[var(--text-primary)] group-hover:text-[var(--border-active)] transition-colors font-mono">
                     {topic.title}
                   </h4>
-                  <p className="text-[11px] text-[#A1A1AA] mt-1 line-clamp-2 font-sans">
+                  <p className="text-[11px] text-[var(--text-secondary)] mt-1 line-clamp-2 font-sans">
                     {topic.query}
                   </p>
                 </div>
 
-                <div className="pt-3 mt-2 flex items-center justify-between text-[10px] text-[#737373] group-hover:text-[#00F0FF]">
+                <div className="pt-3 mt-2 flex items-center justify-between text-[10px] text-[var(--text-muted)] group-hover:text-[var(--border-active)]">
                   <span>Explore Heuristic</span>
-                  <ArrowRight className="w-3 h-3 group-hover:translate-x-1.5 transition-transform text-[#00F0FF]" />
+                  <ArrowRight className="w-3 h-3 group-hover:translate-x-1.5 transition-transform text-[var(--border-active)]" />
                 </div>
               </button>
             );

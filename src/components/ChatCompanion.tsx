@@ -31,7 +31,10 @@ import {
   Languages,
   ArrowDown,
   Eye,
-  BookOpen
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Layers
 } from 'lucide-react';
 import { ChatMessage, ChatRole, GenerationMode, ChatMediaData, JournalEntry } from '../types';
 import { EmojiPicker } from './EmojiPicker';
@@ -537,6 +540,8 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
     exportMessageToPdf(msg, promptText, { mode: msg.mode, role: selectedRole });
   }, [messages, selectedRole]);
 
+  const [isBannerExpanded, setIsBannerExpanded] = useState<boolean>(false);
+
   const lastUserMessage = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'user') return messages[i];
@@ -549,9 +554,9 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
   }, [lastUserMessage]);
 
   return (
-    <div className="max-w-5xl mx-auto h-[calc(100vh-6rem)] p-2 sm:p-5 flex flex-col gap-3 font-sans">
-      {/* Header Bar - Memoized Controls */}
-      <HeaderBar
+    <div className="w-full max-w-6xl mx-auto h-full flex-1 p-1 sm:p-2 flex flex-col gap-2 font-sans overflow-hidden min-h-0">
+      {/* Streamlined Top Status Bar - Zero Redundant Sub-Generator Bar */}
+      <TopStatusBar
         selectedMode={selectedMode}
         activeLanguageStyle={activeLanguageStyle}
         useSearchGrounding={useSearchGrounding}
@@ -560,16 +565,13 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
         onToggleAccessibleMode={toggleAccessibleMode}
         onExportFullSession={handleExportFullSession}
         onReset={handleReset}
-        onSelectMode={(m) => setSelectedMode(m)}
-        selectedRole={selectedRole}
-        onSelectRole={(r) => setSelectedRole(r)}
       />
 
-      {/* Messages Scroll Area with Glassmorphism and Corner Chamfers */}
+      {/* Messages Scroll Area with Glassmorphism and Corner Chamfers - Maximized Flex 1 Height */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 bg-gradient-to-b from-[#0A0A16] to-[#04040A] border border-[#2D2D45] clip-cyber-card shadow-[0_0_30px_rgba(0,240,255,0.06)] p-3 sm:p-5 overflow-y-auto space-y-4 font-sans relative"
+        className="flex-1 min-h-0 bg-[var(--bg-card)] border border-[var(--border-color)] clip-cyber-card shadow-sm p-3 sm:p-5 overflow-y-auto space-y-4 font-sans relative text-[var(--text-primary)]"
       >
         {messages.map((msg, index) => {
           let priorPrompt = '';
@@ -595,27 +597,27 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
         {/* ACTIVE STREAMING ASSISTANT BUBBLE (Instant Visual Feedback) */}
         {isLoading && (
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 shrink-0 bg-black/80 border border-[#00F0FF] text-[#00F0FF] flex items-center justify-center clip-badge-poly shadow-[0_0_15px_rgba(0,240,255,0.4)]">
-              <Bot className="w-4 h-4 text-[#00F0FF] animate-spin" />
+            <div className="w-9 h-9 shrink-0 bg-[var(--bg-secondary)] border border-[var(--border-active)] text-[var(--border-active)] flex items-center justify-center clip-badge-poly shadow-sm">
+              <Bot className="w-4 h-4 text-[var(--border-active)] animate-spin" />
             </div>
 
-            <div className="max-w-[92%] sm:max-w-[82%] p-4 bg-gradient-to-br from-[#0F0F22] to-[#060610] border border-[#00F0FF]/80 text-[#EDEDED] clip-cyber-card shadow-[0_0_20px_rgba(0,240,255,0.15)] space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-mono text-[#00F0FF] border-b border-[#252540] pb-1.5">
+            <div className="max-w-[92%] sm:max-w-[82%] p-4 bg-[var(--chat-bot-bg)] chat-bot-message border border-[var(--border-active)] text-[var(--text-primary)] clip-cyber-card shadow-md space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-mono text-[var(--border-active)] border-b border-[var(--border-color)] pb-1.5">
                 <span className="flex items-center gap-1.5 font-bold">
-                  <Zap className="w-3.5 h-3.5 animate-pulse text-[#00F0FF]" />
+                  <Zap className="w-3.5 h-3.5 animate-pulse text-[var(--border-active)]" />
                   STREAMING REAL-TIME RESPONSE
                 </span>
-                <span className="text-[#A1A1AA] uppercase px-1.5 py-0.2 bg-black/60 border border-[#2D2D45] clip-badge-poly text-[9px]">{selectedMode} MODE</span>
+                <span className="text-[var(--text-secondary)] uppercase px-1.5 py-0.2 bg-[var(--bg-elevated)] border border-[var(--border-color)] clip-badge-poly text-[9px]">{selectedMode} MODE</span>
               </div>
 
-              <div className={`text-[#EDEDED] whitespace-pre-wrap ${accessibleReadingMode ? 'leading-loose tracking-wide text-[15px]' : 'leading-relaxed'} min-h-[24px]`}>
+              <div className={`text-[var(--text-primary)] whitespace-pre-wrap ${accessibleReadingMode ? 'leading-loose tracking-wide text-[15px]' : 'leading-relaxed'} min-h-[24px]`}>
                 {activeStreamingText || (
-                  <span className="text-[#A1A1AA] italic font-mono flex items-center gap-1.5">
-                    <span className="w-2 h-2 bg-[#00F0FF] rounded-full animate-ping" />
+                  <span className="text-[var(--text-muted)] italic font-mono flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-[var(--border-active)] rounded-full animate-ping" />
                     Thinking & generating in {activeLanguageStyle}...
                   </span>
                 )}
-                <span className="inline-block w-2 h-4 bg-[#00F0FF] ml-1 animate-pulse align-middle" />
+                <span className="inline-block w-2 h-4 bg-[var(--border-active)] ml-1 animate-pulse align-middle" />
               </div>
             </div>
           </div>
@@ -638,15 +640,15 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
 
         {/* Slash Command Autocomplete Dropdown Popup */}
         {filteredCommandSuggestions.length > 0 && (
-          <div className="absolute bottom-full left-0 right-0 mb-2 bg-[#0C0C18] border-2 border-[#00F0FF] clip-cyber-card shadow-[0_-4px_25px_rgba(0,240,255,0.2)] z-40 max-h-60 overflow-y-auto font-mono">
-            <div className="px-3 py-1.5 bg-[#00F0FF]/10 border-b border-[#00F0FF]/40 flex items-center justify-between text-[11px] text-[#00F0FF]">
+          <div className="absolute bottom-full left-0 right-0 mb-2 bg-[var(--bg-card)] border-2 border-[var(--border-active)] clip-cyber-card shadow-xl z-40 max-h-60 overflow-y-auto font-mono text-[var(--text-primary)]">
+            <div className="px-3 py-1.5 bg-[var(--bg-elevated)] border-b border-[var(--border-color)] flex items-center justify-between text-[11px] text-[var(--border-active)]">
               <span className="font-bold flex items-center gap-1.5">
                 <Code className="w-3.5 h-3.5" />
                 AVAILABLE COMMANDS
               </span>
-              <span className="text-[10px] text-[#A1A1AA]">Click or type to select</span>
+              <span className="text-[10px] text-[var(--text-secondary)]">Click or type to select</span>
             </div>
-            <div className="divide-y divide-[#222238]">
+            <div className="divide-y divide-[var(--border-color)]">
               {filteredCommandSuggestions.map((cmd, idx) => (
                 <button
                   key={cmd.command}
@@ -654,21 +656,21 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
                   onClick={() => handleApplyCommand(cmd.command)}
                   className={`w-full p-2.5 text-left flex items-start justify-between gap-2 transition-colors cursor-pointer ${
                     idx === selectedSuggestionIndex
-                      ? 'bg-[#18182E] text-[#EDEDED]'
-                      : 'hover:bg-[#121222] text-[#A1A1AA]'
+                      ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)]'
+                      : 'hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)]'
                   }`}
                 >
                   <div className="flex items-center space-x-2.5">
                     <span className="text-base">{cmd.icon}</span>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[#00F0FF]">{cmd.command}</span>
-                        <span className="text-[11px] text-[#EDEDED]">{cmd.label}</span>
+                        <span className="text-xs font-bold text-[var(--border-active)]">{cmd.command}</span>
+                        <span className="text-[11px] text-[var(--text-primary)]">{cmd.label}</span>
                       </div>
-                      <p className="text-[11px] text-[#737373] font-sans mt-0.5">{cmd.desc}</p>
+                      <p className="text-[11px] text-[var(--text-muted)] font-sans mt-0.5">{cmd.desc}</p>
                     </div>
                   </div>
-                  <span className="text-[10px] text-[#A1A1AA] bg-black px-2 py-0.5 border border-[#2D2D45] clip-badge-poly shrink-0">
+                  <span className="text-[10px] text-[var(--text-secondary)] bg-[var(--bg-input)] px-2 py-0.5 border border-[var(--border-color)] clip-badge-poly shrink-0">
                     {cmd.syntax}
                   </span>
                 </button>
@@ -679,8 +681,8 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
 
         {/* Quick Slash Action Chips Bar */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
-          <span className="text-[#A1A1AA] text-[10px] uppercase font-bold shrink-0 mr-1 flex items-center gap-1">
-            <Zap className="w-3 h-3 text-[#00F0FF]" /> Commands:
+          <span className="text-[var(--text-muted)] text-[10px] uppercase font-bold shrink-0 mr-1 flex items-center gap-1">
+            <Zap className="w-3 h-3 text-[var(--border-active)]" /> Commands:
           </span>
 
           <button
@@ -689,7 +691,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
             className={`px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly ${
               detectedIntent.mode === 'image'
                 ? 'bg-[#A855F7] text-black font-bold border-[#A855F7] shadow-[0_0_12px_rgba(168,85,247,0.4)]'
-                : 'bg-black/80 text-[#A1A1AA] hover:text-[#A855F7] border-[#2D2D45] hover:border-[#A855F7]'
+                : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[#A855F7] border-[var(--border-color)] hover:border-[#A855F7]'
             }`}
             title="Render visual artwork"
           >
@@ -703,7 +705,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
             className={`px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly ${
               detectedIntent.mode === 'video'
                 ? 'bg-[#FF007A] text-white font-bold border-[#FF007A] shadow-[0_0_12px_rgba(255,0,122,0.4)]'
-                : 'bg-black/80 text-[#A1A1AA] hover:text-[#FF007A] border-[#2D2D45] hover:border-[#FF007A]'
+                : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[#FF007A] border-[var(--border-color)] hover:border-[#FF007A]'
             }`}
             title="Synthesize 60FPS motion sequence"
           >
@@ -717,7 +719,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
             className={`px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly ${
               detectedIntent.mode === 'music'
                 ? 'bg-[#FFB800] text-black font-bold border-[#FFB800] shadow-[0_0_12px_rgba(255,184,0,0.4)]'
-                : 'bg-black/80 text-[#A1A1AA] hover:text-[#FFB800] border-[#2D2D45] hover:border-[#FFB800]'
+                : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[#FFB800] border-[var(--border-color)] hover:border-[#FFB800]'
             }`}
             title="Compose 432Hz procedural audio"
           >
@@ -728,7 +730,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
           <button
             type="button"
             onClick={() => handleApplyCommand('/pdf')}
-            className="px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly bg-black/80 text-[#A1A1AA] hover:text-[#00F0FF] border-[#2D2D45] hover:border-[#00F0FF]"
+            className="px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--border-active)] border-[var(--border-color)] hover:border-[var(--border-active)]"
             title="Format response for instant PDF download"
           >
             <span>📄</span>
@@ -738,7 +740,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
           <button
             type="button"
             onClick={() => handleApplyCommand('/search')}
-            className="px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly bg-black/80 text-[#A1A1AA] hover:text-[#00F0FF] border-[#2D2D45] hover:border-[#00F0FF]"
+            className="px-2.5 py-1 text-[11px] font-mono border flex items-center gap-1 transition-all cursor-pointer clip-badge-poly bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--border-active)] border-[var(--border-color)] hover:border-[var(--border-active)]"
             title="Ground with live Google search"
           >
             <span>🌐</span>
@@ -747,16 +749,16 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
         </div>
 
         {/* Unified Input Box with Real-Time Intent Pill & Chamfered Polygon Border */}
-        <div className="relative flex items-center bg-gradient-to-r from-[#0C0C18] to-[#070710] border-2 border-[#2D2D48] focus-within:border-[#00F0FF] clip-cyber-card shadow-[0_0_20px_rgba(0,240,255,0.08)] transition-all">
-          <div className="hidden sm:flex items-center pl-3 pr-1 text-xs text-[#00F0FF] shrink-0">
+        <div className="relative flex items-center bg-[var(--bg-input)] border-2 border-[var(--border-color)] focus-within:border-[var(--border-active)] clip-cyber-card shadow-sm transition-all">
+          <div className="hidden sm:flex items-center pl-3 pr-1 text-xs text-[var(--border-active)] shrink-0">
             <span
-              className={`px-2.5 py-1 bg-black/80 border text-[10px] uppercase font-bold flex items-center gap-1 clip-badge-poly transition-colors ${
+              className={`px-2.5 py-1 bg-[var(--bg-secondary)] border text-[10px] uppercase font-bold flex items-center gap-1 clip-badge-poly transition-colors ${
                 detectedIntent.mode !== 'text' || detectedIntent.isExplicitSlash
-                  ? 'border-[#00F0FF] text-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.3)]'
-                  : 'border-[#2D2D45] text-[#A1A1AA]'
+                  ? 'border-[var(--border-active)] text-[var(--border-active)] shadow-sm'
+                  : 'border-[var(--border-color)] text-[var(--text-secondary)]'
               }`}
             >
-              <Zap className={`w-3 h-3 ${detectedIntent.mode !== 'text' ? 'text-[#00F0FF] animate-pulse' : 'text-[#A1A1AA]'}`} />
+              <Zap className={`w-3 h-3 ${detectedIntent.mode !== 'text' ? 'text-[var(--border-active)] animate-pulse' : 'text-[var(--text-muted)]'}`} />
               {detectedIntent.badgeLabel}
             </span>
           </div>
@@ -776,7 +778,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
                 : "Ask anything in any language (English, Hindi, Hinglish, etc.)..."
             }
             disabled={isLoading}
-            className="flex-1 px-3 sm:px-4 py-3.5 bg-transparent text-sm text-[#EDEDED] placeholder-[#525252] focus:outline-none font-sans"
+            className="flex-1 px-3 sm:px-4 py-3.5 bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none font-sans"
           />
 
           <div className="flex items-center space-x-1.5 pr-2">
@@ -785,8 +787,8 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
               onClick={() => setShowEmojiPicker((prev) => !prev)}
               className={`p-2 border transition-all cursor-pointer clip-badge-poly ${
                 showEmojiPicker
-                  ? 'bg-[#00F0FF] text-black border-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.4)]'
-                  : 'bg-black/80 text-[#A1A1AA] hover:text-[#00F0FF] border-[#2D2D45] hover:border-[#00F0FF]'
+                  ? 'bg-[var(--border-active)] text-black border-[var(--border-active)] shadow-sm'
+                  : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--border-active)] border-[var(--border-color)] hover:border-[var(--border-active)]'
               }`}
               title="Open Emoji Picker"
             >
@@ -862,9 +864,9 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
 };
 
 /**
- * Optimized Memoized Header Bar (Prevents unnecessary re-renders during active token streaming)
+ * Streamlined Top Status Bar (Zero redundant mode buttons, maximized vertical workspace)
  */
-const HeaderBar = memo<{
+const TopStatusBar = memo<{
   selectedMode: GenerationMode;
   activeLanguageStyle: string;
   useSearchGrounding: boolean;
@@ -873,9 +875,6 @@ const HeaderBar = memo<{
   onToggleAccessibleMode: () => void;
   onExportFullSession: () => void;
   onReset: () => void;
-  onSelectMode: (mode: GenerationMode) => void;
-  selectedRole: ChatRole;
-  onSelectRole: (role: ChatRole) => void;
 }>(({
   selectedMode,
   activeLanguageStyle,
@@ -885,143 +884,83 @@ const HeaderBar = memo<{
   onToggleAccessibleMode,
   onExportFullSession,
   onReset,
-  onSelectMode,
-  selectedRole,
-  onSelectRole,
 }) => {
+  const modeInfo: Record<GenerationMode, { label: string; icon: string; tag: string }> = {
+    text: { label: 'Smart AI Chat', icon: '⚡', tag: 'REALTIME-SSE' },
+    image: { label: 'Image Synthesis', icon: '🎨', tag: 'PHOTOREAL' },
+    video: { label: 'Motion Sequence', icon: '🎬', tag: '60FPS' },
+    music: { label: 'Procedural Audio', icon: '🎵', tag: '432HZ' },
+  };
+
+  const current = modeInfo[selectedMode] || modeInfo.text;
+
   return (
-    <div className="bg-gradient-to-br from-[#0E0E1C] via-[#090914] to-[#04040A] p-3 sm:p-4 border border-[#2D2D45] clip-stealth-notch shadow-[0_0_25px_rgba(0,240,255,0.06)] flex flex-col gap-3 font-mono">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-black/80 border border-[#00F0FF] text-[#00F0FF] flex items-center justify-center clip-badge-poly shadow-[0_0_15px_rgba(0,240,255,0.4)]">
-            <Zap className="w-5 h-5 text-[#00F0FF] animate-pulse" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-base sm:text-lg font-bold text-[#EDEDED] tracking-tight">
-                Somotoz AI Suite
-              </h1>
-              <span className="text-[10px] px-2 py-0.5 bg-black/80 text-[#00F0FF] border border-[#00F0FF]/40 clip-badge-poly flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-[#00F0FF] rounded-full animate-ping" />
-                ULTRA-FAST
-              </span>
-              <span className="text-[10px] px-2 py-0.5 bg-[#141424] text-[#A1A1AA] border border-[#2D2D45] clip-badge-poly hidden md:flex items-center gap-1">
-                <Languages className="w-3 h-3 text-[#00F0FF]" />
-                {activeLanguageStyle}
-              </span>
-            </div>
-            <p className="text-xs text-[#737373] font-sans">
-              Autonomous Master AI Core • Real-World Photography, 60FPS Video & 432Hz Music Engine.
-            </p>
-          </div>
+    <div className="bg-[var(--bg-card)] px-3 py-1.5 sm:py-2 border border-[var(--border-color)] clip-stealth-notch shadow-xs flex items-center justify-between gap-2 font-mono text-[var(--text-primary)] shrink-0 transition-colors">
+      {/* Left: Active Module Identifier */}
+      <div className="flex items-center space-x-2 min-w-0">
+        <div className="w-6 h-6 sm:w-7 sm:h-7 bg-[var(--bg-secondary)] border border-[var(--border-active)] flex items-center justify-center clip-badge-poly shadow-xs shrink-0">
+          <span className="text-xs">{current.icon}</span>
         </div>
-
-        <div className="flex items-center space-x-2 flex-wrap">
-          <button
-            onClick={onToggleAccessibleMode}
-            className={`px-2.5 py-1.5 text-xs font-mono font-medium border flex items-center space-x-1.5 transition-all cursor-pointer clip-badge-poly ${
-              accessibleReadingMode
-                ? 'bg-black text-[#00F0FF] border-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.3)]'
-                : 'bg-black/80 hover:bg-[#121222] text-[#A1A1AA] hover:text-[#00F0FF] border-[#2D2D45]'
-            }`}
-            title="Toggle Accessible Dyslexia-Friendly Reading Mode"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-[#00F0FF]" />
-            <span>{accessibleReadingMode ? 'Accessible (ON)' : 'Accessible Mode'}</span>
-          </button>
-
-          <button
-            onClick={onExportFullSession}
-            className="px-2.5 py-1.5 text-xs font-mono font-medium border flex items-center space-x-1.5 bg-black/80 hover:bg-[#121222] text-[#A1A1AA] hover:text-[#00F0FF] border-[#2D2D45] hover:border-[#00F0FF] transition-all cursor-pointer clip-badge-poly"
-            title="Download full conversation transcript as PDF document"
-          >
-            <FileDown className="w-3.5 h-3.5 text-[#00F0FF]" />
-            <span className="hidden sm:inline">Export PDF</span>
-          </button>
-
-          <button
-            onClick={onToggleGrounding}
-            className={`px-2.5 py-1.5 text-xs font-mono font-medium border flex items-center space-x-1.5 transition-all cursor-pointer clip-badge-poly ${
-              useSearchGrounding
-                ? 'bg-black text-[#00F0FF] border-[#00F0FF] shadow-[0_0_12px_rgba(0,240,255,0.3)]'
-                : 'bg-black/80 text-[#737373] border-[#2D2D45] hover:text-[#EDEDED]'
-            }`}
-            title="Ground response with live web research"
-          >
-            <Globe className="w-3.5 h-3.5 text-[#00F0FF]" />
-            <span>{useSearchGrounding ? 'Web (ON)' : 'Web'}</span>
-          </button>
-
-          <button
-            onClick={onReset}
-            className="p-1.5 bg-black/80 border border-[#2D2D45] hover:border-[#00F0FF] text-[#737373] hover:text-[#00F0FF] clip-badge-poly transition-colors cursor-pointer"
-            title="Reset conversation"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Multimodal Mode Selector Chips with Polygon Cuts and Multi-Hue Accents */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[#25253D]">
-        {MODES.map((mode) => {
-          const isSelected = selectedMode === mode.id;
-          const Icon = mode.icon;
-          const colorMap = {
-            text: { active: 'bg-black/90 border-[#00F0FF] text-[#00F0FF] shadow-[0_0_15px_rgba(0,240,255,0.25)]', icon: 'text-[#00F0FF]', hover: 'hover:border-[#00F0FF]' },
-            image: { active: 'bg-black/90 border-[#A855F7] text-[#A855F7] shadow-[0_0_15px_rgba(168,85,247,0.25)]', icon: 'text-[#A855F7]', hover: 'hover:border-[#A855F7]' },
-            video: { active: 'bg-black/90 border-[#FF007A] text-[#FF007A] shadow-[0_0_15px_rgba(255,0,122,0.25)]', icon: 'text-[#FF007A]', hover: 'hover:border-[#FF007A]' },
-            music: { active: 'bg-black/90 border-[#FFB800] text-[#FFB800] shadow-[0_0_15px_rgba(255,184,0,0.25)]', icon: 'text-[#FFB800]', hover: 'hover:border-[#FFB800]' },
-          };
-          const style = colorMap[mode.id];
-
-          return (
-            <button
-              key={mode.id}
-              onClick={() => onSelectMode(mode.id)}
-              className={`p-2.5 text-left border transition-all cursor-pointer flex flex-col justify-between group clip-cyber-card ${
-                isSelected
-                  ? style.active
-                  : `bg-[#0C0C18] hover:bg-[#121224] border-[#25253D] ${style.hover} text-[#737373]`
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Icon className={`w-4 h-4 ${isSelected ? style.icon : 'text-[#737373] group-hover:text-[#EDEDED]'}`} />
-                  <span className="text-xs font-semibold font-mono text-[#EDEDED]">{mode.label}</span>
-                </div>
-                <span className="text-[9px] font-mono px-1.5 py-0.2 bg-black text-[#A1A1AA] border border-[#2D2D45] clip-badge-poly">
-                  {mode.badge}
-                </span>
-              </div>
-              <span className="text-[10px] text-[#737373] line-clamp-1 mt-1 font-sans">{mode.desc}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Persona/Role Selector for Text Mode */}
-      {selectedMode === 'text' && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar pt-1 font-mono">
-          <span className="text-[#A1A1AA] text-[11px] shrink-0 mr-1 flex items-center gap-1">
-            <Sliders className="w-3 h-3 text-[#00F0FF]" /> Persona:
+        <div className="flex items-center gap-1.5 sm:gap-2 truncate">
+          <span className="text-xs sm:text-sm font-bold tracking-tight text-[var(--text-primary)] truncate">
+            {current.label}
           </span>
-          {ROLES.map((role) => (
-            <button
-              key={role.id}
-              onClick={() => onSelectRole(role.id)}
-              className={`px-2.5 py-1 text-[11px] font-medium shrink-0 transition-colors cursor-pointer flex items-center space-x-1 border clip-badge-poly ${
-                selectedRole === role.id
-                  ? 'bg-[#00F0FF] text-black font-bold border-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.3)]'
-                  : 'bg-black/80 text-[#A1A1AA] hover:text-[#00F0FF] border-[#2D2D45] hover:border-[#00F0FF]'
-              }`}
-            >
-              <span>{role.icon}</span>
-              <span>{role.name}</span>
-            </button>
-          ))}
+          <span className="text-[9px] px-1.5 py-0.2 bg-[var(--bg-elevated)] text-[var(--border-active)] border border-[var(--border-active)]/40 clip-badge-poly hidden xs:inline-flex items-center gap-1 shrink-0 font-bold">
+            <span className="w-1.5 h-1.5 bg-[var(--border-active)] rounded-full animate-ping" />
+            {current.tag}
+          </span>
+          <span className="text-[9px] px-1.5 py-0.2 bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border-color)] clip-badge-poly hidden md:inline-flex items-center gap-1 shrink-0">
+            <Languages className="w-2.5 h-2.5 text-[var(--border-active)]" />
+            {activeLanguageStyle}
+          </span>
         </div>
-      )}
+      </div>
+
+      {/* Right: Essential Tools */}
+      <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0">
+        <button
+          onClick={onToggleAccessibleMode}
+          className={`px-2 py-1 text-[10px] sm:text-[11px] font-mono border flex items-center space-x-1 transition-all cursor-pointer clip-badge-poly ${
+            accessibleReadingMode
+              ? 'bg-[var(--border-active)] text-black font-bold border-[var(--border-active)] shadow-xs'
+              : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--border-active)] border-[var(--border-color)]'
+          }`}
+          title="Toggle Accessible Dyslexia-Friendly Reading Mode"
+        >
+          <BookOpen className="w-3 h-3" />
+          <span className="hidden sm:inline">{accessibleReadingMode ? 'Accessible' : 'Access'}</span>
+        </button>
+
+        <button
+          onClick={onExportFullSession}
+          className="px-2 py-1 text-[10px] sm:text-[11px] font-mono border flex items-center space-x-1 bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--border-active)] border-[var(--border-color)] hover:border-[var(--border-active)] transition-all cursor-pointer clip-badge-poly"
+          title="Download conversation transcript as PDF document"
+        >
+          <FileDown className="w-3 h-3" />
+          <span className="hidden sm:inline">PDF</span>
+        </button>
+
+        <button
+          onClick={onToggleGrounding}
+          className={`px-2 py-1 text-[10px] sm:text-[11px] font-mono border flex items-center space-x-1 transition-all cursor-pointer clip-badge-poly ${
+            useSearchGrounding
+              ? 'bg-[var(--border-active)] text-black font-bold border-[var(--border-active)] shadow-xs'
+              : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--border-active)] border-[var(--border-color)]'
+          }`}
+          title="Toggle Live Google Search Grounding"
+        >
+          <Globe className="w-3 h-3" />
+          <span className="hidden sm:inline">{useSearchGrounding ? 'Web ON' : 'Web OFF'}</span>
+        </button>
+
+        <button
+          onClick={onReset}
+          className="p-1 sm:p-1.5 bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--border-active)] text-[var(--text-secondary)] hover:text-[var(--border-active)] clip-badge-poly transition-colors cursor-pointer"
+          title="Reset conversation"
+        >
+          <RefreshCw className="w-3 h-3" />
+        </button>
+      </div>
     </div>
   );
 });
@@ -1053,11 +992,11 @@ const ChatMessageItem = memo<{
       <div
         className={`w-8 h-8 shrink-0 flex items-center justify-center text-xs font-semibold font-mono border clip-badge-poly ${
           isUser
-            ? 'bg-gradient-to-br from-[#00F0FF] to-[#A855F7] text-black border-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.4)]'
-            : 'bg-black/80 border-[#2D2D45] text-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.2)]'
+            ? 'bg-gradient-to-br from-[#00F0FF] to-[#A855F7] text-black border-[#00F0FF] shadow-sm'
+            : 'bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--border-active)] shadow-sm'
         }`}
       >
-        {isUser ? <User className="w-4 h-4 text-black" /> : <Bot className="w-4 h-4 text-[#00F0FF]" />}
+        {isUser ? <User className="w-4 h-4 text-black" /> : <Bot className="w-4 h-4 text-[var(--border-active)]" />}
       </div>
 
       <div
@@ -1065,23 +1004,23 @@ const ChatMessageItem = memo<{
           accessibleReadingMode ? 'text-[15px] leading-loose tracking-wide' : 'text-sm leading-relaxed'
         } ${
           isUser
-            ? 'bg-gradient-to-br from-[#0E0E24] to-[#070714] border-[#00F0FF]/70 text-[#EDEDED] clip-cyber-corner shadow-[0_0_15px_rgba(0,240,255,0.12)]'
-            : 'bg-gradient-to-br from-[#0A0A18] to-[#05050E] border-[#2A2A42] hover:border-[#3D3D60] text-[#EDEDED] clip-cyber-card shadow-[0_0_15px_rgba(0,0,0,0.5)]'
+            ? 'chat-user-message bg-[var(--chat-user-bg)] border-[var(--border-active)]/70 text-[var(--text-primary)] clip-cyber-corner shadow-sm'
+            : 'chat-bot-message bg-[var(--chat-bot-bg)] border-[var(--border-color)] hover:border-[var(--border-active)] text-[var(--text-primary)] clip-cyber-card shadow-sm'
         }`}
       >
         {/* Accessible Mode Tag */}
         {accessibleReadingMode && !isUser && (
-          <div className="mb-2 pb-1.5 border-b border-[#222238] flex items-center justify-between text-[11px] font-mono text-[#00F0FF]">
+          <div className="mb-2 pb-1.5 border-b border-[var(--border-color)] flex items-center justify-between text-[11px] font-mono text-[var(--border-active)]">
             <span className="flex items-center gap-1">
-              <Eye className="w-3 h-3 text-[#00F0FF]" />
+              <Eye className="w-3 h-3 text-[var(--border-active)]" />
               Accessible Dyslexia-Friendly Layout
             </span>
-            <span className="text-[10px] text-[#A1A1AA]">Optimized Spacing</span>
+            <span className="text-[10px] text-[var(--text-secondary)]">Optimized Spacing</span>
           </div>
         )}
 
         {/* Text Content */}
-        <div className={`text-[#EDEDED] whitespace-pre-wrap ${accessibleReadingMode ? 'leading-loose tracking-wide font-sans text-[15px]' : 'leading-relaxed font-sans'}`}>
+        <div className={`text-[var(--text-primary)] whitespace-pre-wrap ${accessibleReadingMode ? 'leading-loose tracking-wide font-sans text-[15px]' : 'leading-relaxed font-sans'}`}>
           {message.content}
         </div>
 

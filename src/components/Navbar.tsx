@@ -90,7 +90,7 @@ export const Navbar: React.FC<NavbarProps> = memo(({
             onClick={() => onSelectView('chat')}
             className={`px-3 py-1.5 font-bold flex items-center space-x-1.5 clip-badge-poly transition-all cursor-pointer ${
               currentView === 'chat'
-                ? 'bg-[#A855F7] text-black shadow-[0_0_12px_rgba(168,85,247,0.4)]'
+                ? 'bg-[#A855F7] text-white shadow-[0_0_12px_rgba(168,85,247,0.4)]'
                 : 'text-[#A1A1AA] hover:text-[#EDEDED] hover:bg-[#151528]'
             }`}
           >
@@ -211,7 +211,7 @@ export const Navbar: React.FC<NavbarProps> = memo(({
         <button
           onClick={() => onSelectView('chat')}
           className={`flex-1 py-1.5 text-center border clip-badge-poly ${
-            currentView === 'chat' ? 'bg-[#A855F7] text-black border-[#A855F7]' : 'bg-black text-[#A1A1AA] border-[#25253D]'
+            currentView === 'chat' ? 'bg-[#A855F7] text-white border-[#A855F7]' : 'bg-black text-[#A1A1AA] border-[#25253D]'
           }`}
         >
           CHAT

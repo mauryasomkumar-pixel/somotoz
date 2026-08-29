@@ -125,18 +125,33 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => clearInterval(interval);
   }, [isAutoMode]);
 
-  // Apply DOM attributes on theme change
+  // Apply DOM attributes and root classes on theme change
   useEffect(() => {
     const root = document.documentElement;
     const body = document.body;
 
+    const themeClassMap: Record<AppTheme, string[]> = {
+      black: ['theme-black', 'theme-night', 'dark'],
+      white: ['theme-white', 'theme-day', 'light', 'theme-day-mode'],
+      mix: ['theme-mix', 'theme-eye-comfort', 'theme-comfort', 'theme-eye-care'],
+    };
+
+    const allThemeClasses = ['theme-black', 'theme-night', 'dark', 'theme-white', 'theme-day', 'light', 'theme-day-mode', 'theme-mix', 'theme-eye-comfort', 'theme-comfort', 'theme-eye-care'];
+
     root.setAttribute('data-theme', theme);
     body.setAttribute('data-theme', theme);
 
-    root.classList.remove('theme-black', 'theme-white', 'theme-mix');
-    root.classList.add(`theme-${theme}`);
-    body.classList.remove('theme-black', 'theme-white', 'theme-mix');
-    body.classList.add(`theme-${theme}`);
+    // Remove old classes
+    allThemeClasses.forEach((cls) => {
+      root.classList.remove(cls);
+      body.classList.remove(cls);
+    });
+
+    // Add current theme classes
+    themeClassMap[theme].forEach((cls) => {
+      root.classList.add(cls);
+      body.classList.add(cls);
+    });
   }, [theme]);
 
   return (

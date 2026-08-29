@@ -587,7 +587,8 @@ export default function App() {
         )}
 
         {/* Right Main Content Area */}
-        <main className="flex-1 overflow-y-auto bg-[var(--bg-primary)] relative p-4 sm:p-6 transition-colors duration-300">
+        {/* Main Workspace Dynamic View Port */}
+        <main className={`flex-1 overflow-y-auto bg-[var(--bg-primary)] relative transition-colors duration-300 ${viewMode === 'chat' ? 'p-1 sm:p-2 md:p-3 h-[calc(100vh-3.5rem)] flex flex-col' : 'p-4 sm:p-6'}`}>
           
           {/* 1. COMMAND DASHBOARD VIEW */}
           {viewMode === 'dashboard' && (
@@ -671,7 +672,7 @@ export default function App() {
 
           {/* 5. MULTIMODAL SYNTHESIS CHAT VIEW */}
           {viewMode === 'chat' && (
-            <div className="h-full">
+            <div className="h-full flex-1 flex flex-col min-h-0">
               <ChatCompanion
                 initialReflection={chatReflectionAnchor}
                 initialMode={activeChatMode}
