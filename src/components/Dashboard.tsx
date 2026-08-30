@@ -1337,13 +1337,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </motion.div>
 
       {/* ========================================================================= */}
-      {/* 4. MODULAR COGNITIVE TOOL SELECTORS (4 HYPER-MODERN GEOMETRIC CARDS)     */}
+      {/* 4. MODULAR COGNITIVE WORKSPACE SELECTORS (4 DISTINCT SUITE MODULES)      */}
       {/* ========================================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Card 1: AI Chat (Electric Cyan Engine) */}
+        {/* Card 1: Unified Multimodal AI Chat (Electric Cyan Engine) */}
         <div
-          onClick={() => onNavigate('chat', 'text')}
+          onClick={() => onNavigate('chat')}
           className={`p-5 transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden border-2 ${
             isLight
               ? 'bg-gradient-to-br from-sky-50/90 via-white to-sky-100/50 border-sky-300 hover:border-sky-500 hover:shadow-lg'
@@ -1360,24 +1360,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
               }`}>
                 <MessageSquare className="w-4 h-4" />
               </div>
-              <span className="text-[10px] font-mono text-[#00F0FF] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#00F0FF]/30 font-bold">01 // REASONING</span>
+              <span className="text-[10px] font-mono text-[#00F0FF] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#00F0FF]/30 font-bold">01 // UNIFIED</span>
             </div>
             <h3 className={`text-base font-bold font-display mb-1 group-hover:text-[#00F0FF] transition-colors ${textPrimaryClass}`}>
-              AI Reasoning Engine
+              Multimodal AI Chat
             </h3>
             <p className={`text-xs font-sans leading-relaxed ${textSecondaryClass}`}>
-              Multi-turn reasoning, mathematical proofing, architecture diagrams, and syntax processing.
+              Unified chat stream for text reasoning, photorealistic artwork, 60FPS motion, and voice talk.
             </p>
           </div>
           <div className="pt-4 flex items-center justify-between text-[11px] font-mono text-[#00F0FF]">
-            <span className="font-bold">Launch Engine</span>
+            <span className="font-bold">Open Chat</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform text-[#00F0FF]" />
           </div>
         </div>
 
-        {/* Card 2: Image Generation (Ultraviolet Purple Engine) */}
+        {/* Card 2: Daily Notes & Journal (Ultraviolet Purple Engine) */}
         <div
-          onClick={() => onNavigate('chat', 'image')}
+          onClick={() => onNavigate('write')}
           className={`p-5 transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden border-2 ${
             isLight
               ? 'bg-gradient-to-br from-purple-50/90 via-white to-purple-100/50 border-purple-300 hover:border-purple-500 hover:shadow-lg'
@@ -1392,26 +1392,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className={`p-2.5 clip-badge-poly border transition-all ${
                 isLight ? 'bg-purple-100 border-purple-300 text-purple-700 group-hover:bg-[#7C3AED] group-hover:text-white' : isMix ? 'bg-[#ECE5D6] border-[#D8CEBF] text-[#6366F1] group-hover:bg-[#6366F1] group-hover:text-white' : 'bg-black/80 border-[#A855F7]/60 text-[#A855F7] group-hover:bg-[#A855F7] group-hover:text-black shadow-[0_0_12px_rgba(168,85,247,0.3)]'
               }`}>
-                <ImageIcon className="w-4 h-4" />
+                <Activity className="w-4 h-4" />
               </div>
-              <span className="text-[10px] font-mono text-[#A855F7] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#A855F7]/30 font-bold">02 // VISUALS</span>
+              <span className="text-[10px] font-mono text-[#A855F7] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#A855F7]/30 font-bold">02 // JOURNAL</span>
             </div>
             <h3 className={`text-base font-bold font-display mb-1 group-hover:text-[#A855F7] transition-colors ${textPrimaryClass}`}>
-              Photoreal & Vector Suite
+              Notes & Engineering Logs
             </h3>
             <p className={`text-xs font-sans leading-relaxed ${textSecondaryClass}`}>
-              Cinematic 1K photorealism and crisp vector SVG generation with true lighting and optics.
+              Structured daily reflections, AI-powered cognitive analysis, and persistent Firestore memory.
             </p>
           </div>
           <div className="pt-4 flex items-center justify-between text-[11px] font-mono text-[#A855F7]">
-            <span className="font-bold">Launch Engine</span>
+            <span className="font-bold">Open Journal</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform text-[#A855F7]" />
           </div>
         </div>
 
-        {/* Card 3: Video Generator (Neon Hot Magenta Engine) */}
+        {/* Card 3: Knowledge Explorer (Neon Hot Magenta Engine) */}
         <div
-          onClick={() => onNavigate('chat', 'video')}
+          onClick={() => onNavigate('wisdom')}
           className={`p-5 transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden border-2 ${
             isLight
               ? 'bg-gradient-to-br from-rose-50/90 via-white to-rose-100/50 border-rose-300 hover:border-rose-500 hover:shadow-lg'
@@ -1426,26 +1426,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className={`p-2.5 clip-badge-poly border transition-all ${
                 isLight ? 'bg-rose-100 border-rose-300 text-rose-700 group-hover:bg-[#E11D48] group-hover:text-white' : isMix ? 'bg-[#ECE5D6] border-[#D8CEBF] text-[#F43F5E] group-hover:bg-[#F43F5E] group-hover:text-white' : 'bg-black/80 border-[#FF007A]/60 text-[#FF007A] group-hover:bg-[#FF007A] group-hover:text-black shadow-[0_0_12px_rgba(255,0,122,0.3)]'
               }`}>
-                <Film className="w-4 h-4" />
+                <Sparkles className="w-4 h-4" />
               </div>
-              <span className="text-[10px] font-mono text-[#FF007A] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#FF007A]/30 font-bold">03 // MOTION</span>
+              <span className="text-[10px] font-mono text-[#FF007A] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#FF007A]/30 font-bold">03 // EXPLORER</span>
             </div>
             <h3 className={`text-base font-bold font-display mb-1 group-hover:text-[#FF007A] transition-colors ${textPrimaryClass}`}>
-              60FPS Motion Simulator
+              Wisdom & Deep Search
             </h3>
             <p className={`text-xs font-sans leading-relaxed ${textSecondaryClass}`}>
-              60FPS motion keyframing, camera tracking, and procedural scene storyboard animation engine.
+              Semantic discovery engine, curated philosophy archives, and real-time knowledge synthesis.
             </p>
           </div>
           <div className="pt-4 flex items-center justify-between text-[11px] font-mono text-[#FF007A]">
-            <span className="font-bold">Launch Engine</span>
+            <span className="font-bold">Explore Hub</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform text-[#FF007A]" />
           </div>
         </div>
 
-        {/* Card 4: Music Generator (Electric Amber Gold Engine) */}
+        {/* Card 4: Soundscapes & Synth (Electric Amber Gold Engine) */}
         <div
-          onClick={() => onNavigate('chat', 'music')}
+          onClick={() => onNavigate('soundscapes')}
           className={`p-5 transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden border-2 ${
             isLight
               ? 'bg-gradient-to-br from-amber-50/90 via-white to-amber-100/50 border-amber-300 hover:border-amber-500 hover:shadow-lg'
@@ -1465,14 +1465,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span className="text-[10px] font-mono text-[#FFB800] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#FFB800]/30 font-bold">04 // AUDIO</span>
             </div>
             <h3 className={`text-base font-bold font-display mb-1 group-hover:text-[#FFB800] transition-colors ${textPrimaryClass}`}>
-              Harmonic Soundscapes
+              Focus Soundscapes & Synth
             </h3>
             <p className={`text-xs font-sans leading-relaxed ${textSecondaryClass}`}>
-              432Hz harmonic acoustic modeling, procedural synthesizer frequencies, and binaural focus sound.
+              432Hz harmonic acoustic modeling, procedural synthesizer frequencies, and binaural focus audio.
             </p>
           </div>
           <div className="pt-4 flex items-center justify-between text-[11px] font-mono text-[#FFB800]">
-            <span className="font-bold">Launch Engine</span>
+            <span className="font-bold">Launch Player</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform text-[#FFB800]" />
           </div>
         </div>

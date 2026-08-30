@@ -731,7 +731,8 @@ function generateProceduralMusic(prompt: string) {
 function generateProceduralChatReply(
   messages: Array<{ role: string; content: string }>,
   role: string = 'ai_engineer',
-  contextReflection?: string
+  contextReflection?: string,
+  clientTime?: { hour?: number; minute?: number; timeOfDay?: string; dateStr?: string; timeStr?: string; timezone?: string }
 ): string {
   const latest = messages[messages.length - 1]?.content || 'Hello';
   const trimmed = latest.trim();
@@ -755,23 +756,33 @@ function generateProceduralChatReply(
     return `**Somotoz AI Suite** [Autonomous Execution]:\n\nAapke input: *"^${trimmed.slice(0, 60)}"* par direct action liya gaya hai.\n\n• **Direct Outcome**: Task complete analyze ho gaya hai aur best architecture pattern ready hai.\n• **Immediate Value**: High performance and zero lag execution.\n• **Next Step**: Kisi specific component ya deeper breakdown ke liye prompt karein!`;
   }
 
-  // 3. Greetings in English with Real-World Time of Day Validation
-  const now = new Date();
-  const currentHour = now.getHours();
-  let timeOfDay = 'night';
-  if (currentHour >= 5 && currentHour < 12) timeOfDay = 'morning';
-  else if (currentHour >= 12 && currentHour < 17) timeOfDay = 'afternoon';
-  else if (currentHour >= 17 && currentHour < 22) timeOfDay = 'evening';
-
-  if (/good\s+morning\b/i.test(lower)) {
-    if (timeOfDay !== 'morning') {
-      return `⚡ **Somotoz Autonomous AI Core Online**.\n\nGood ${timeOfDay}! (Just noting that it's currently ${timeOfDay} here in August ${now.getFullYear()}).\n\nI am your master intelligence engine, engineered by Som Maurya. Provide any prompt for reasoning, code architecture, 1K photorealistic visuals, 60FPS video motion sequencing, or 432Hz harmonic music synthesis, and I will execute it completely end-to-end.`;
-    } else {
-      return `⚡ **Somotoz Autonomous AI Core Online**.\n\nGood morning! Today is a productive day for building.\n\nI am your master intelligence engine, engineered by Som Maurya. Provide any prompt for reasoning, code architecture, 1K photorealistic visuals, 60FPS video motion sequencing, or 432Hz harmonic music synthesis, and I will execute it completely end-to-end.`;
-    }
+  // 3. Greetings in English with Real-World User Local Time Synchronization
+  const resolvedHour = typeof clientTime?.hour === 'number' ? clientTime.hour : new Date().getHours();
+  let timeOfDay = clientTime?.timeOfDay;
+  if (!timeOfDay) {
+    if (resolvedHour >= 5 && resolvedHour < 12) timeOfDay = 'morning';
+    else if (resolvedHour >= 12 && resolvedHour < 17) timeOfDay = 'afternoon';
+    else if (resolvedHour >= 17 && resolvedHour < 22) timeOfDay = 'evening';
+    else timeOfDay = 'night';
   }
 
-  if (/^(hi|hello|hey|greetings|good\s+(afternoon|evening|night)|yo)\b/i.test(lower)) {
+  if (/good\s+morning\b/i.test(lower)) {
+    return `⚡ **Somotoz Autonomous AI Core Online**.\n\nGood morning! Wishing you a productive and focused start to your day.\n\nI am your master intelligence engine, engineered by Som Maurya. Provide any prompt for reasoning, code architecture, 1K photorealistic visuals, 60FPS video motion sequencing, or 432Hz harmonic music synthesis, and I will execute it completely end-to-end.`;
+  }
+
+  if (/good\s+afternoon\b/i.test(lower)) {
+    return `⚡ **Somotoz Autonomous AI Core Online**.\n\nGood afternoon! Ready to accelerate your workflow.\n\nI am your master intelligence engine, engineered by Som Maurya. Provide any prompt for reasoning, code architecture, 1K photorealistic visuals, 60FPS video motion sequencing, or 432Hz harmonic music synthesis, and I will execute it completely end-to-end.`;
+  }
+
+  if (/good\s+evening\b/i.test(lower)) {
+    return `⚡ **Somotoz Autonomous AI Core Online**.\n\nGood evening! Ready to synthesize insights and build great ideas.\n\nI am your master intelligence engine, engineered by Som Maurya. Provide any prompt for reasoning, code architecture, 1K photorealistic visuals, 60FPS video motion sequencing, or 432Hz harmonic music synthesis, and I will execute it completely end-to-end.`;
+  }
+
+  if (/good\s+night\b/i.test(lower)) {
+    return `⚡ **Somotoz Autonomous AI Core Online**.\n\nGood night! Rest well and let me know if you would like to summarize or log your day's reflections.\n\nI am your master intelligence engine, engineered by Som Maurya. Ready whenever you are.`;
+  }
+
+  if (/^(hi|hello|hey|greetings|yo)\b/i.test(lower)) {
     return `⚡ **Somotoz Autonomous AI Core Online**.\n\nGood ${timeOfDay}! I am your autonomous master intelligence, engineered by Som Maurya. Provide any prompt for reasoning, code architecture, 1K photorealistic visuals, 60FPS video motion sequencing, or 432Hz harmonic music synthesis, and I will execute it completely end-to-end.`;
   }
 
@@ -804,15 +815,57 @@ function generateProceduralChatReply(
   return `⚡ **Somotoz Autonomous Intelligence Core**:\n\nRegarding: *"^${trimmed.slice(0, 60)}"* \n\n• **Autonomous Execution**: Your request has been analyzed and processed with strict adherence to instructions.\n• **High-Fidelity Output**: Clean, actionable, and structured for immediate implementation.\n• **Continuous Execution**: Specify your next prompt or query for instantaneous processing.`;
 }
 
+function buildGeminiContents(messages: Array<any>) {
+  return messages.map(msg => {
+    const parts: any[] = [];
+    if (Array.isArray(msg.attachments) && msg.attachments.length > 0) {
+      for (const att of msg.attachments) {
+        if (att && typeof att === 'object') {
+          const rawBase64 = att.base64 || att.dataUrl;
+          if (rawBase64 && typeof rawBase64 === 'string' && (att.type?.startsWith('image/') || att.type === 'application/pdf' || rawBase64.startsWith('data:image/') || rawBase64.startsWith('data:application/pdf'))) {
+            let mime = att.type || 'image/jpeg';
+            if (rawBase64.startsWith('data:')) {
+              const matches = rawBase64.match(/^data:([^;]+);base64,/);
+              if (matches && matches[1]) {
+                mime = matches[1];
+              }
+            }
+            const cleanData = rawBase64.replace(/^data:[^;]+;base64,/, '');
+            parts.push({
+              inlineData: {
+                mimeType: mime,
+                data: cleanData,
+              },
+            });
+          } else if (att.textContent && typeof att.textContent === 'string') {
+            parts.push({
+              text: `\n--- ATTACHED FILE: "${att.name || 'document'}" (${att.type || 'text/plain'}) ---\n${att.textContent.slice(0, 40000)}\n--- END ATTACHED FILE ---\n`,
+            });
+          }
+        }
+      }
+    }
+    const userText = (typeof msg.content === 'string' && msg.content.trim())
+      ? msg.content
+      : (parts.length > 0 ? 'Please analyze the attached document / image with deep accuracy, providing structured takeaways, key data points, and custom notes.' : 'Hello Somotoz AI');
+    parts.push({ text: userText });
+    return {
+      role: msg.role === 'model' ? 'model' : 'user',
+      parts,
+    };
+  });
+}
+
 /**
  * Multimodal Generation & Chat Helper (Text, Image, Video, Music)
  */
 async function generateMultimodalChatResponse(
-  messages: Array<{ role: 'user' | 'model'; content: string }>,
+  messages: Array<{ role: 'user' | 'model'; content: string; attachments?: any[] }>,
   mode: 'text' | 'image' | 'video' | 'music' = 'text',
   role: string = 'ai_engineer',
   contextReflection?: string,
-  useSearchGrounding: boolean = false
+  useSearchGrounding: boolean = false,
+  clientTime?: { hour?: number; minute?: number; timeOfDay?: string; dateStr?: string; timeStr?: string; timezone?: string }
 ): Promise<{
   reply: string;
   sources: Array<{ title: string; uri: string }>;
@@ -1127,25 +1180,27 @@ Provide clear, actionable insights with clean code examples, technical breakdown
       break;
   }
 
-  const nowUtc = new Date();
-  const currentYear = nowUtc.getFullYear();
-  const currentMonthName = nowUtc.toLocaleString('en-US', { month: 'long' });
-  const currentDay = nowUtc.getDate();
-  const currentHour = nowUtc.getHours();
-  let timeOfDay = 'night';
-  if (currentHour >= 5 && currentHour < 12) timeOfDay = 'morning';
-  else if (currentHour >= 12 && currentHour < 17) timeOfDay = 'afternoon';
-  else if (currentHour >= 17 && currentHour < 22) timeOfDay = 'evening';
+  const resolvedHour = typeof clientTime?.hour === 'number' ? clientTime.hour : new Date().getHours();
+  let timeOfDay = clientTime?.timeOfDay;
+  if (!timeOfDay) {
+    if (resolvedHour >= 5 && resolvedHour < 12) timeOfDay = 'morning';
+    else if (resolvedHour >= 12 && resolvedHour < 17) timeOfDay = 'afternoon';
+    else if (resolvedHour >= 17 && resolvedHour < 22) timeOfDay = 'evening';
+    else timeOfDay = 'night';
+  }
+  const dateStr = clientTime?.dateStr || new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const timeStr = clientTime?.timeStr || new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const timezoneStr = clientTime?.timezone || 'Local Browser Timezone';
 
   const systemInstruction = `${roleInstruction}
 
 MASTER AI CORE & CONTROL DIRECTIVES (ENGINEERED BY SOM MAURYA):
 You are the master core intelligence and lead full-stack architect of Somotoz AI Suite, engineered by Som Maurya (Data Science & Computational Thinking). You must strictly adhere to these directives:
 
-1. REAL-WORLD TIME & GREETING VALIDATION:
-- Current Real-World Date & Time: Today is ${currentMonthName} ${currentDay}, ${currentYear}. Current time of day is: ${timeOfDay.toUpperCase()} (Hour: ${currentHour}:00).
-- If the user greets you with "Good morning" during the afternoon, evening, or night, you MUST gently and politely correct them with the actual current time of day (e.g., "Good ${timeOfDay}! (Just noting that it's currently ${timeOfDay} here in ${currentMonthName} ${currentYear})...").
-- Always acknowledge and respect the real-world calendar year ${currentYear} (e.g. August ${currentYear}).
+1. ACCURATE REAL-WORLD LOCAL TIME & NATURAL GREETING ALIGNMENT:
+- User's Local Real-World System Time: ${timeStr} (${dateStr}) [Timezone: ${timezoneStr}, Period: ${timeOfDay.toUpperCase()}].
+- When the user greets you with "Good morning", "Good afternoon", "Good evening", or "Namaste", respond back naturally, warmly, and politely in harmony with their local time period (${timeOfDay}). Never display or assume an incorrect time period.
+- Always acknowledge the user's real-world context respectfully and accurately.
 
 2. ACCESSIBLE READING MODE (DYSLEXIA & COMPREHENSION SUPPORT):
 - Structure all chat responses cleanly using bullet points, short paragraphs, and simple accessible language.
@@ -1167,10 +1222,7 @@ You are the master core intelligence and lead full-stack architect of Somotoz AI
 - Always detect and mirror the exact language and dialect of the user's latest query (English, Hindi, Hinglish, Spanish, French, etc.). Never force English when the user communicates in Hindi or Hinglish.
 ${contextReflection ? `\nContext / Working Memory:\n"""${contextReflection.slice(0, 3000)}"""` : ''}`;
 
-  const formattedContents = messages.map(msg => ({
-    role: msg.role === 'model' ? 'model' : 'user',
-    parts: [{ text: msg.content }],
-  }));
+  const formattedContents = buildGeminiContents(messages);
 
   for (const modelName of CHAT_MODELS) {
     try {
@@ -1228,7 +1280,7 @@ ${contextReflection ? `\nContext / Working Memory:\n"""${contextReflection.slice
   // Resilient procedural reply fallback (Zero 503 error popup)
   console.log('[Somotoz API] Falling back to procedural chat intelligence.');
   return {
-    reply: generateProceduralChatReply(messages, role, contextReflection),
+    reply: generateProceduralChatReply(messages, role, contextReflection, clientTime),
     sources: [],
     modelUsed: 'procedural-cognitive-engine',
   };
@@ -1238,10 +1290,11 @@ ${contextReflection ? `\nContext / Working Memory:\n"""${contextReflection.slice
  * Real-Time Ultra-Fast Token Streaming Generator
  */
 async function* streamTextChatResponse(
-  messages: Array<{ role: string; content: string }>,
+  messages: Array<{ role: string; content: string; attachments?: any[] }>,
   role: string = 'ai_engineer',
   contextReflection?: string,
-  useSearchGrounding: boolean = false
+  useSearchGrounding: boolean = false,
+  clientTime?: { hour?: number; minute?: number; timeOfDay?: string; dateStr?: string; timeStr?: string; timezone?: string }
 ) {
   const ai = getGeminiClient();
 
@@ -1265,25 +1318,27 @@ async function* streamTextChatResponse(
       break;
   }
 
-  const nowUtc = new Date();
-  const currentYear = nowUtc.getFullYear();
-  const currentMonthName = nowUtc.toLocaleString('en-US', { month: 'long' });
-  const currentDay = nowUtc.getDate();
-  const currentHour = nowUtc.getHours();
-  let timeOfDay = 'night';
-  if (currentHour >= 5 && currentHour < 12) timeOfDay = 'morning';
-  else if (currentHour >= 12 && currentHour < 17) timeOfDay = 'afternoon';
-  else if (currentHour >= 17 && currentHour < 22) timeOfDay = 'evening';
+  const resolvedHour = typeof clientTime?.hour === 'number' ? clientTime.hour : new Date().getHours();
+  let timeOfDay = clientTime?.timeOfDay;
+  if (!timeOfDay) {
+    if (resolvedHour >= 5 && resolvedHour < 12) timeOfDay = 'morning';
+    else if (resolvedHour >= 12 && resolvedHour < 17) timeOfDay = 'afternoon';
+    else if (resolvedHour >= 17 && resolvedHour < 22) timeOfDay = 'evening';
+    else timeOfDay = 'night';
+  }
+  const dateStr = clientTime?.dateStr || new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const timeStr = clientTime?.timeStr || new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const timezoneStr = clientTime?.timezone || 'Local Browser Timezone';
 
   const systemInstruction = `${roleInstruction}
 
 MASTER AI CORE & CONTROL DIRECTIVES (ENGINEERED BY SOM MAURYA):
 You are the master core intelligence and lead full-stack architect of Somotoz AI Suite, engineered by Som Maurya (Data Science & Computational Thinking). You must strictly adhere to these directives:
 
-1. REAL-WORLD TIME & GREETING VALIDATION:
-- Current Real-World Date & Time: Today is ${currentMonthName} ${currentDay}, ${currentYear}. Current time of day is: ${timeOfDay.toUpperCase()} (Hour: ${currentHour}:00).
-- If the user greets you with "Good morning" during the afternoon, evening, or night, you MUST gently and politely correct them with the actual current time of day (e.g., "Good ${timeOfDay}! (Just noting that it's currently ${timeOfDay} here in ${currentMonthName} ${currentYear})...").
-- Always acknowledge and respect the real-world calendar year ${currentYear} (e.g. August ${currentYear}).
+1. ACCURATE REAL-WORLD LOCAL TIME & NATURAL GREETING ALIGNMENT:
+- User's Local Real-World System Time: ${timeStr} (${dateStr}) [Timezone: ${timezoneStr}, Period: ${timeOfDay.toUpperCase()}].
+- When the user greets you with "Good morning", "Good afternoon", "Good evening", or "Namaste", respond back naturally, warmly, and politely in harmony with their local time period (${timeOfDay}). Never display or assume an incorrect time period.
+- Always acknowledge the user's real-world context respectfully and accurately.
 
 2. ACCESSIBLE READING MODE (DYSLEXIA & COMPREHENSION SUPPORT):
 - Structure all chat responses cleanly using bullet points, short paragraphs, and simple accessible language.
@@ -1305,10 +1360,7 @@ You are the master core intelligence and lead full-stack architect of Somotoz AI
 - Always detect and mirror the exact language and dialect of the user's latest query (English, Hindi, Hinglish, Spanish, French, etc.). Never force English when the user communicates in Hindi or Hinglish.
 ${contextReflection ? `\nContext / Working Memory:\n"""${contextReflection.slice(0, 3000)}"""` : ''}`;
 
-  const formattedContents = messages.map(msg => ({
-    role: msg.role === 'model' ? 'model' : 'user',
-    parts: [{ text: msg.content }],
-  }));
+  const formattedContents = buildGeminiContents(messages);
 
   for (const modelName of CHAT_MODELS) {
     let hasYieldedAny = false;
@@ -1367,7 +1419,7 @@ ${contextReflection ? `\nContext / Working Memory:\n"""${contextReflection.slice
 
   // 100% Guaranteed High-Speed Fallback: Stream procedural response token-by-token
   console.log('[Somotoz Streaming] High demand across cloud models. Engaging procedural streaming engine.');
-  const proceduralText = generateProceduralChatReply(messages, role, contextReflection);
+  const proceduralText = generateProceduralChatReply(messages, role, contextReflection, clientTime);
   const words = proceduralText.split(' ');
   for (let i = 0; i < words.length; i += 3) {
     const chunkWords = words.slice(i, i + 3).join(' ') + ' ';
@@ -1436,6 +1488,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     const role = typeof body.role === 'string' ? body.role : 'ai_engineer';
     const contextReflection = typeof body.contextReflection === 'string' ? body.contextReflection : undefined;
     const useSearchGrounding = Boolean(body.useSearchGrounding);
+    const clientTime = (body.clientTime && typeof body.clientTime === 'object') ? body.clientTime : undefined;
 
     if (messages.length === 0) {
       return res.status(400).json({ error: 'Messages array cannot be empty.' });
@@ -1459,7 +1512,8 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       effectiveMode,
       role,
       contextReflection,
-      useSearchGrounding
+      useSearchGrounding,
+      clientTime
     );
 
     return res.json({ success: true, reply, sources, mode: effectiveMode, media, modelUsed });
@@ -1479,6 +1533,7 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
   const role = typeof body.role === 'string' ? body.role : 'ai_engineer';
   const contextReflection = typeof body.contextReflection === 'string' ? body.contextReflection : undefined;
   const useSearchGrounding = Boolean(body.useSearchGrounding);
+  const clientTime = (body.clientTime && typeof body.clientTime === 'object') ? body.clientTime : undefined;
 
   if (messages.length === 0) {
     return res.status(400).json({ error: 'Messages array cannot be empty.' });
@@ -1510,7 +1565,7 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
   try {
     if (effectiveMode === 'text') {
       let accumulatedText = '';
-      for await (const chunk of streamTextChatResponse(effectiveMessages, role, contextReflection, useSearchGrounding)) {
+      for await (const chunk of streamTextChatResponse(effectiveMessages, role, contextReflection, useSearchGrounding, clientTime)) {
         accumulatedText += chunk.text;
         res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunk.text, modelUsed: chunk.modelUsed })}\n\n`);
       }
@@ -1525,7 +1580,8 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
         effectiveMode,
         role,
         contextReflection,
-        useSearchGrounding
+        useSearchGrounding,
+        clientTime
       );
 
       res.write(`data: ${JSON.stringify({ type: 'done', fullText: reply, sources, media, mode: effectiveMode, modelUsed })}\n\n`);

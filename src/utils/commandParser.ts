@@ -50,6 +50,16 @@ export const SLASH_COMMANDS = [
     icon: '📄',
   },
   {
+    command: '/talk',
+    aliases: ['/voice', '/speak', '/listen'],
+    mode: 'text' as GenerationMode,
+    label: 'Voice Interactive Talk',
+    syntax: '/talk [message]',
+    example: '/talk Explain transformer self-attention in simple terms',
+    desc: 'Engage in natural voice talk with automated spoken narration',
+    icon: '🎙️',
+  },
+  {
     command: '/search',
     aliases: ['/web', '/find'],
     mode: 'text' as GenerationMode,
@@ -106,6 +116,17 @@ export function parseClientInputIntent(text: string, activeFallbackMode: Generat
       isExplicitSlash: true,
       commandName: `/${musicSlashMatch[1].toLowerCase()}`,
       badgeLabel: '432HZ AUDIO SYNTHESIS',
+    };
+  }
+
+  const talkSlashMatch = trimmed.match(/^\/(talk|voice|speak|listen)\s*(.*)$/i);
+  if (talkSlashMatch) {
+    return {
+      mode: 'text',
+      cleanPrompt: talkSlashMatch[2]?.trim() || '',
+      isExplicitSlash: true,
+      commandName: `/${talkSlashMatch[1].toLowerCase()}`,
+      badgeLabel: 'VOICE TALK MODE',
     };
   }
 

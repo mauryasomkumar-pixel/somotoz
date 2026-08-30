@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Check, Terminal } from 'lucide-react';
@@ -73,12 +73,42 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ inline, className, children }) =>
   );
 };
 
+/**
+ * Sanitize and fix imperfect or streaming markdown tokens before rendering.
+ * Normalizes stray triple asterisks, unclosed bold/italic tags, and unclosed code blocks.
+ */
+function sanitizeMarkdownContent(raw: string): string {
+  if (!raw) return '';
+  let text = raw;
+
+  // 1. Normalize triple asterisks with text to standard bold-italic markdown
+  text = text.replace(/\*\*\*([^*]+)\*\*\*/g, '**_$1_**');
+
+  // 2. Fix dangling or unclosed triple asterisks at end of streaming tokens
+  if (text.endsWith('***')) {
+    text = text.slice(0, -3);
+  }
+
+  // 3. Balance unclosed double asterisks during streaming
+  const doubleAsteriskMatches = text.match(/\*\*/g);
+  if (doubleAsteriskMatches && doubleAsteriskMatches.length % 2 !== 0) {
+    text += '**';
+  }
+
+  // 4. Balance unclosed code blocks during streaming
+  const codeBlockMatches = text.match(/```/g);
+  if (codeBlockMatches && codeBlockMatches.length % 2 !== 0) {
+    text += '\n```';
+  }
+
+  return text;
+}
+
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   content,
   accessibleReadingMode = false,
 }) => {
-  // Pre-process any messy markdown quirks if needed while keeping standard markdown intact
-  const sanitizedContent = content || '';
+  const sanitizedContent = useMemo(() => sanitizeMarkdownContent(content || ''), [content]);
 
   return (
     <div

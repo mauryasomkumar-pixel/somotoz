@@ -588,7 +588,7 @@ export default function App() {
 
         {/* Right Main Content Area */}
         {/* Main Workspace Dynamic View Port */}
-        <main className={`flex-1 overflow-y-auto bg-[var(--bg-primary)] relative transition-colors duration-300 ${viewMode === 'chat' ? 'p-1 sm:p-2 md:p-3 h-[calc(100vh-3.5rem)] flex flex-col' : 'p-4 sm:p-6'}`}>
+        <main className={`flex-1 bg-[var(--bg-primary)] relative transition-colors duration-300 ${viewMode === 'chat' ? 'chat-viewport-container overflow-hidden' : 'overflow-y-auto p-4 sm:p-6'}`}>
           
           {/* 1. COMMAND DASHBOARD VIEW */}
           {viewMode === 'dashboard' && (

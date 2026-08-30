@@ -102,7 +102,7 @@ export const CommandSidebar: React.FC<CommandSidebarProps> = ({
   const [showDevModal, setShowDevModal] = useState(false);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(true);
 
-  // Command Navigation Items - Matching Simplified Tool Naming & Radiant Multi-Hue Identity
+  // Command Navigation Items - Unified Primary Workspace
   const navItems = [
     {
       id: 'dashboard' as ViewMode,
@@ -119,54 +119,15 @@ export const CommandSidebar: React.FC<CommandSidebarProps> = ({
     {
       id: 'chat' as ViewMode,
       chatMode: 'text' as GenerationMode,
-      label: 'Chat',
-      shortLabel: 'Conversation',
-      desc: 'Advanced AI conversation and logic.',
+      label: 'Multimodal AI Chat',
+      shortLabel: 'Unified Chat',
+      desc: 'Text, Image, Video, Music & Voice all-in-one.',
       icon: MessageSquare,
-      badge: 'LLM-2.5',
+      badge: 'UNIFIED 2.5',
       accent: '#00F0FF',
       glow: 'shadow-[0_0_15px_rgba(0,240,255,0.25)]',
       borderActive: isLight ? 'border-sky-500 bg-sky-50 text-sky-800 ring-1 ring-sky-400' : isMix ? 'border-amber-600 bg-amber-50 text-amber-900 ring-1 ring-amber-500' : 'border-[#00F0FF] bg-black/90 text-[#00F0FF]',
       textActive: isLight ? 'text-sky-800' : isMix ? 'text-amber-900' : 'text-[#00F0FF]',
-    },
-    {
-      id: 'chat' as ViewMode,
-      chatMode: 'image' as GenerationMode,
-      label: 'Image Generation',
-      shortLabel: 'Visuals',
-      desc: 'Photorealistic, high-fidelity visuals from text.',
-      icon: ImageIcon,
-      badge: 'PHOTOREAL 1K',
-      accent: '#A855F7',
-      glow: 'shadow-[0_0_15px_rgba(168,85,247,0.25)]',
-      borderActive: isLight ? 'border-purple-500 bg-purple-50 text-purple-900 ring-1 ring-purple-400' : isMix ? 'border-purple-600 bg-purple-50 text-purple-950 ring-1 ring-purple-400' : 'border-[#A855F7] bg-black/90 text-[#A855F7]',
-      textActive: isLight ? 'text-purple-900' : isMix ? 'text-purple-950' : 'text-[#A855F7]',
-    },
-    {
-      id: 'chat' as ViewMode,
-      chatMode: 'video' as GenerationMode,
-      label: 'Video Generator',
-      shortLabel: 'Motion FX',
-      desc: 'Generate high-quality video frames.',
-      icon: Film,
-      badge: '60FPS',
-      accent: '#FF007A',
-      glow: 'shadow-[0_0_15px_rgba(255,0,122,0.25)]',
-      borderActive: isLight ? 'border-pink-500 bg-pink-50 text-pink-900 ring-1 ring-pink-400' : isMix ? 'border-rose-600 bg-rose-50 text-rose-950 ring-1 ring-rose-400' : 'border-[#FF007A] bg-black/90 text-[#FF007A]',
-      textActive: isLight ? 'text-pink-900' : isMix ? 'text-rose-950' : 'text-[#FF007A]',
-    },
-    {
-      id: 'chat' as ViewMode,
-      chatMode: 'music' as GenerationMode,
-      label: 'Music Generator',
-      shortLabel: 'Audio Synth',
-      desc: 'Compose dynamic audio and music.',
-      icon: Music,
-      badge: '432HZ',
-      accent: '#FFB800',
-      glow: 'shadow-[0_0_15px_rgba(255,184,0,0.25)]',
-      borderActive: isLight ? 'border-amber-500 bg-amber-50 text-amber-900 ring-1 ring-amber-400' : isMix ? 'border-amber-600 bg-amber-50 text-amber-950 ring-1 ring-amber-500' : 'border-[#FFB800] bg-black/90 text-[#FFB800]',
-      textActive: isLight ? 'text-amber-900' : isMix ? 'text-amber-950' : 'text-[#FFB800]',
     },
   ];
 
@@ -272,7 +233,7 @@ export const CommandSidebar: React.FC<CommandSidebarProps> = ({
             <span>MAIN TOOLS</span>
             <span className={`text-[9px] font-bold ${
               isLight ? 'text-sky-600' : isMix ? 'text-amber-700' : 'text-[#00F0FF]'
-            }`}>5 ACTIVE</span>
+            }`}>2 ACTIVE</span>
           </div>
 
           <div className="mt-1.5 space-y-1.5">

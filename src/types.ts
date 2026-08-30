@@ -22,6 +22,15 @@ export interface ChatMediaData {
   animationType?: 'ambient_pulse' | 'cyber_wave' | 'neural_mesh' | 'cosmic_drift' | 'cinematic_motion' | string;
 }
 
+export interface FileAttachment {
+  name: string;
+  type: string;
+  size: number;
+  dataUrl?: string;
+  textContent?: string;
+  base64?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
@@ -31,6 +40,7 @@ export interface ChatMessage {
   media?: ChatMediaData;
   sources?: { title: string; uri: string }[];
   modelUsed?: string;
+  attachments?: FileAttachment[];
 }
 
 export type ChatRole = 'ai_engineer' | 'empathetic_listener' | 'cognitive_reframer' | 'socratic_guide' | 'mindfulness_coach';
