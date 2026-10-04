@@ -4,6 +4,28 @@ import { getEffectiveAdminEmail } from '../config/adminConfig';
 import { AdminActivityLog, ManagedUser, AdminAnalytics, UserProfile } from '../types';
 
 /**
+ * Automatically retrieves fresh Firebase ID token and builds authorization headers
+ * without requiring the user to manually copy, paste, or supply tokens.
+ */
+export async function getAdminAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  const currentAuthUser = auth.currentUser;
+  if (currentAuthUser) {
+    try {
+      const idToken = await currentAuthUser.getIdToken();
+      headers['Authorization'] = `Bearer ${idToken}`;
+      headers['x-user-id'] = currentAuthUser.uid;
+      headers['x-user-email'] = currentAuthUser.email || '';
+    } catch (err) {
+      console.warn('[Admin] Failed to obtain fresh ID token automatically:', err);
+    }
+  }
+  return headers;
+}
+
+/**
  * Validates whether the given user has administrative privileges.
  * 1. Checks if email matches configured ADMIN_EMAIL
  * 2. Checks if custom claim admin == true on Firebase token
@@ -23,6 +45,21 @@ export async function verifyAdminStatusAsync(): Promise<boolean> {
 
   // 1. Direct email check against configured ADMIN_EMAIL
   if (checkIsAdmin({ email: currentAuthUser.email })) {
+    // Automatically ensure admin_roles document in Firestore
+    try {
+      const roleRef = doc(db, 'admin_roles', currentAuthUser.uid);
+      const snap = await getDoc(roleRef);
+      if (!snap.exists()) {
+        await setDoc(roleRef, {
+          uid: currentAuthUser.uid,
+          email: currentAuthUser.email,
+          role: 'admin',
+          grantedAt: Date.now(),
+        });
+      }
+    } catch {
+      // Ignored
+    }
     return true;
   }
 
@@ -44,6 +81,18 @@ export async function verifyAdminStatusAsync(): Promise<boolean> {
     }
   } catch (err) {
     // Expected to fail if security rules deny non-admins
+  }
+
+  // 4. Server-side token verification endpoint
+  try {
+    const headers = await getAdminAuthHeaders();
+    const res = await fetch('/api/admin/verify', { method: 'POST', headers });
+    if (res.ok) {
+      const json = await res.json();
+      return json.authorized === true;
+    }
+  } catch (err) {
+    // Ignore
   }
 
   return false;
@@ -171,7 +220,8 @@ export async function fetchAdminActivityLogs(options?: {
     console.error('[Admin] Error fetching activity logs from Firestore:', err);
     // Fallback to server endpoint
     try {
-      const res = await fetch('/api/admin/activity-logs');
+      const headers = await getAdminAuthHeaders();
+      const res = await fetch('/api/admin/activity-logs', { headers });
       if (res.ok) {
         const data = await res.json();
         return data.logs || [];
@@ -189,7 +239,8 @@ export async function fetchAdminActivityLogs(options?: {
 export async function fetchManagedUsers(): Promise<ManagedUser[]> {
   try {
     // Call server endpoint or compile from Firestore
-    const res = await fetch('/api/admin/users');
+    const headers = await getAdminAuthHeaders();
+    const res = await fetch('/api/admin/users', { headers });
     if (res.ok) {
       const json = await res.json();
       if (Array.isArray(json.users) && json.users.length > 0) {
@@ -295,9 +346,10 @@ export async function setUserAccessStatus(userId: string, isDisabled: boolean, r
     );
 
     // Also notify server endpoint to update memory state
+    const headers = await getAdminAuthHeaders();
     await fetch(`/api/admin/users/${userId}/status`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ isDisabled, reason }),
     }).catch(() => {});
 
@@ -342,9 +394,10 @@ export async function updateUserAppDataByAdmin(
       { merge: true }
     );
 
+    const headers = await getAdminAuthHeaders();
     await fetch(`/api/admin/users/${userId}/edit`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(updatedData),
     }).catch(() => {});
 
@@ -393,8 +446,10 @@ export async function deleteUserSomotozData(userId: string): Promise<boolean> {
     await deleteDoc(profileDocRef);
 
     // 4. Notify server
+    const headers = await getAdminAuthHeaders();
     await fetch(`/api/admin/users/${userId}/data`, {
       method: 'DELETE',
+      headers,
     }).catch(() => {});
 
     // Log the admin deletion event
@@ -422,7 +477,8 @@ export async function deleteUserSomotozData(userId: string): Promise<boolean> {
  */
 export async function fetchAdminAnalyticsData(): Promise<AdminAnalytics> {
   try {
-    const res = await fetch('/api/admin/analytics');
+    const headers = await getAdminAuthHeaders();
+    const res = await fetch('/api/admin/analytics', { headers });
     if (res.ok) {
       return await res.json();
     }

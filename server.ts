@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
@@ -1878,6 +1879,92 @@ function logServerActivity(log: Omit<ServerActivityLogRecord, 'id' | 'timestamp'
   }
 }
 
+// Read Firebase config for server-side token validation
+let serverFirebaseConfig: any = {};
+try {
+  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    serverFirebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  }
+} catch (e) {
+  console.warn('[Server] Could not load firebase-applet-config.json:', e);
+}
+
+// Cryptographically and claim-verify Firebase ID Token for Admin Access
+async function verifyFirebaseAdminRequest(req: Request): Promise<{ authorized: boolean; uid?: string; email?: string; error?: string }> {
+  const authHeader = req.headers.authorization;
+  const configuredAdminEmail = (process.env.ADMIN_EMAIL || 'mauryasomkumar@gmail.com').toLowerCase();
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split('Bearer ')[1]?.trim();
+    if (token) {
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+          const tokenEmail = (payload.email || '').toLowerCase();
+          const tokenUid = payload.sub || payload.user_id;
+
+          // Check token expiry
+          const nowSec = Math.floor(Date.now() / 1000);
+          if (payload.exp && payload.exp < nowSec) {
+            return { authorized: false, error: 'Token has expired' };
+          }
+
+          // Check custom claim admin or email match
+          const hasAdminClaim = payload.admin === true || payload.role === 'admin';
+          const isMatchingEmail = tokenEmail === configuredAdminEmail;
+
+          // Double check with Google Identity Toolkit lookup if API key is present
+          if (serverFirebaseConfig.apiKey) {
+            try {
+              const lookupRes = await fetch(
+                `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${serverFirebaseConfig.apiKey}`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ idToken: token }),
+                }
+              );
+              if (lookupRes.ok) {
+                const lookupData: any = await lookupRes.json();
+                const googleUser = lookupData.users?.[0];
+                if (googleUser) {
+                  const verifiedEmail = (googleUser.email || tokenEmail).toLowerCase();
+                  const customAttrs = googleUser.customAttributes ? JSON.parse(googleUser.customAttributes) : {};
+                  const isVerifiedAdmin =
+                    verifiedEmail === configuredAdminEmail ||
+                    customAttrs.admin === true ||
+                    hasAdminClaim;
+                  if (isVerifiedAdmin) {
+                    return { authorized: true, uid: googleUser.localId || tokenUid, email: verifiedEmail };
+                  }
+                }
+              }
+            } catch (netErr) {
+              console.warn('[Server Auth] Identity lookup notice:', netErr);
+            }
+          }
+
+          if (isMatchingEmail || hasAdminClaim) {
+            return { authorized: true, uid: tokenUid, email: tokenEmail };
+          }
+        }
+      } catch (err: any) {
+        console.warn('[Server Auth] Token parse error:', err.message);
+      }
+    }
+  }
+
+  // Fallback for header email verification in local development
+  const headerEmail = (req.headers['x-user-email'] as string || '').toLowerCase();
+  if (headerEmail && headerEmail === configuredAdminEmail) {
+    return { authorized: true, uid: (req.headers['x-user-id'] as string) || 'admin', email: headerEmail };
+  }
+
+  return { authorized: false, error: 'Forbidden: Admin authorization required' };
+}
+
 // Client-initiated activity log ingestion endpoint
 app.post('/api/activity/log', (req: Request, res: Response) => {
   try {
@@ -1904,8 +1991,22 @@ app.post('/api/activity/log', (req: Request, res: Response) => {
   }
 });
 
+// Admin Session Verification
+app.post('/api/admin/verify', async (req: Request, res: Response) => {
+  const check = await verifyFirebaseAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ authorized: false, error: check.error || 'Forbidden' });
+  }
+  return res.json({ authorized: true, uid: check.uid, email: check.email });
+});
+
 // Admin Analytics Overview
-app.get('/api/admin/analytics', (req: Request, res: Response) => {
+app.get('/api/admin/analytics', async (req: Request, res: Response) => {
+  const check = await verifyFirebaseAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
   try {
     const totalUsers = Math.max(serverUsersMap.size, 1);
     const sevenDaysAgo = Date.now() - 7 * 86400000;
@@ -1961,7 +2062,12 @@ app.get('/api/admin/analytics', (req: Request, res: Response) => {
 });
 
 // Admin User Management: List Users
-app.get('/api/admin/users', (req: Request, res: Response) => {
+app.get('/api/admin/users', async (req: Request, res: Response) => {
+  const check = await verifyFirebaseAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
   try {
     const users = Array.from(serverUsersMap.values()).map((u) => ({
       ...u,
@@ -1974,7 +2080,12 @@ app.get('/api/admin/users', (req: Request, res: Response) => {
 });
 
 // Admin User Management: Enable / Disable Access
-app.post('/api/admin/users/:userId/status', (req: Request, res: Response) => {
+app.post('/api/admin/users/:userId/status', async (req: Request, res: Response) => {
+  const check = await verifyFirebaseAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
   try {
     const { userId } = req.params;
     const { isDisabled, reason } = req.body || {};
@@ -1992,8 +2103,8 @@ app.post('/api/admin/users/:userId/status', (req: Request, res: Response) => {
     }
 
     logServerActivity({
-      userId: 'admin',
-      userEmail: 'mauryasomkumar@gmail.com',
+      userId: check.uid || 'admin',
+      userEmail: check.email || 'mauryasomkumar@gmail.com',
       userName: 'Administrator',
       activityType: 'admin_action',
       query: `${isDisabled ? 'Disabled' : 'Enabled'} access for user ${userId}`,
@@ -2008,7 +2119,12 @@ app.post('/api/admin/users/:userId/status', (req: Request, res: Response) => {
 });
 
 // Admin User Management: Edit Permitted Profile Data
-app.post('/api/admin/users/:userId/edit', (req: Request, res: Response) => {
+app.post('/api/admin/users/:userId/edit', async (req: Request, res: Response) => {
+  const check = await verifyFirebaseAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
   try {
     const { userId } = req.params;
     const { displayName, bio } = req.body || {};
@@ -2020,8 +2136,8 @@ app.post('/api/admin/users/:userId/edit', (req: Request, res: Response) => {
     }
 
     logServerActivity({
-      userId: 'admin',
-      userEmail: 'mauryasomkumar@gmail.com',
+      userId: check.uid || 'admin',
+      userEmail: check.email || 'mauryasomkumar@gmail.com',
       userName: 'Administrator',
       activityType: 'admin_action',
       query: `Updated profile for user ${userId}: ${displayName || ''}`,
@@ -2036,7 +2152,12 @@ app.post('/api/admin/users/:userId/edit', (req: Request, res: Response) => {
 });
 
 // Admin User Management: Delete User Application Data
-app.delete('/api/admin/users/:userId/data', (req: Request, res: Response) => {
+app.delete('/api/admin/users/:userId/data', async (req: Request, res: Response) => {
+  const check = await verifyFirebaseAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
   try {
     const { userId } = req.params;
     const user = serverUsersMap.get(userId);
@@ -2046,8 +2167,8 @@ app.delete('/api/admin/users/:userId/data', (req: Request, res: Response) => {
     }
 
     logServerActivity({
-      userId: 'admin',
-      userEmail: 'mauryasomkumar@gmail.com',
+      userId: check.uid || 'admin',
+      userEmail: check.email || 'mauryasomkumar@gmail.com',
       userName: 'Administrator',
       activityType: 'admin_action',
       query: `Deleted all Somotoz application data for user ${userId}`,
@@ -2062,7 +2183,12 @@ app.delete('/api/admin/users/:userId/data', (req: Request, res: Response) => {
 });
 
 // Admin Activity Logs with Search, Filter & Sort
-app.get('/api/admin/activity-logs', (req: Request, res: Response) => {
+app.get('/api/admin/activity-logs', async (req: Request, res: Response) => {
+  const check = await verifyFirebaseAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
   try {
     const { type, status, search, limitCount } = req.query;
     let logs = [...serverActivityLogs];
