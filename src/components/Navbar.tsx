@@ -9,10 +9,12 @@ import {
   Terminal,
   LogOut,
   Menu,
-  Cpu
+  Cpu,
+  Shield
 } from 'lucide-react';
 import { UserProfile, ViewMode, GenerationMode } from '../types';
 import { ThemeSwitcher } from './ThemeSwitcher';
+import { checkIsAdmin } from '../lib/adminService';
 
 interface NavbarProps {
   user: UserProfile;
@@ -85,6 +87,19 @@ export const Navbar: React.FC<NavbarProps> = memo(({
             <span>DASHBOARD</span>
           </button>
 
+          {/* Somochat E2EE Tab */}
+          <button
+            onClick={() => onSelectView('somochat')}
+            className={`px-3 py-1.5 font-bold flex items-center space-x-1.5 clip-badge-poly transition-all cursor-pointer ${
+              currentView === 'somochat'
+                ? 'bg-gradient-to-r from-[#00F0FF] to-[#A855F7] text-black shadow-[0_0_15px_rgba(0,240,255,0.5)]'
+                : 'text-[#A1A1AA] hover:text-[#00F0FF] hover:bg-[#151528]'
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5 text-[#00F0FF]" />
+            <span>SOMOCHAT</span>
+          </button>
+
           {/* Multimodal Chat Tab */}
           <button
             onClick={() => onSelectView('chat')}
@@ -136,6 +151,21 @@ export const Navbar: React.FC<NavbarProps> = memo(({
             <Headphones className="w-3.5 h-3.5" />
             <span>MUSIC</span>
           </button>
+
+          {/* Admin Tab (Exclusively rendered for authorized master admin) */}
+          {checkIsAdmin(user) && (
+            <button
+              onClick={() => onSelectView('admin')}
+              className={`px-3 py-1.5 font-bold flex items-center space-x-1.5 clip-badge-poly transition-all cursor-pointer ${
+                currentView === 'admin'
+                  ? 'bg-rose-500 text-white shadow-[0_0_14px_rgba(244,63,94,0.5)]'
+                  : 'text-rose-400 hover:text-white hover:bg-rose-950/40 border border-rose-500/30'
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>ADMIN</span>
+            </button>
+          )}
         </nav>
 
         {/* Right: Theme Switcher & New Entry & Interactive Profile & Logout */}
@@ -199,18 +229,26 @@ export const Navbar: React.FC<NavbarProps> = memo(({
       </div>
 
       {/* Mobile Sub-Navigation Bar */}
-      <div className="flex md:hidden items-center justify-around gap-1 mt-2 pt-2 border-t border-[#25253D] text-[10px] font-mono font-bold">
+      <div className="flex md:hidden items-center justify-around gap-1 mt-2 pt-2 border-t border-[#25253D] text-[10px] font-mono font-bold overflow-x-auto">
         <button
           onClick={() => onSelectView('dashboard')}
-          className={`flex-1 py-1.5 text-center border clip-badge-poly ${
+          className={`flex-1 py-1.5 px-2 text-center border clip-badge-poly shrink-0 ${
             currentView === 'dashboard' ? 'bg-[#00F0FF] text-black border-[#00F0FF]' : 'bg-black text-[#A1A1AA] border-[#25253D]'
           }`}
         >
           DASH
         </button>
         <button
+          onClick={() => onSelectView('somochat')}
+          className={`flex-1 py-1.5 px-2 text-center border clip-badge-poly shrink-0 ${
+            currentView === 'somochat' ? 'bg-gradient-to-r from-[#00F0FF] to-[#A855F7] text-black border-[#00F0FF]' : 'bg-black text-[#A1A1AA] border-[#25253D]'
+          }`}
+        >
+          SOMOCHAT
+        </button>
+        <button
           onClick={() => onSelectView('chat')}
-          className={`flex-1 py-1.5 text-center border clip-badge-poly ${
+          className={`flex-1 py-1.5 px-2 text-center border clip-badge-poly shrink-0 ${
             currentView === 'chat' ? 'bg-[#A855F7] text-white border-[#A855F7]' : 'bg-black text-[#A1A1AA] border-[#25253D]'
           }`}
         >
@@ -218,7 +256,7 @@ export const Navbar: React.FC<NavbarProps> = memo(({
         </button>
         <button
           onClick={() => onSelectView('write')}
-          className={`flex-1 py-1.5 text-center border clip-badge-poly ${
+          className={`flex-1 py-1.5 px-2 text-center border clip-badge-poly shrink-0 ${
             isJournalActive ? 'bg-[#00F0FF] text-black border-[#00F0FF]' : 'bg-black text-[#A1A1AA] border-[#25253D]'
           }`}
         >
@@ -226,7 +264,7 @@ export const Navbar: React.FC<NavbarProps> = memo(({
         </button>
         <button
           onClick={() => onSelectView('wisdom')}
-          className={`flex-1 py-1.5 text-center border clip-badge-poly ${
+          className={`flex-1 py-1.5 px-2 text-center border clip-badge-poly shrink-0 ${
             currentView === 'wisdom' ? 'bg-[#FF007A] text-white border-[#FF007A]' : 'bg-black text-[#A1A1AA] border-[#25253D]'
           }`}
         >
@@ -234,12 +272,22 @@ export const Navbar: React.FC<NavbarProps> = memo(({
         </button>
         <button
           onClick={() => onSelectView('soundscapes')}
-          className={`flex-1 py-1.5 text-center border clip-badge-poly ${
+          className={`flex-1 py-1.5 px-2 text-center border clip-badge-poly shrink-0 ${
             currentView === 'soundscapes' ? 'bg-[#FFB800] text-black border-[#FFB800]' : 'bg-black text-[#A1A1AA] border-[#25253D]'
           }`}
         >
           MUSIC
         </button>
+        {checkIsAdmin(user) && (
+          <button
+            onClick={() => onSelectView('admin')}
+            className={`flex-1 py-1.5 px-2 text-center border clip-badge-poly shrink-0 font-bold ${
+              currentView === 'admin' ? 'bg-rose-500 text-white border-rose-500' : 'bg-black text-rose-400 border-rose-500/50'
+            }`}
+          >
+            ADMIN
+          </button>
+        )}
       </div>
     </header>
   );

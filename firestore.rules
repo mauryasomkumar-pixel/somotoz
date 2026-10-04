@@ -1,8 +1,45 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper: Check if current authenticated user has administrative authorization
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.admin == true ||
+        request.auth.token.email == "mauryasomkumar@gmail.com" ||
+        exists(/databases/$(database)/documents/admin_roles/$(request.auth.uid))
+      );
+    }
+
+    // User application data (entries, activities, profile)
+    // - Owner has full read and write access
+    // - Authorized Admin has read, update, and delete access for management
     match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+
+    // Activity and AI Query Audit Logs
+    // - Authenticated users can write log entries for their own actions
+    // - Only Admin can read, query, list, or delete activity audit records
+    match /admin_activity_logs/{logId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Admin Roles collection
+    // - Authenticated users can check admin role status
+    // - Only Admin can modify roles
+    match /admin_roles/{uid} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // User account status (enable/disable flags)
+    // - Authenticated users can read status to verify account access
+    // - Only Admin can update or write status
+    match /user_status/{userId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
     }
   }
 }

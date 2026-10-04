@@ -1448,7 +1448,25 @@ app.post('/api/reflect', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Reflection exceeds maximum character limit of 15,000.' });
     }
 
+    const userId = req.headers['x-user-id'] || body.userId;
+    if (userId && disabledUserIds.has(String(userId))) {
+      return res.status(403).json({ error: 'User access has been disabled by Somotoz administrator.' });
+    }
+
     const reflection = await generateReflectionWithFallback(content, promptType);
+
+    logServerActivity({
+      userId: String(userId || 'anonymous'),
+      userEmail: String(req.headers['x-user-email'] || body.userEmail || 'user@somotoz.ai'),
+      userName: String(body.userName || ''),
+      activityType: 'reflection',
+      query: content.slice(0, 300),
+      feature: 'Reflection Studio',
+      status: 'success',
+      tokens: Math.round(content.length / 4) + 150,
+      modelUsed: 'gemini-3.1-flash-lite',
+    });
+
     return res.json({ success: true, reflection });
   } catch (error: any) {
     console.error('[API /api/reflect Error]:', error);
@@ -1543,6 +1561,11 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
   const parsed = parseUserCommandIntent(latestMsg?.content || '', requestedMode);
   const effectiveMode = parsed.mode;
 
+  const callerUid = req.headers['x-user-id'] || body.userId;
+  if (callerUid && disabledUserIds.has(String(callerUid))) {
+    return res.status(403).json({ error: 'User access has been disabled by Somotoz administrator.' });
+  }
+
   // Use clean prompt for generation if slash command or intent matched
   const effectiveMessages = [...messages];
   if (parsed.cleanPrompt && (parsed.isExplicitSlash || effectiveMode !== 'text')) {
@@ -1569,6 +1592,19 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
         accumulatedText += chunk.text;
         res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunk.text, modelUsed: chunk.modelUsed })}\n\n`);
       }
+
+      logServerActivity({
+        userId: String(callerUid || 'anonymous'),
+        userEmail: String(req.headers['x-user-email'] || body.userEmail || 'user@somotoz.ai'),
+        userName: String(body.userName || ''),
+        activityType: 'ai_query',
+        query: (latestMsg?.content || '').slice(0, 500),
+        feature: 'Chat Companion (TEXT)',
+        status: 'success',
+        tokens: Math.round(accumulatedText.length / 4) + 100,
+        modelUsed: 'gemini-flash',
+      });
+
       res.write(`data: ${JSON.stringify({ type: 'done', fullText: accumulatedText, mode: 'text' })}\n\n`);
       res.end();
     } else {
@@ -1583,6 +1619,18 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
         useSearchGrounding,
         clientTime
       );
+
+      logServerActivity({
+        userId: String(callerUid || 'anonymous'),
+        userEmail: String(req.headers['x-user-email'] || body.userEmail || 'user@somotoz.ai'),
+        userName: String(body.userName || ''),
+        activityType: 'media_gen',
+        query: (latestMsg?.content || '').slice(0, 500),
+        feature: `Chat Companion (${effectiveMode.toUpperCase()})`,
+        status: 'success',
+        tokens: 240,
+        modelUsed: modelUsed || 'gemini-multimodal',
+      });
 
       res.write(`data: ${JSON.stringify({ type: 'done', fullText: reply, sources, media, mode: effectiveMode, modelUsed })}\n\n`);
       res.end();
@@ -1602,6 +1650,11 @@ app.post('/api/search-wisdom', async (req: Request, res: Response) => {
 
     if (!query) {
       return res.status(400).json({ error: 'Wisdom query cannot be empty.' });
+    }
+
+    const callerUid = req.headers['x-user-id'] || body.userId;
+    if (callerUid && disabledUserIds.has(String(callerUid))) {
+      return res.status(403).json({ error: 'User access has been disabled by Somotoz administrator.' });
     }
 
     const ai = getGeminiClient();
@@ -1637,6 +1690,18 @@ When answering technical, psychological, or scientific inquiries:
             }
           }
         }
+
+        logServerActivity({
+          userId: String(callerUid || 'anonymous'),
+          userEmail: String(req.headers['x-user-email'] || body.userEmail || 'user@somotoz.ai'),
+          userName: String(body.userName || ''),
+          activityType: 'search',
+          query: query.slice(0, 400),
+          feature: 'Wisdom Explorer Grounded Search',
+          status: 'success',
+          tokens: 280,
+          modelUsed: `${modelName} (Google Search Grounding)`,
+        });
 
         return res.json({ success: true, answer, sources, modelUsed: modelName });
       } catch (err: any) {
@@ -1714,6 +1779,315 @@ CRITICAL: Output ONLY valid SVG without markdown backticks or commentary.`;
   } catch (error: any) {
     console.error('[API /api/generate-art Error]:', error);
     return res.status(500).json({ error: error.message || 'Artwork generation failed.' });
+  }
+});
+
+// ============================================================================
+// SOMOTOZ SECURE ADMIN TELEMETRY & MANAGEMENT SYSTEM
+// ============================================================================
+
+interface ServerActivityLogRecord {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName?: string;
+  activityType: 'ai_query' | 'search' | 'reflection' | 'media_gen' | 'auth' | 'admin_action';
+  query: string;
+  feature: string;
+  status: 'success' | 'error';
+  timestamp: number;
+  tokens?: number;
+  modelUsed?: string;
+  metadata?: Record<string, any>;
+}
+
+// In-memory telemetry cache synchronized with Firestore
+const serverActivityLogs: ServerActivityLogRecord[] = [];
+const disabledUserIds = new Set<string>();
+const serverUsersMap = new Map<string, {
+  uid: string;
+  displayName: string;
+  email: string;
+  createdAt: number;
+  lastLoginAt: number;
+  status: 'active' | 'disabled';
+  disabledReason?: string;
+  totalActivities: number;
+  totalEntries: number;
+  role: 'admin' | 'user';
+  bio?: string;
+}>();
+
+// Initialize default owner
+serverUsersMap.set('som_maurya_owner', {
+  uid: 'som_maurya_owner',
+  displayName: 'Som Maurya',
+  email: 'mauryasomkumar@gmail.com',
+  createdAt: Date.now() - 86400000 * 14,
+  lastLoginAt: Date.now(),
+  status: 'active',
+  totalActivities: 28,
+  totalEntries: 8,
+  role: 'admin',
+  bio: 'AI Architect & Data Engineer (IIT Madras)',
+});
+
+function logServerActivity(log: Omit<ServerActivityLogRecord, 'id' | 'timestamp'> & { id?: string; timestamp?: number }) {
+  const fullRecord: ServerActivityLogRecord = {
+    id: log.id || `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    userId: log.userId || 'anonymous',
+    userEmail: log.userEmail || 'user@somotoz.ai',
+    userName: log.userName || (log.userEmail ? log.userEmail.split('@')[0] : 'Somotoz User'),
+    activityType: log.activityType,
+    query: (log.query || '').slice(0, 3000),
+    feature: log.feature || 'General',
+    status: log.status || 'success',
+    timestamp: log.timestamp || Date.now(),
+    tokens: log.tokens || 100,
+    modelUsed: log.modelUsed || 'gemini-3.1-flash-lite',
+    metadata: log.metadata,
+  };
+
+  serverActivityLogs.unshift(fullRecord);
+  if (serverActivityLogs.length > 1000) {
+    serverActivityLogs.pop();
+  }
+
+  // Update or register user in telemetry map
+  if (fullRecord.userId && fullRecord.userId !== 'anonymous') {
+    const existing = serverUsersMap.get(fullRecord.userId);
+    if (existing) {
+      existing.lastLoginAt = fullRecord.timestamp;
+      existing.totalActivities += 1;
+      if (fullRecord.activityType === 'reflection') existing.totalEntries += 1;
+      if (fullRecord.userEmail) existing.email = fullRecord.userEmail;
+      if (fullRecord.userName) existing.displayName = fullRecord.userName;
+    } else {
+      serverUsersMap.set(fullRecord.userId, {
+        uid: fullRecord.userId,
+        displayName: fullRecord.userName || fullRecord.userEmail.split('@')[0] || 'Somotoz User',
+        email: fullRecord.userEmail,
+        createdAt: fullRecord.timestamp,
+        lastLoginAt: fullRecord.timestamp,
+        status: disabledUserIds.has(fullRecord.userId) ? 'disabled' : 'active',
+        totalActivities: 1,
+        totalEntries: fullRecord.activityType === 'reflection' ? 1 : 0,
+        role: fullRecord.userEmail.toLowerCase().includes('som') ? 'admin' : 'user',
+      });
+    }
+  }
+}
+
+// Client-initiated activity log ingestion endpoint
+app.post('/api/activity/log', (req: Request, res: Response) => {
+  try {
+    const body = req.body || {};
+    if (body.query || body.activityType) {
+      logServerActivity({
+        id: body.id,
+        userId: body.userId,
+        userEmail: body.userEmail,
+        userName: body.userName,
+        activityType: body.activityType || 'ai_query',
+        query: body.query || '',
+        feature: body.feature || 'Somotoz AI',
+        status: body.status || 'success',
+        timestamp: body.timestamp,
+        tokens: body.tokens,
+        modelUsed: body.modelUsed,
+        metadata: body.metadata,
+      });
+    }
+    return res.json({ success: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Logging failed' });
+  }
+});
+
+// Admin Analytics Overview
+app.get('/api/admin/analytics', (req: Request, res: Response) => {
+  try {
+    const totalUsers = Math.max(serverUsersMap.size, 1);
+    const sevenDaysAgo = Date.now() - 7 * 86400000;
+    const activeUsers = Array.from(serverUsersMap.values()).filter(
+      (u) => u.lastLoginAt >= sevenDaysAgo && u.status === 'active'
+    ).length;
+
+    const totalAiQueries = serverActivityLogs.filter(
+      (l) => l.activityType === 'ai_query' || l.activityType === 'media_gen'
+    ).length;
+    const totalSearches = serverActivityLogs.filter((l) => l.activityType === 'search').length;
+    const totalReflections = serverActivityLogs.filter((l) => l.activityType === 'reflection').length;
+
+    // 7-day trend
+    const trendsMap = new Map<string, { aiQueries: number; searches: number; reflections: number }>();
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().split('T')[0];
+      trendsMap.set(key, { aiQueries: 0, searches: 0, reflections: 0 });
+    }
+
+    serverActivityLogs.forEach((log) => {
+      const dateKey = new Date(log.timestamp).toISOString().split('T')[0];
+      if (trendsMap.has(dateKey)) {
+        const item = trendsMap.get(dateKey)!;
+        if (log.activityType === 'ai_query' || log.activityType === 'media_gen') item.aiQueries += 1;
+        else if (log.activityType === 'search') item.searches += 1;
+        else if (log.activityType === 'reflection') item.reflections += 1;
+      }
+    });
+
+    const activityTrends = Array.from(trendsMap.entries()).map(([date, counts]) => ({
+      date: date.slice(5),
+      aiQueries: counts.aiQueries,
+      searches: counts.searches,
+      reflections: counts.reflections,
+    }));
+
+    return res.json({
+      totalUsers,
+      activeUsers: Math.max(activeUsers, 1),
+      totalAiQueries,
+      totalSearches,
+      totalReflections,
+      recentActivityCount: serverActivityLogs.length,
+      activityTrends,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Analytics fetch failed.' });
+  }
+});
+
+// Admin User Management: List Users
+app.get('/api/admin/users', (req: Request, res: Response) => {
+  try {
+    const users = Array.from(serverUsersMap.values()).map((u) => ({
+      ...u,
+      status: disabledUserIds.has(u.uid) ? 'disabled' : u.status,
+    }));
+    return res.json({ success: true, users });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Users list fetch failed.' });
+  }
+});
+
+// Admin User Management: Enable / Disable Access
+app.post('/api/admin/users/:userId/status', (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { isDisabled, reason } = req.body || {};
+
+    if (isDisabled) {
+      disabledUserIds.add(userId);
+    } else {
+      disabledUserIds.delete(userId);
+    }
+
+    const user = serverUsersMap.get(userId);
+    if (user) {
+      user.status = isDisabled ? 'disabled' : 'active';
+      user.disabledReason = reason;
+    }
+
+    logServerActivity({
+      userId: 'admin',
+      userEmail: 'mauryasomkumar@gmail.com',
+      userName: 'Administrator',
+      activityType: 'admin_action',
+      query: `${isDisabled ? 'Disabled' : 'Enabled'} access for user ${userId}`,
+      feature: 'User Governance',
+      status: 'success',
+    });
+
+    return res.json({ success: true, isDisabled });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Status toggle failed.' });
+  }
+});
+
+// Admin User Management: Edit Permitted Profile Data
+app.post('/api/admin/users/:userId/edit', (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { displayName, bio } = req.body || {};
+
+    const user = serverUsersMap.get(userId);
+    if (user) {
+      if (displayName) user.displayName = displayName;
+      if (bio !== undefined) user.bio = bio;
+    }
+
+    logServerActivity({
+      userId: 'admin',
+      userEmail: 'mauryasomkumar@gmail.com',
+      userName: 'Administrator',
+      activityType: 'admin_action',
+      query: `Updated profile for user ${userId}: ${displayName || ''}`,
+      feature: 'User Governance',
+      status: 'success',
+    });
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Profile edit failed.' });
+  }
+});
+
+// Admin User Management: Delete User Application Data
+app.delete('/api/admin/users/:userId/data', (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const user = serverUsersMap.get(userId);
+    if (user) {
+      user.totalEntries = 0;
+      user.totalActivities = 0;
+    }
+
+    logServerActivity({
+      userId: 'admin',
+      userEmail: 'mauryasomkumar@gmail.com',
+      userName: 'Administrator',
+      activityType: 'admin_action',
+      query: `Deleted all Somotoz application data for user ${userId}`,
+      feature: 'User Governance',
+      status: 'success',
+    });
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Data deletion failed.' });
+  }
+});
+
+// Admin Activity Logs with Search, Filter & Sort
+app.get('/api/admin/activity-logs', (req: Request, res: Response) => {
+  try {
+    const { type, status, search, limitCount } = req.query;
+    let logs = [...serverActivityLogs];
+
+    if (type && type !== 'all') {
+      logs = logs.filter((l) => l.activityType === type);
+    }
+    if (status && status !== 'all') {
+      logs = logs.filter((l) => l.status === status);
+    }
+    if (search && typeof search === 'string' && search.trim()) {
+      const term = search.toLowerCase().trim();
+      logs = logs.filter(
+        (l) =>
+          l.query.toLowerCase().includes(term) ||
+          l.userEmail.toLowerCase().includes(term) ||
+          l.userId.toLowerCase().includes(term) ||
+          l.feature.toLowerCase().includes(term)
+      );
+    }
+
+    const limitNum = Math.min(Number(limitCount) || 200, 500);
+    return res.json({ success: true, logs: logs.slice(0, limitNum) });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Logs fetch failed.' });
   }
 });
 

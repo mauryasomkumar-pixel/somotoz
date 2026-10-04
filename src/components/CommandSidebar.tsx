@@ -27,6 +27,7 @@ import {
 import { ViewMode, GenerationMode, UserProfile, JournalEntry } from '../types';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { useTheme } from '../context/ThemeContext';
+import { checkIsAdmin } from '../lib/adminService';
 
 interface CommandSidebarProps {
   currentView: ViewMode;
@@ -117,6 +118,18 @@ export const CommandSidebar: React.FC<CommandSidebarProps> = ({
       textActive: isLight ? 'text-sky-800' : isMix ? 'text-amber-900' : 'text-[#00F0FF]',
     },
     {
+      id: 'somochat' as ViewMode,
+      label: 'Somochat (E2EE)',
+      shortLabel: 'Somochat',
+      desc: 'Gen-Z secure messaging, media & unique IDs.',
+      icon: Shield,
+      badge: 'NEW // E2EE',
+      accent: '#00F0FF',
+      glow: 'shadow-[0_0_15px_rgba(0,240,255,0.25)]',
+      borderActive: isLight ? 'border-sky-500 bg-sky-50 text-sky-800 ring-1 ring-sky-400' : isMix ? 'border-amber-600 bg-amber-50 text-amber-900 ring-1 ring-amber-500' : 'border-[#00F0FF] bg-black/90 text-[#00F0FF]',
+      textActive: isLight ? 'text-sky-800' : isMix ? 'text-amber-900' : 'text-[#00F0FF]',
+    },
+    {
       id: 'chat' as ViewMode,
       chatMode: 'text' as GenerationMode,
       label: 'Multimodal AI Chat',
@@ -152,6 +165,16 @@ export const CommandSidebar: React.FC<CommandSidebarProps> = ({
       icon: Headphones,
       accent: '#FFB800',
     },
+    ...(checkIsAdmin(user)
+      ? [
+          {
+            id: 'admin' as ViewMode,
+            label: 'Master Admin Console',
+            icon: Shield,
+            accent: '#F43F5E',
+          },
+        ]
+      : []),
   ];
 
   const formatRelativeTime = (timestamp: number) => {

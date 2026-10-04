@@ -21,12 +21,15 @@ import { Dashboard } from './components/Dashboard';
 import { ReflectionEditor } from './components/ReflectionEditor';
 import { ReflectionDetail } from './components/ReflectionDetail';
 import { ChatCompanion } from './components/ChatCompanion';
+import { Somochat } from './components/Somochat';
 import { WisdomExplorer } from './components/WisdomExplorer';
 import { SoundscapePlayer } from './components/SoundscapePlayer';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { ProfileModal } from './components/ProfileModal';
+import { AdminDashboard } from './components/admin/AdminDashboard';
 import { ToastContainer, ToastMessage } from './components/Toast';
-import { Loader2, Terminal, BookOpen } from 'lucide-react';
+import { Loader2, Terminal, BookOpen, ShieldAlert, LogOut } from 'lucide-react';
+import { checkIsAdmin, checkUserIsDisabled, recordAdminActivity } from './lib/adminService';
 
 export default function App() {
   // Auth state
@@ -34,6 +37,7 @@ export default function App() {
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isUserDisabled, setIsUserDisabled] = useState<boolean>(false);
 
   // Journal data state
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -79,7 +83,25 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // 1. Auth Listener
+  // 1. Auth Listener & URL Synchronizer
+  useEffect(() => {
+    const handleUrlRoute = () => {
+      const path = window.location.pathname;
+      const hash = window.location.hash;
+      if (path === '/admin' || hash === '#/admin' || hash === '#admin') {
+        setViewMode('admin');
+      }
+    };
+
+    handleUrlRoute();
+    window.addEventListener('popstate', handleUrlRoute);
+    window.addEventListener('hashchange', handleUrlRoute);
+    return () => {
+      window.removeEventListener('popstate', handleUrlRoute);
+      window.removeEventListener('hashchange', handleUrlRoute);
+    };
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(
       auth,
@@ -97,6 +119,14 @@ export default function App() {
             console.warn('Could not read user profile from firestore, using auth defaults', e);
           }
 
+          // Check if this account has been disabled by Somotoz administrator
+          try {
+            const disabled = await checkUserIsDisabled(user.uid);
+            setIsUserDisabled(disabled);
+          } catch (e) {
+            console.warn('Could not verify user status:', e);
+          }
+
           setCurrentUser({
             uid: user.uid,
             displayName: customProfile.displayName || user.displayName || 'Som Maurya',
@@ -108,6 +138,7 @@ export default function App() {
           setAuthError(null);
         } else {
           setCurrentUser(null);
+          setIsUserDisabled(false);
           setEntries([]);
           setActivityLogs([]);
           setSelectedEntryId(null);
@@ -230,8 +261,21 @@ export default function App() {
       } catch (err) {
         console.warn('Could not persist activity log to Firestore:', err);
       }
+
+      // Record to Somotoz Admin Audit collection
+      recordAdminActivity({
+        userId: currentUser.uid,
+        userEmail: currentUser.email || 'user@somotoz.ai',
+        userName: currentUser.displayName || 'Somotoz User',
+        activityType: mode === 'text' ? 'ai_query' : 'media_gen',
+        query: action,
+        feature: mode === 'text' ? 'Chat Companion' : `Multimodal Generator (${mode})`,
+        status: 'success',
+        tokens: tokens || 120,
+        metadata,
+      });
     },
-    [currentUser?.uid]
+    [currentUser]
   );
 
   // Handle Profile Updates from ProfileModal
@@ -309,6 +353,15 @@ export default function App() {
       setActiveChatMode(chatMode);
     }
     setViewMode(view);
+    if (view === 'admin') {
+      if (window.location.pathname !== '/admin') {
+        window.history.pushState(null, '', '/admin');
+      }
+    } else {
+      if (window.location.pathname === '/admin') {
+        window.history.pushState(null, '', '/');
+      }
+    }
   };
 
   // Handle New Entry Submission to Gemini & Firestore
@@ -324,13 +377,19 @@ export default function App() {
 
     setIsSubmittingAI(true);
     try {
-      // Step 1: Call Gemini API proxy endpoint
+      // Step 1: Call Gemini API proxy endpoint with user identification headers
       const response = await fetch('/api/reflect', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': currentUser.uid,
+          'x-user-email': currentUser.email || '',
+        },
         body: JSON.stringify({
           content,
           promptType,
+          userId: currentUser.uid,
+          userEmail: currentUser.email,
         }),
       });
 
@@ -377,12 +436,25 @@ export default function App() {
       const entryDocRef = doc(db, 'users', currentUser.uid, 'entries', entryId);
       await setDoc(entryDocRef, cleanData);
 
-      // Record Activity
+      // Record Activity in user's personal logs
       logActivity(
         'text',
         isEditing ? `Updated reflection: "${finalTitle}"` : `Created reflection: "${finalTitle}"`,
         Math.round(wordCount * 1.3)
       );
+
+      // Step 3: Record to Somotoz Admin Audit collection
+      recordAdminActivity({
+        userId: currentUser.uid,
+        userEmail: currentUser.email || 'user@somotoz.ai',
+        userName: currentUser.displayName || 'Somotoz User',
+        activityType: 'reflection',
+        query: isEditing ? `Updated reflection: "${finalTitle}"` : `Created reflection: "${finalTitle}"`,
+        feature: 'Reflection Studio',
+        status: 'success',
+        tokens: Math.round(wordCount * 1.3),
+        metadata: { wordCount, moodTags },
+      });
 
       // Step 3: Switch to View mode with the created/updated entry
       setSelectedEntryId(entryId);
@@ -516,6 +588,37 @@ export default function App() {
     );
   }
 
+  // Render Suspended / Access Disabled Screen if user is marked disabled
+  if (isUserDisabled && currentUser) {
+    return (
+      <div className="min-h-screen bg-[#070712] text-white flex flex-col items-center justify-center p-6 font-mono selection:bg-rose-500 selection:text-white">
+        <div className="max-w-md w-full p-8 bg-[#090916] border-2 border-rose-500/80 shadow-[0_0_35px_rgba(244,63,94,0.3)] clip-cyber-card text-center space-y-5">
+          <div className="w-16 h-16 mx-auto bg-rose-950/40 border border-rose-500 flex items-center justify-center text-rose-400 clip-badge-poly">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold uppercase tracking-wider text-rose-400">
+              Account Access Suspended
+            </h2>
+            <p className="mt-2 text-xs text-[#A1A1AA] font-sans leading-relaxed">
+              Your access to the Somotoz intelligence suite and messaging has been disabled by the system administrator.
+            </p>
+          </div>
+          <div className="p-3 bg-black/60 border border-[#25253D] text-[11px] text-[#737373]">
+            UID: <span className="text-[#A1A1AA] font-mono">{currentUser.uid}</span>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="w-full py-2.5 bg-black/80 hover:bg-rose-950/40 border border-[#25253D] hover:border-rose-500/60 text-xs text-rose-300 font-bold uppercase clip-badge-poly flex items-center justify-center gap-2 cursor-pointer transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const isJournalView = viewMode === 'write' || viewMode === 'view' || viewMode === 'edit';
   const userName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Som Maurya';
 
@@ -588,7 +691,7 @@ export default function App() {
 
         {/* Right Main Content Area */}
         {/* Main Workspace Dynamic View Port */}
-        <main className={`flex-1 bg-[var(--bg-primary)] relative transition-colors duration-300 ${viewMode === 'chat' ? 'chat-viewport-container overflow-hidden' : 'overflow-y-auto p-4 sm:p-6'}`}>
+        <main className={`flex-1 bg-[var(--bg-primary)] relative transition-colors duration-300 ${viewMode === 'chat' ? 'chat-viewport-container overflow-hidden' : viewMode === 'somochat' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto p-4 sm:p-6'}`}>
           
           {/* 1. COMMAND DASHBOARD VIEW */}
           {viewMode === 'dashboard' && (
@@ -607,7 +710,16 @@ export default function App() {
             </div>
           )}
 
-          {/* 2. JOURNAL WRITE VIEW */}
+          {/* 2. SOMOCHAT E2EE GEN-Z MESSAGING VIEW */}
+          {viewMode === 'somochat' && (
+            <Somochat
+              currentUser={currentUser}
+              onShowToast={addToast}
+              onLogActivity={(mode, action, tokens) => logActivity(mode as any, action, tokens)}
+            />
+          )}
+
+          {/* 3. JOURNAL WRITE VIEW */}
           {viewMode === 'write' && (
             <div className="max-w-5xl mx-auto">
               <ReflectionEditor
@@ -693,6 +805,17 @@ export default function App() {
           {viewMode === 'soundscapes' && (
             <div className="max-w-5xl mx-auto">
               <SoundscapePlayer />
+            </div>
+          )}
+
+          {/* 8. MASTER ADMIN DASHBOARD VIEW */}
+          {viewMode === 'admin' && (
+            <div className="max-w-7xl mx-auto">
+              <AdminDashboard
+                currentUser={currentUser}
+                onNavigate={handleNavigate}
+                onShowToast={addToast}
+              />
             </div>
           )}
         </main>

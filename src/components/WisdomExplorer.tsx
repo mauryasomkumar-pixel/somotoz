@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Search, Globe, BookOpen, Sparkles, ExternalLink, Compass, HeartPulse, Brain, Moon, ArrowRight } from 'lucide-react';
 import { GroundingSource } from '../types';
 import { useTheme } from '../context/ThemeContext';
+import { auth } from '../lib/firebase';
+import { recordAdminActivity } from '../lib/adminService';
 
 interface WisdomExplorerProps {
   onApplyTechnique?: (text: string) => void;
@@ -51,9 +53,14 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = () => {
     setSearchQuery(q);
 
     try {
+      const currentUser = auth.currentUser;
       const res = await fetch('/api/search-wisdom', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': currentUser?.uid || '',
+          'x-user-email': currentUser?.email || '',
+        },
         body: JSON.stringify({ query: q }),
       });
 
@@ -64,6 +71,18 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = () => {
 
       setAnswer(data.answer);
       setSources(data.sources || []);
+
+      // Log internal search to Admin audit collection
+      recordAdminActivity({
+        userId: currentUser?.uid || 'anonymous',
+        userEmail: currentUser?.email || 'user@somotoz.ai',
+        userName: currentUser?.displayName || 'Somotoz User',
+        activityType: 'search',
+        query: q,
+        feature: 'Wisdom Explorer Grounded Search',
+        status: 'success',
+        tokens: 280,
+      });
     } catch (err: any) {
       console.error('Wisdom search error:', err);
       setErrorMsg(err.message || 'Unable to complete search. Please try again.');

@@ -1337,11 +1337,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </motion.div>
 
       {/* ========================================================================= */}
-      {/* 4. MODULAR COGNITIVE WORKSPACE SELECTORS (4 DISTINCT SUITE MODULES)      */}
+      {/* 4. MODULAR COGNITIVE WORKSPACE SELECTORS (5 DISTINCT SUITE MODULES)      */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         
-        {/* Card 1: Unified Multimodal AI Chat (Electric Cyan Engine) */}
+        {/* Card 1: Somochat E2EE Gen-Z Messenger */}
+        <div
+          onClick={() => onNavigate('somochat')}
+          className={`p-5 transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden border-2 ${
+            isLight
+              ? 'bg-gradient-to-br from-cyan-50/90 via-white to-sky-100/50 border-cyan-300 hover:border-cyan-500 hover:shadow-lg'
+              : isMix
+              ? 'bg-gradient-to-br from-[#FAF6EE] via-[#F4EFE6] to-[#ECE5D6] border-[#D3C7B5] hover:border-cyan-600 hover:shadow-lg'
+              : 'bg-gradient-to-br from-[#071926] via-[#040E17] to-[#02070C] border-[#00F0FF]/40 hover:border-[#00F0FF] hover:-translate-y-2 hover:shadow-[0_0_30px_rgba(0,240,255,0.5)]'
+          }`}
+        >
+          <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#00F0FF] via-[#A855F7] to-[#FF007A] opacity-80 group-hover:opacity-100 transition-opacity" />
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className={`p-2.5 clip-badge-poly border transition-all ${
+                isLight ? 'bg-cyan-100 border-cyan-300 text-cyan-700 group-hover:bg-[#00F0FF] group-hover:text-black' : isMix ? 'bg-[#ECE5D6] border-[#D8CEBF] text-[#0D9488] group-hover:bg-[#0D9488] group-hover:text-white' : 'bg-black/80 border-[#00F0FF]/60 text-[#00F0FF] group-hover:bg-[#00F0FF] group-hover:text-black shadow-[0_0_12px_rgba(0,240,255,0.3)]'
+              }`}>
+                <Shield className="w-4 h-4" />
+              </div>
+              <span className="text-[10px] font-mono text-[#00F0FF] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#00F0FF]/40 font-bold animate-pulse">01 // E2EE</span>
+            </div>
+            <h3 className={`text-base font-bold font-display mb-1 group-hover:text-[#00F0FF] transition-colors ${textPrimaryClass}`}>
+              Somochat Secure
+            </h3>
+            <p className={`text-xs font-sans leading-relaxed ${textSecondaryClass}`}>
+              Gen-Z messaging with instant XOR cryptographic ciphers, unique Somo IDs, and rich media transmission.
+            </p>
+          </div>
+          <div className="pt-4 flex items-center justify-between text-[11px] font-mono text-[#00F0FF]">
+            <span className="font-bold">Launch Somochat</span>
+            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform text-[#00F0FF]" />
+          </div>
+        </div>
+
+        {/* Card 2: Unified Multimodal AI Chat (Electric Cyan Engine) */}
         <div
           onClick={() => onNavigate('chat')}
           className={`p-5 transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden border-2 ${
@@ -1360,7 +1394,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               }`}>
                 <MessageSquare className="w-4 h-4" />
               </div>
-              <span className="text-[10px] font-mono text-[#00F0FF] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#00F0FF]/30 font-bold">01 // UNIFIED</span>
+              <span className="text-[10px] font-mono text-[#00F0FF] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#00F0FF]/30 font-bold">02 // UNIFIED</span>
             </div>
             <h3 className={`text-base font-bold font-display mb-1 group-hover:text-[#00F0FF] transition-colors ${textPrimaryClass}`}>
               Multimodal AI Chat
@@ -1375,7 +1409,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* Card 2: Daily Notes & Journal (Ultraviolet Purple Engine) */}
+        {/* Card 3: Daily Notes & Journal (Ultraviolet Purple Engine) */}
         <div
           onClick={() => onNavigate('write')}
           className={`p-5 transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden border-2 ${
@@ -1394,7 +1428,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               }`}>
                 <Activity className="w-4 h-4" />
               </div>
-              <span className="text-[10px] font-mono text-[#A855F7] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#A855F7]/30 font-bold">02 // JOURNAL</span>
+              <span className="text-[10px] font-mono text-[#A855F7] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#A855F7]/30 font-bold">03 // JOURNAL</span>
             </div>
             <h3 className={`text-base font-bold font-display mb-1 group-hover:text-[#A855F7] transition-colors ${textPrimaryClass}`}>
               Notes & Engineering Logs
@@ -1409,7 +1443,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* Card 3: Knowledge Explorer (Neon Hot Magenta Engine) */}
+        {/* Card 4: Knowledge Explorer (Neon Hot Magenta Engine) */}
         <div
           onClick={() => onNavigate('wisdom')}
           className={`p-5 transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden border-2 ${
@@ -1428,7 +1462,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               }`}>
                 <Sparkles className="w-4 h-4" />
               </div>
-              <span className="text-[10px] font-mono text-[#FF007A] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#FF007A]/30 font-bold">03 // EXPLORER</span>
+              <span className="text-[10px] font-mono text-[#FF007A] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#FF007A]/30 font-bold">04 // EXPLORER</span>
             </div>
             <h3 className={`text-base font-bold font-display mb-1 group-hover:text-[#FF007A] transition-colors ${textPrimaryClass}`}>
               Wisdom & Deep Search
@@ -1443,7 +1477,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* Card 4: Soundscapes & Synth (Electric Amber Gold Engine) */}
+        {/* Card 5: Soundscapes & Synth (Electric Amber Gold Engine) */}
         <div
           onClick={() => onNavigate('soundscapes')}
           className={`p-5 transition-all duration-300 clip-cyber-card group cursor-pointer flex flex-col justify-between relative overflow-hidden border-2 ${
@@ -1462,7 +1496,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               }`}>
                 <Music className="w-4 h-4" />
               </div>
-              <span className="text-[10px] font-mono text-[#FFB800] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#FFB800]/30 font-bold">04 // AUDIO</span>
+              <span className="text-[10px] font-mono text-[#FFB800] px-2 py-0.5 bg-black/60 clip-badge-poly border border-[#FFB800]/30 font-bold">05 // AUDIO</span>
             </div>
             <h3 className={`text-base font-bold font-display mb-1 group-hover:text-[#FFB800] transition-colors ${textPrimaryClass}`}>
               Focus Soundscapes & Synth

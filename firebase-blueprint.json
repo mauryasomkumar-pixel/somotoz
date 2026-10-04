@@ -21,6 +21,42 @@
         "wordCount": { "type": "number", "description": "Word count of reflection" },
         "isFavorite": { "type": "boolean", "description": "Whether user marked entry as favorite" }
       }
+    },
+    "AdminActivityLog": {
+      "path": "admin_activity_logs/{logId}",
+      "fields": {
+        "id": { "type": "string", "description": "Unique activity log identifier" },
+        "userId": { "type": "string", "description": "User UID who initiated the action" },
+        "userEmail": { "type": "string", "description": "User email address" },
+        "userName": { "type": "string", "description": "User display name" },
+        "activityType": { "type": "string", "description": "Type: ai_query, search, reflection, media_gen, auth, admin_action" },
+        "query": { "type": "string", "description": "Prompt or search query submitted inside Somotoz" },
+        "feature": { "type": "string", "description": "Feature or page used (Chat, Wisdom, Journal, etc.)" },
+        "status": { "type": "string", "description": "Execution status: success or error" },
+        "timestamp": { "type": "timestamp", "description": "Unix timestamp in ms" },
+        "tokens": { "type": "number", "description": "Token count estimate" },
+        "modelUsed": { "type": "string", "description": "Gemini or search model identifier" },
+        "metadata": { "type": "object", "description": "Optional application metadata" }
+      }
+    },
+    "AdminRole": {
+      "path": "admin_roles/{uid}",
+      "fields": {
+        "uid": { "type": "string", "description": "Admin user UID" },
+        "email": { "type": "string", "description": "Admin email address" },
+        "role": { "type": "string", "description": "Role string (super_admin or admin)" },
+        "grantedAt": { "type": "timestamp", "description": "Timestamp when admin role was granted" }
+      }
+    },
+    "UserStatus": {
+      "path": "user_status/{userId}",
+      "fields": {
+        "userId": { "type": "string", "description": "User UID" },
+        "isDisabled": { "type": "boolean", "description": "Whether user access to Somotoz is disabled by admin" },
+        "disabledReason": { "type": "string", "description": "Reason for disabling access" },
+        "updatedAt": { "type": "timestamp", "description": "Last status modification timestamp" },
+        "updatedBy": { "type": "string", "description": "Admin UID who updated status" }
+      }
     }
   }
 }
