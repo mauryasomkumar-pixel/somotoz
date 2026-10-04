@@ -16,23 +16,27 @@
 
 1. [System Flow & Architecture Diagrams](#-system-flow--architecture-diagrams)
    - [1. Universal Full-Stack Topology](#1-universal-full-stack-topology)
-   - [2. Multi-Modal Generation & Resilient Fallback Ladder Flow](#2-multi-modal-generation--resilient-fallback-ladder-flow)
-   - [3. Tri-Mode Hybrid Real-Time Theme Engine Flow](#3-tri-mode-hybrid-real-time-theme-engine-flow)
-   - [4. Firebase Auth & Firestore Isolation Sequence](#4-firebase-auth--firestore-isolation-sequence)
-   - [5. Neural Voice Transcription (Audio-to-Token) Flow](#5-neural-voice-transcription-audio-to-token-flow)
-   - [6. Procedural 432Hz Harmonic Soundscape Synthesis](#6-procedural-432hz-harmonic-soundscape-synthesis)
+   - [2. Master Admin Security & Cryptographic Gate Sequence](#2-master-admin-security--cryptographic-gate-sequence)
+   - [3. Multi-Modal Generation & Resilient Fallback Ladder Flow](#3-multi-modal-generation--resilient-fallback-ladder-flow)
+   - [4. Tri-Mode Hybrid Real-Time Theme Engine Flow](#4-tri-mode-hybrid-real-time-theme-engine-flow)
+   - [5. Firebase Auth & Firestore Isolation Sequence](#5-firebase-auth--firestore-isolation-sequence)
+   - [6. Persistent AI & Search Query Audit Logging Pipeline](#6-persistent-ai--search-query-audit-logging-pipeline)
+   - [7. Neural Voice Transcription (Audio-to-Token) Flow](#7-neural-voice-transcription-audio-to-token-flow)
+   - [8. Procedural 432Hz Harmonic Soundscape Synthesis](#8-procedural-432hz-harmonic-soundscape-synthesis)
 2. [Complete Repository Directory & Module Guide](#-complete-repository-directory--module-guide)
 3. [Prerequisites & System Requirements](#-prerequisites--system-requirements)
 4. [Step-by-Step Local Setup Guide](#-step-by-step-local-setup-guide)
-5. [How to Test in Locality (Comprehensive Testing Guide)](#-how-to-test-in-locality-comprehensive-testing-guide)
+5. [Vercel & Production Environment Variables](#-vercel--production-environment-variables)
+6. [How to Test in Locality (Comprehensive Testing Guide)](#-how-to-test-in-locality-comprehensive-testing-guide)
    - [A. End-to-End Browser UI Walkthrough Matrix](#a-end-to-end-browser-ui-walkthrough-matrix)
-   - [B. Backend Streaming & API Verification with cURL](#b-backend-streaming--api-verification-with-curl)
-   - [C. Automated Build & Type-Checking Quality Gates](#c-automated-build--type-checking-quality-gates)
-6. [API Route Specifications](#-api-route-specifications)
-7. [Database Security Rules & Schema](#-database-security-rules--schema)
-8. [Production Deployment (Google Cloud Run & Secret Manager)](#-production-deployment-google-cloud-run--secret-manager)
-9. [Troubleshooting & FAQs](#-troubleshooting--faqs)
-10. [License & Credits](#-license--credits)
+   - [B. Master Admin Dashboard & Audit Verification](#b-master-admin-dashboard--audit-verification)
+   - [C. Backend Streaming & API Verification with cURL](#c-backend-streaming--api-verification-with-curl)
+   - [D. Automated Build & Type-Checking Quality Gates](#d-automated-build--type-checking-quality-gates)
+7. [API Route Specifications (Core & Admin)](#-api-route-specifications-core--admin)
+8. [Database Security Rules & Schema](#-database-security-rules--schema)
+9. [Production Deployment (Vercel & Google Cloud Run)](#-production-deployment-vercel--google-cloud-run)
+10. [Troubleshooting & FAQs](#-troubleshooting--faqs)
+11. [License & Credits](#-license--credits)
 
 ---
 
@@ -45,36 +49,67 @@
 |                                    SOMOTOZ FRONTEND CLIENT LAYER                                  |
 |        React 19 • Vite 6 • Tailwind CSS v4 • Motion Layout Engine • JetBrains & Space Grotesk     |
 |   [Non-Rectangular Cyber Geometry] • [Dynamic Theme Engine (Night/Day/Mix)] • [High-Contrast AA]  |
+|   [Admin Dashboard Suite: Analytics • User Governance • Query Audit Logs • Security Verification] |
 +===================================================================================================+
                                                   │
                  ┌────────────────────────────────┴────────────────────────────────┐
-                 │                                                                 │
+                 │ Authorization: Bearer <ID_TOKEN>                                │
                  ▼                                                                 ▼
 +─────────────────────────────────+                             +─────────────────────────────────+
 |     CLIENT-SIDE FIREBASE SDK    |                             |      NODE.JS / EXPRESS BACKEND  |
 |  • Google Federated Identity    |                             |  • Port 3000 (Unified Server)   |
-|  • Real-Time Firestore Sync     |                             |  • SSE Streaming (Chunk Buffer) |
-|  • Offline IndexedDB Cache      |                             |  • Media Synthesizer & Proxy    |
+|  • Real-Time Firestore Sync     |                             |  • Firebase Admin SDK v12 Auth  |
+|  • Automatic ID Token Refresh   |                             |  • adminAuth.verifyIdToken()    |
+|  • Offline IndexedDB Cache      |                             |  • Cryptographic Gatekeeper     |
 +────────────────+────────────────+                             +────────────────+────────────────+
                  │                                                               │
                  ▼                                                               ▼
 +─────────────────────────────────+                             +─────────────────────────────────+
 |     GOOGLE CLOUD FIRESTORE      |                             |        @google/genai SDK        |
-|  • users/{userId}/entries/{id}  |                             |  • gemini-3.6-flash (Primary)   |
-|  • Owner-Bound Security Rules   |                             |  • gemini-3.1-flash-lite        |
-|  • Zero Undefined Strip Hygiene |                             |  • gemini-3.7-flash (Deep Flow) |
-+─────────────────────────────────+                             +────────────────+────────────────+
-                                                                                 │
-                ┌────────────────────────┬────────────────────────┬──────────────┴──────────────┐
-                │                        │                        │                             │
-                ▼                        ▼                        ▼                             ▼
-        [Smart Chat LLM]        [SVG Vector Matrix]     [60FPS Canvas Video]          [432Hz Audio Synth]
-        Sub-50ms Stream         Scalable Vector Code    Real-time Keyframing          Web Audio Polyphony
+|  • users/{userId}/entries/{id}  |                             |  • gemini-2.5/3.1/3.6/3.7       |
+|  • admin_activity_logs/{logId}  |                             |  • Google Search Grounding Hub  |
+|  • admin_roles/{userId}         |                             |  • Audio Multimodal Transcribe  |
+|  • Cryptographic Security Rules |                             |  • Procedural Media Generation  |
++─────────────────────────────────+                             +─────────────────────────────────+
 ```
 
 ---
 
-### 2. Multi-Modal Generation & Resilient Fallback Ladder Flow
+### 2. Master Admin Security & Cryptographic Gate Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as Authorized Admin (mauryasomkumar@gmail.com)
+    participant Client as React Client (AdminDashboard)
+    participant AuthSDK as Firebase Auth Client SDK
+    participant Server as Express Server (server.ts)
+    participant AdminSDK as Firebase Admin SDK (Auth & DB)
+    participant Firestore as Firestore Database
+
+    Admin->>Client: Open /admin or click "ADMIN" Badge
+    Client->>AuthSDK: currentUser.getIdToken(true)
+    AuthSDK-->>Client: Returns cryptographically signed ID Token
+    Client->>Server: GET /api/admin/users (Header: Bearer <Token>)
+    Server->>AdminSDK: adminAuth.verifyIdToken(token, checkRevoked: true)
+    
+    alt Token is invalid or unauthenticated
+        AdminSDK-->>Server: Verification Failure
+        Server-->>Client: 403 Forbidden: "Valid Firebase ID token required"
+    else Token valid & verified
+        AdminSDK-->>Server: DecodedToken { uid, email, admin: true }
+        Server->>Server: Validate email === "mauryasomkumar@gmail.com" OR claims.admin === true
+        Server->>AdminSDK: adminAuth.listUsers(100)
+        AdminSDK-->>Server: Real Firebase Auth user accounts
+        Server->>Firestore: Fetch user metrics from entries & activities
+        Server-->>Client: 200 OK: Real user records + telemetry
+        Client-->>Admin: Render full Admin Dashboard Suite
+    end
+```
+
+---
+
+### 3. Multi-Modal Generation & Resilient Fallback Ladder Flow
 
 ```mermaid
 flowchart TD
@@ -152,7 +187,34 @@ sequenceDiagram
 
 ---
 
-### 5. Neural Voice Transcription (Audio-to-Token) Flow
+### 6. Persistent AI & Search Query Audit Logging Pipeline
+
+```mermaid
+flowchart TD
+    subgraph Client Activity
+        UserQuery[User submits Chat / Search / Reflection / Media Generation]
+        GetToken[Acquire fresh Firebase ID token via auth.currentUser.getIdToken]
+        SendReq[Send HTTP Request with Authorization: Bearer token]
+    end
+
+    subgraph Server Verification & Execution
+        UserQuery --> GetToken --> SendReq
+        SendReq --> SrvAuth[server.ts: authenticateUserRequest]
+        SrvAuth --> DecryptToken[adminAuth.verifyIdToken -> Extracts verified UID & Email]
+        DecryptToken --> ModelCall[Call Gemini AI / Google Search API]
+        ModelCall --> SrvResponse[Stream or return JSON response to Client]
+    end
+
+    subgraph Firestore Audit Persistence
+        DecryptToken --> AuditRecord[Construct Audit Log Document]
+        AuditRecord --> FSStore[(Firestore Collection: admin_activity_logs/{logId})]
+        FSStore --> LogProps["• userId: Verified Auth UID<br/>• userEmail: Verified Email<br/>• activityType: ai_query | search | reflection<br/>• query: Raw input text payload<br/>• timestamp: Server Timestamp<br/>• model: gemini-3.6-flash / Search Grounding<br/>• tokens: Inferred/Estimated token usage<br/>• status: success | error"]
+    end
+```
+
+---
+
+### 7. Neural Voice Transcription (Audio-to-Token) Flow
 
 ```mermaid
 sequenceDiagram
@@ -176,7 +238,7 @@ sequenceDiagram
 
 ---
 
-### 6. Procedural 432Hz Harmonic Soundscape Synthesis
+### 8. Procedural 432Hz Harmonic Soundscape Synthesis
 
 flowchart TD
     UserAction["User Toggles Soundscape Preset / Melody"] --> InitCtx["Initialize Web Audio AudioContext"]
@@ -200,35 +262,41 @@ flowchart TD
 
 ```
 somotoz-workspace/
-├── .env.example                     # Environment variables schema declaration
+├── .env.example                     # Environment variables schema declaration (including Admin & Vercel vars)
 ├── .gitignore                       # Git ignore configuration for production build hygiene
 ├── README.md                        # Complete project blueprint, flow diagrams & locality guide
 ├── firebase-applet-config.json      # Client Firebase credentials config
 ├── firebase-blueprint.json          # Firestore schema blueprint & permissions definition
-├── firestore.rules                  # Firestore document isolation security rules
+├── firestore.rules                  # Firestore document isolation & admin security rules
 ├── index.html                       # HTML5 entry point with JetBrains Mono & Space Grotesk typography
 ├── metadata.json                    # Workspace metadata & frame permissions declarations
-├── package.json                     # Scripts and full-stack dependencies
-├── server.ts                        # Unified Express API server, SSE streaming & Gemini proxies
+├── package.json                     # Scripts and full-stack dependencies (firebase-admin included)
+├── server.ts                        # Unified Express API server, Firebase Admin SDK gatekeeper & Gemini proxies
 ├── tsconfig.json                    # TypeScript strict compiler configuration
 ├── vite.config.ts                   # Vite 6 bundler config with Tailwind CSS v4
 │
 └── src/
     ├── main.tsx                     # Application bootstrap & DOM root mount
-    ├── App.tsx                      # Primary layout coordinator, auth state & view router
-    ├── types.ts                     # TypeScript definitions (Reflection, Message, MoodTag, UserProfile)
-    ├── index.css                    # Tailwind CSS v4 styles, custom scrollbars & cybernetic theme
+    ├── App.tsx                      # Primary layout coordinator, auth state, router & admin guard
+    ├── types.ts                     # TypeScript definitions (ManagedUser, AdminActivityLog, AdminAnalytics)
+    ├── index.css                    # Tailwind CSS v4 styles, semantic theme CSS variables & cybernetic styles
+    │
+    ├── config/
+    │   └── adminConfig.ts           # Authoritative master admin configuration (ADMIN_EMAIL)
     │
     ├── context/
     │   └── ThemeContext.tsx         # Hybrid real-time clock & session-locked theme engine
     │
     ├── lib/
-    │   ├── firebase.ts              # Firebase app initialization, Auth & Firestore helpers
+    │   ├── adminService.ts          # Firebase Admin client layer, Firestore audit fetchers & governance
+    │   ├── firebase.ts              # Client Firebase SDK initialization, Auth & Firestore helpers
     │   └── soundSynthesizer.ts      # Web Audio API engine (Rain, Ocean, Bowls, Pink Noise, 432Hz)
     │
     └── components/
+        ├── admin/
+        │   └── AdminDashboard.tsx   # Master Admin Dashboard Suite (Analytics, Users, AI Audit, Security)
         ├── LandingPage.tsx          # Cybernetic gate entrance & Google Authentication
-        ├── Navbar.tsx               # Top command bar with view switcher, clock, search & profile
+        ├── Navbar.tsx               # Top command bar with view switcher, admin badge, clock & profile
         ├── Dashboard.tsx            # Mission control overview, telemetry metrics & quick launch cards
         ├── DynamicWelcomeBanner.tsx # Dedicated floating glassmorphism greeting & GenZ quotes container
         ├── CommandSidebar.tsx       # Compact command drawer with telemetry stats & navigation
@@ -305,6 +373,22 @@ npm start
 
 ---
 
+## 🌐 Vercel & Production Environment Variables
+
+When deploying Somotoz to **Vercel**, **Google Cloud Run**, or any serverless runtime, configure these production environment variables in your project settings:
+
+| Variable Name | Required | Environment | Description & Format |
+| :--- | :---: | :--- | :--- |
+| **`GEMINI_API_KEY`** | **Yes** | Server | Google Gemini API Key for neural inference & multimodal media generation. |
+| **`ADMIN_EMAIL`** | **Yes** | Server / Client | The single authoritative master administrator email: `mauryasomkumar@gmail.com`. |
+| **`FIREBASE_PROJECT_ID`** | **Yes** | Server / Client | The target Firebase Project identifier: `ai-studio-25adb58e-a6f1-481b-8be8-2c4d53b05155`. |
+| **`FIREBASE_SERVICE_ACCOUNT`** | **Recommended** | Server | Full Firebase Admin Service Account JSON serialized as a single-line string (`{"type":"service_account",...}`). Ideal for Vercel. |
+| **`FIREBASE_CLIENT_EMAIL`** | Optional | Server | Service account client email (alternative to `FIREBASE_SERVICE_ACCOUNT`). |
+| **`FIREBASE_PRIVATE_KEY`** | Optional | Server | Service account private key string (escaped `\n` supported). |
+| **`APP_URL`** | Optional | Server | Public URL of the deployed application (e.g. `https://somotoz.vercel.app`). |
+
+---
+
 ## 🧪 How to Test in Locality (Comprehensive Testing Guide)
 
 ### A. End-to-End Browser UI Walkthrough Matrix
@@ -327,7 +411,21 @@ Every user interaction has been categorized below with explicit test steps and e
 
 ---
 
-### B. Backend Streaming & API Verification with cURL
+### B. Master Admin Dashboard & Audit Verification
+
+| Test ID | Admin Module | Step-by-Step Testing Procedure | Expected Result |
+| :--- | :--- | :--- | :--- |
+| **ADM-01** | **Unauthorized Gatekeeper** | Attempt navigating to `/admin` while unauthenticated or signed in with a non-admin account. | Displays cybernetic **Access Denied Shield**. Discloses zero system telemetry, logs, or user data. |
+| **ADM-02** | **Admin Navigation** | Sign in with `mauryasomkumar@gmail.com` $\rightarrow$ Click the **`ADMIN`** badge in top command bar. | Directly opens **Somotoz Master Admin** with green *SECURE ROOT* status and 4 sub-tabs. |
+| **ADM-03** | **Real User Governance** | Click **User Management** tab $\rightarrow$ Search by email/UID $\rightarrow$ Click toggle access button. | Real accounts from Firebase Authentication listed. Toggling immediately enables/disables access via Firebase Admin SDK. |
+| **ADM-04** | **AI Query & Search Audit** | Submit a chat prompt in Smart Chat $\rightarrow$ Navigate to **AI Queries & Search Audit** tab. | Verified record appears showing exact prompt text, user UID, model used, token count, and timestamp. |
+| **ADM-05** | **Audit Filter & CSV Export** | Select Type filter (*AI Queries* / *Searches*) $\rightarrow$ Click **EXPORT CSV**. | Generates clean CSV download (`somotoz_admin_audit_<timestamp>.csv`) of all matching records. |
+| **ADM-06** | **Tri-Theme Admin Styling** | Toggle theme to Day Mode, Night Mode, and Eye Comfort Mode while viewing the Admin Dashboard. | All cards, tables, modals, badges, and text dynamically adjust with crisp contrast and zero unreadable text. |
+| **ADM-07** | **Admin Claim Re-Assertion** | In **Security & Rules** tab $\rightarrow$ Click **Sync / Re-Assert Admin Claim**. | Invokes `/api/admin/claim-admin-role`, binds `admin: true` custom claim, and refreshes token. |
+
+---
+
+### C. Backend Streaming & API Verification with cURL
 
 #### 1. Server Health Check
 ```bash
@@ -369,7 +467,7 @@ curl -X POST http://localhost:3000/api/reflect \
 
 ---
 
-### C. Automated Build & Type-Checking Quality Gates
+### D. Automated Build & Type-Checking Quality Gates
 
 ```bash
 # 1. Run static TypeScript analysis (Zero error guarantee)
@@ -381,28 +479,95 @@ npm run build
 
 ---
 
-## 📡 API Route Specifications
+## 📡 API Route Specifications (Core & Admin)
 
-| Endpoint | Method | Payload Type | Description |
-| :--- | :--- | :--- | :--- |
-| `/api/health` | `GET` | JSON | Server uptime, runtime environment, and health status. |
-| `/api/chat-stream` | `POST` | SSE Stream | High-speed multi-turn token streaming with multi-model fallback ladder. |
-| `/api/chat` | `POST` | JSON | Multimodal generation handler (`text`, `image`, `video`, `music`). |
-| `/api/reflect` | `POST` | JSON | Structured reflection analysis with emotion analysis and action tagging. |
-| `/api/generate-art` | `POST` | JSON | Procedural SVG vector graphics generator. |
-| `/api/transcribe` | `POST` | JSON | Voice-to-text neural transcription using Gemini Multimodal Audio. |
-| `/api/search-wisdom` | `POST` | JSON | Grounded knowledge search backed by Google Search Grounding. |
+### 1. Core Workspace API Endpoints
+
+| Endpoint | Method | Auth Required | Payload Type | Description |
+| :--- | :---: | :---: | :--- | :--- |
+| `/api/health` | `GET` | No | JSON | Server uptime, runtime environment, and health status. |
+| `/api/chat-stream` | `POST` | Optional | SSE Stream | High-speed multi-turn token streaming with multi-model fallback ladder. |
+| `/api/chat` | `POST` | Optional | JSON | Multimodal generation handler (`text`, `image`, `video`, `music`). |
+| `/api/reflect` | `POST` | Yes | JSON | Structured reflection analysis with emotion analysis and action tagging. |
+| `/api/generate-art` | `POST` | Optional | JSON | Procedural SVG vector graphics generator. |
+| `/api/transcribe` | `POST` | Optional | JSON | Voice-to-text neural transcription using Gemini Multimodal Audio. |
+| `/api/search-wisdom` | `POST` | Optional | JSON | Grounded knowledge search backed by Google Search Grounding. |
+
+### 2. Master Admin Security & Governance API Endpoints
+
+> 🔐 **Cryptographic Gate Requirement**: All `/api/admin/*` endpoints strictly require a verified Firebase ID token in the `Authorization: Bearer <ID_TOKEN>` header. Unauthenticated or spoofed requests are rejected immediately with `403 Forbidden`.
+
+| Endpoint | Method | Admin Claim | Description |
+| :--- | :---: | :---: | :--- |
+| `/api/admin/verify` | `POST` | Required | Cryptographically verifies caller session & returns `{ authorized: true }`. |
+| `/api/admin/users` | `GET` | Required | Returns real Firebase Authentication accounts (`adminAuth.listUsers(100)`) merged with Firestore usage metrics. |
+| `/api/admin/users/:id/status` | `POST` | Required | Toggles account access (`active` vs `disabled`) using Firebase Admin SDK (`adminAuth.updateUser`). |
+| `/api/admin/users/:id/profile` | `PATCH` | Required | Updates permitted user application profile data (displayName, bio) in Firestore. |
+| `/api/admin/users/:id/data` | `DELETE` | Required | Permanently purges user application data (entries, activities) from Firestore for GDPR/privacy compliance. |
+| `/api/admin/users/:id/role` | `POST` | Required | Assigns administrative custom claim role to a designated user. |
+| `/api/admin/logs` | `GET` | Required | Queries persistent Firestore collection `admin_activity_logs` with pagination and date filters. |
+| `/api/admin/analytics` | `GET` | Required | Computes aggregate user velocity, prompt counts, and 7-day chronological telemetry distribution. |
+| `/api/admin/claim-admin-role` | `POST` | Root Email | Authoritative bootstrap endpoint: Binds `admin: true` custom claim to `mauryasomkumar@gmail.com`. |
 
 ---
 
 ## 🔒 Database Security Rules & Schema
 
+Somotoz enforces strict document-level data boundary rules to ensure absolute user data privacy and administrative isolation:
+
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/entries/{entryId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == "mauryasomkumar@gmail.com" ||
+        request.auth.token.admin == true ||
+        request.auth.token.role == "admin"
+      );
+    }
+
+    // 1. User Application Profiles & Private Subcollections
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+
+      match /entries/{entryId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+
+      match /activities/{activityId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // 2. Persistent Admin Audit Logs
+    match /admin_activity_logs/{logId} {
+      // Authenticated users can append records of their own queries
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // Only verified administrators can read, update, or delete audit telemetry
+      allow read, update, delete: if isAdmin();
+    }
+
+    // 3. Admin Roles & System Governance Gate
+    match /admin_roles/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // 4. User Access Status Overrides
+    match /user_status/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
   }
 }
@@ -410,9 +575,24 @@ service cloud.firestore {
 
 ---
 
-## 🚀 Production Deployment (Google Cloud Run & Secret Manager)
+## 🚀 Production Deployment (Vercel & Google Cloud Run)
 
-### Step 1: Store Secret in Secret Manager
+### Method A: Deploy to Vercel (Recommended for Next-Gen Full-Stack)
+
+1. **Push your repository** to GitHub, GitLab, or Bitbucket.
+2. In the [Vercel Dashboard](https://vercel.com/), click **"Add New Project"** $\rightarrow$ Import your Somotoz repository.
+3. In **Settings $\rightarrow$ Environment Variables**, configure the required variables:
+   - `GEMINI_API_KEY`: Your Google Gemini API Key.
+   - `ADMIN_EMAIL`: `mauryasomkumar@gmail.com`.
+   - `FIREBASE_PROJECT_ID`: `ai-studio-25adb58e-a6f1-481b-8be8-2c4d53b05155`.
+   - `FIREBASE_SERVICE_ACCOUNT`: Your full Firebase Admin Service Account JSON string.
+4. **Deploy**: Vercel will automatically build the client bundle and deploy the Express server.
+
+---
+
+### Method B: Deploy to Google Cloud Run (Container Service)
+
+#### Step 1: Store Secret in Google Secret Manager
 ```bash
 gcloud secrets create GEMINI_API_KEY --replication-policy="automatic"
 echo -n "YOUR_GEMINI_API_KEY" | gcloud secrets versions add GEMINI_API_KEY --data-file=-
@@ -423,7 +603,7 @@ gcloud secrets add-iam-policy-binding GEMINI_API_KEY \
   --role="roles/secretmanager.secretAccessor"
 ```
 
-### Step 2: Deploy Container Service to Cloud Run
+#### Step 2: Deploy Container Service to Cloud Run
 ```bash
 gcloud run deploy somotoz-suite \
   --source . \
@@ -431,6 +611,7 @@ gcloud run deploy somotoz-suite \
   --region us-central1 \
   --allow-unauthenticated \
   --set-secrets GEMINI_API_KEY=GEMINI_API_KEY:latest \
+  --set-env-vars ADMIN_EMAIL="mauryasomkumar@gmail.com",FIREBASE_PROJECT_ID="ai-studio-25adb58e-a6f1-481b-8be8-2c4d53b05155" \
   --port 3000
 ```
 
