@@ -2,44 +2,58 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper: Check if current authenticated user has administrative authorization
+    // Helper: Check if caller is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: Check if caller holds verified administrative authorization
     function isAdmin() {
-      return request.auth != null && (
+      return isSignedIn() && (
         request.auth.token.admin == true ||
         request.auth.token.email == "mauryasomkumar@gmail.com" ||
         exists(/databases/$(database)/documents/admin_roles/$(request.auth.uid))
       );
     }
 
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
     // User application data (entries, activities, profile)
     // - Owner has full read and write access
-    // - Authorized Admin has read, update, and delete access for management
+    // - Authorized Admin has management access
     match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     // Activity and AI Query Audit Logs
-    // - Authenticated users can write log entries for their own actions
-    // - Only Admin can read, query, list, or delete activity audit records
+    // - Authenticated users can ONLY create log records strictly bound to their own verified UID and verified email
+    // - Normal users cannot read, list, update, or delete activity audit records
+    // - Only authorized administrators can read, list, and manage audit logs
     match /admin_activity_logs/{logId} {
-      allow create: if request.auth != null;
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        (request.resource.data.userEmail == request.auth.token.email || request.auth.token.email == null);
       allow read, update, delete: if isAdmin();
     }
 
     // Admin Roles collection
-    // - Authenticated users can check admin role status
-    // - Only Admin can modify roles
+    // - Normal users can only read their own role document to verify admin state
+    // - Only verified admins can read all roles or modify roles
     match /admin_roles/{uid} {
-      allow read: if request.auth != null;
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
       allow write: if isAdmin();
     }
 
     // User account status (enable/disable flags)
-    // - Authenticated users can read status to verify account access
-    // - Only Admin can update or write status
+    // - Normal users can only read their own status
+    // - Only verified admins can read all or write/update status
     match /user_status/{userId} {
-      allow read: if request.auth != null;
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow write: if isAdmin();
     }
   }
 }
+

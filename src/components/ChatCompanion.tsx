@@ -58,6 +58,7 @@ import {
   downloadVideoStoryboard
 } from '../utils/mediaExport';
 import { SLASH_COMMANDS, parseClientInputIntent } from '../utils/commandParser';
+import { auth } from '../lib/firebase';
 
 interface ChatCompanionProps {
   initialReflection?: JournalEntry | null;
@@ -611,6 +612,16 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local Browser Timezone',
     };
 
+    const chatHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (auth.currentUser) {
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        chatHeaders['Authorization'] = `Bearer ${idToken}`;
+      } catch (tokErr) {
+        console.warn('Could not fetch fresh token for chat:', tokErr);
+      }
+    }
+
     try {
       const payloadMessages = newMessages
         .filter((m) => m.id !== 'welcome')
@@ -623,7 +634,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
       // Try Real-Time SSE Stream Endpoint
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: chatHeaders,
         body: JSON.stringify({
           messages: payloadMessages.length > 0 ? payloadMessages : [{ role: 'user', content: displayText, attachments: currentAttachments }],
           attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
@@ -718,7 +729,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
       try {
         const fallbackRes = await fetch('/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: chatHeaders,
           body: JSON.stringify({
             messages: [{ role: 'user', content: displayText, attachments: currentAttachments }],
             attachments: currentAttachments.length > 0 ? currentAttachments : undefined,

@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Sparkles, Send, Lightbulb, Heart, Feather, Compass, Mic, Square, Loader2, Zap, BookOpen, CheckCircle2, AlertCircle } from 'lucide-react';
 import { DynamicWelcomeBanner } from './DynamicWelcomeBanner';
 import { useTheme } from '../context/ThemeContext';
+import { auth } from '../lib/firebase';
 
 interface ReflectionEditorProps {
   initialContent?: string;
@@ -188,9 +189,19 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
       reader.readAsDataURL(blob);
       reader.onloadend = async () => {
         const base64Data = (reader.result as string).split(',')[1];
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (auth.currentUser) {
+          try {
+            const idToken = await auth.currentUser.getIdToken();
+            headers['Authorization'] = `Bearer ${idToken}`;
+          } catch (tErr) {
+            console.warn('Could not retrieve token for transcription:', tErr);
+          }
+        }
+
         const res = await fetch('/api/transcribe', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             audioBase64: base64Data,
             mimeType: 'audio/webm',

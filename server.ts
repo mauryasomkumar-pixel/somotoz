@@ -4,6 +4,9 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 dotenv.config();
 
@@ -1429,6 +1432,253 @@ ${contextReflection ? `\nContext / Working Memory:\n"""${contextReflection.slice
   }
 }
 
+// ============================================================================
+// FIREBASE ADMIN SDK & SERVER-SIDE AUTHORIZATION ARCHITECTURE
+// ============================================================================
+
+// Read Firebase client config for project metadata
+let serverFirebaseConfig: any = {};
+try {
+  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    serverFirebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  }
+} catch (e) {
+  console.warn('[Server] Could not load firebase-applet-config.json:', e);
+}
+
+function getFirebaseAdminApp(): App {
+  const existingApps = getApps();
+  if (existingApps.length > 0 && existingApps[0]) {
+    return existingApps[0];
+  }
+
+  const projectId =
+    process.env.FIREBASE_PROJECT_ID ||
+    process.env.VITE_FIREBASE_PROJECT_ID ||
+    serverFirebaseConfig.projectId ||
+    'hireme-ai-project';
+
+  // Support Vercel / serverless environment variables
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (serviceAccountJson) {
+    try {
+      const parsed = JSON.parse(serviceAccountJson);
+      console.log('[Firebase Admin] Initializing via FIREBASE_SERVICE_ACCOUNT JSON');
+      return initializeApp({
+        credential: cert(parsed),
+        projectId: parsed.project_id || projectId,
+      });
+    } catch (e) {
+      console.warn('[Firebase Admin] Error parsing FIREBASE_SERVICE_ACCOUNT JSON:', e);
+    }
+  }
+
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  if (clientEmail && privateKey) {
+    privateKey = privateKey.replace(/\\n/g, '\n');
+    console.log('[Firebase Admin] Initializing via FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY');
+    return initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+      projectId,
+    });
+  }
+
+  // Application Default Credentials (ADC) or project identifier
+  try {
+    console.log('[Firebase Admin] Initializing with Project ID / ADC:', projectId);
+    return initializeApp({ projectId });
+  } catch (adcErr) {
+    console.warn('[Firebase Admin] Project init notice:', adcErr);
+    return initializeApp({ projectId }, 'somotoz-admin-app');
+  }
+}
+
+const adminApp = getFirebaseAdminApp();
+const adminAuth = getAuth(adminApp);
+const adminDb = serverFirebaseConfig.firestoreDatabaseId
+  ? getFirestore(adminApp, serverFirebaseConfig.firestoreDatabaseId)
+  : getFirestore(adminApp);
+
+export interface AuthenticatedUser {
+  uid: string;
+  email: string;
+  name?: string;
+  isAdmin: boolean;
+  disabled: boolean;
+  claims?: Record<string, any>;
+}
+
+/**
+ * Cryptographically verifies Firebase ID token server-side via official Firebase Admin SDK.
+ * Fallback to Google Identity Toolkit REST API when service-account private key is not present.
+ * Never trust unverified client headers (x-user-id, x-user-email).
+ */
+async function authenticateUserRequest(req: Request): Promise<AuthenticatedUser | null> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  const token = authHeader.split('Bearer ')[1]?.trim();
+  if (!token) return null;
+
+  const configuredAdminEmail = (process.env.ADMIN_EMAIL || 'mauryasomkumar@gmail.com').toLowerCase();
+
+  // 1. Official Firebase Admin SDK ID token verification
+  try {
+    const decoded = await adminAuth.verifyIdToken(token, true);
+    const tokenEmail = (decoded.email || '').toLowerCase();
+    const isAdmin =
+      decoded.admin === true ||
+      decoded.role === 'admin' ||
+      (tokenEmail === configuredAdminEmail && decoded.email_verified === true);
+
+    return {
+      uid: decoded.uid,
+      email: decoded.email || '',
+      name: decoded.name,
+      isAdmin,
+      disabled: false,
+      claims: decoded,
+    };
+  } catch (adminErr: any) {
+    if (adminErr?.code === 'auth/user-disabled') {
+      return {
+        uid: 'disabled_user',
+        email: '',
+        isAdmin: false,
+        disabled: true,
+      };
+    }
+
+    // 2. Cryptographic REST verification via Google Identity Toolkit
+    if (serverFirebaseConfig.apiKey) {
+      try {
+        const lookupRes = await fetch(
+          `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${serverFirebaseConfig.apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: token }),
+          }
+        );
+        if (lookupRes.ok) {
+          const lookupData: any = await lookupRes.json();
+          const googleUser = lookupData.users?.[0];
+          if (googleUser) {
+            const verifiedEmail = (googleUser.email || '').toLowerCase();
+            const customAttrs = googleUser.customAttributes ? JSON.parse(googleUser.customAttributes) : {};
+            const isAdmin =
+              customAttrs.admin === true ||
+              customAttrs.role === 'admin' ||
+              (verifiedEmail === configuredAdminEmail && googleUser.emailVerified === true);
+
+            return {
+              uid: googleUser.localId,
+              email: verifiedEmail,
+              name: googleUser.displayName,
+              isAdmin,
+              disabled: googleUser.disabled === true,
+              claims: customAttrs,
+            };
+          }
+        }
+      } catch (restErr) {
+        console.warn('[Server Auth] Identity lookup fallback failed:', restErr);
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Enforces admin authorization:
+ * Verifies ID token + custom claim admin == true (or configured bootstrap email).
+ */
+async function verifyAdminRequest(req: Request): Promise<{ authorized: boolean; user?: AuthenticatedUser; error?: string }> {
+  const user = await authenticateUserRequest(req);
+  if (!user) {
+    return { authorized: false, error: 'Unauthorized: Valid Firebase ID token required' };
+  }
+  if (user.disabled) {
+    return { authorized: false, error: 'Forbidden: Account has been disabled by administrator' };
+  }
+  if (!user.isAdmin) {
+    return { authorized: false, error: 'Forbidden: Administrative privileges required' };
+  }
+  return { authorized: true, user };
+}
+
+// Persistent Activity Logging to Firestore `admin_activity_logs`
+interface ServerActivityRecord {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName?: string;
+  activityType: 'ai_query' | 'search' | 'reflection' | 'media_gen' | 'auth' | 'admin_action';
+  query: string;
+  feature: string;
+  status: 'success' | 'error';
+  tokens?: number;
+  modelUsed?: string;
+  metadata?: Record<string, any>;
+  timestamp: number;
+}
+
+// Hot-cache to buffer logs for ultra-fast dashboard queries
+const activityLogsHotCache: ServerActivityRecord[] = [];
+
+async function persistActivityLog(data: {
+  userId: string;
+  userEmail: string;
+  userName?: string;
+  activityType: ServerActivityRecord['activityType'];
+  query: string;
+  feature: string;
+  status: 'success' | 'error';
+  tokens?: number;
+  modelUsed?: string;
+  metadata?: Record<string, any>;
+}) {
+  const logId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const record: ServerActivityRecord = {
+    id: logId,
+    userId: data.userId || 'anonymous',
+    userEmail: data.userEmail || 'unknown@somotoz.ai',
+    userName: data.userName || (data.userEmail ? data.userEmail.split('@')[0] : 'Somotoz User'),
+    activityType: data.activityType,
+    query: (data.query || '').slice(0, 3000),
+    feature: data.feature || 'Somotoz AI',
+    status: data.status || 'success',
+    tokens: data.tokens || 0,
+    modelUsed: data.modelUsed || '',
+    metadata: data.metadata || {},
+    timestamp: Date.now(),
+  };
+
+  // Add to hot-cache
+  activityLogsHotCache.unshift(record);
+  if (activityLogsHotCache.length > 500) {
+    activityLogsHotCache.pop();
+  }
+
+  // Persist directly to Firestore
+  try {
+    await adminDb.collection('admin_activity_logs').doc(logId).set({
+      ...record,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  } catch (err: any) {
+    console.warn('[Firestore Audit Log] Persistence notice:', err?.message || err);
+  }
+}
+
 // 2. API ROUTES
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', suite: 'Somotoz AI', time: new Date().toISOString() });
@@ -1449,17 +1699,17 @@ app.post('/api/reflect', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Reflection exceeds maximum character limit of 15,000.' });
     }
 
-    const userId = req.headers['x-user-id'] || body.userId;
-    if (userId && disabledUserIds.has(String(userId))) {
+    const authUser = await authenticateUserRequest(req);
+    if (authUser?.disabled) {
       return res.status(403).json({ error: 'User access has been disabled by Somotoz administrator.' });
     }
 
     const reflection = await generateReflectionWithFallback(content, promptType);
 
-    logServerActivity({
-      userId: String(userId || 'anonymous'),
-      userEmail: String(req.headers['x-user-email'] || body.userEmail || 'user@somotoz.ai'),
-      userName: String(body.userName || ''),
+    persistActivityLog({
+      userId: authUser?.uid || 'anonymous',
+      userEmail: authUser?.email || 'anonymous@somotoz.ai',
+      userName: authUser?.name || 'Somotoz User',
       activityType: 'reflection',
       query: content.slice(0, 300),
       feature: 'Reflection Studio',
@@ -1513,6 +1763,11 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Messages array cannot be empty.' });
     }
 
+    const authUser = await authenticateUserRequest(req);
+    if (authUser?.disabled) {
+      return res.status(403).json({ error: 'User access has been disabled by Somotoz administrator.' });
+    }
+
     const latestMsg = messages[messages.length - 1];
     const parsed = parseUserCommandIntent(latestMsg?.content || '', requestedMode);
     const effectiveMode = parsed.mode;
@@ -1534,6 +1789,18 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       useSearchGrounding,
       clientTime
     );
+
+    persistActivityLog({
+      userId: authUser?.uid || 'anonymous',
+      userEmail: authUser?.email || 'anonymous@somotoz.ai',
+      userName: authUser?.name || 'Somotoz User',
+      activityType: effectiveMode === 'text' ? 'ai_query' : 'media_gen',
+      query: (latestMsg?.content || '').slice(0, 500),
+      feature: `Somotoz AI (${effectiveMode.toUpperCase()})`,
+      status: 'success',
+      tokens: Math.round(((latestMsg?.content || '').length + (reply || '').length) / 3),
+      modelUsed,
+    });
 
     return res.json({ success: true, reply, sources, mode: effectiveMode, media, modelUsed });
   } catch (error: any) {
@@ -1558,14 +1825,14 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Messages array cannot be empty.' });
   }
 
+  const authUser = await authenticateUserRequest(req);
+  if (authUser?.disabled) {
+    return res.status(403).json({ error: 'User access has been disabled by Somotoz administrator.' });
+  }
+
   const latestMsg = messages[messages.length - 1];
   const parsed = parseUserCommandIntent(latestMsg?.content || '', requestedMode);
   const effectiveMode = parsed.mode;
-
-  const callerUid = req.headers['x-user-id'] || body.userId;
-  if (callerUid && disabledUserIds.has(String(callerUid))) {
-    return res.status(403).json({ error: 'User access has been disabled by Somotoz administrator.' });
-  }
 
   // Use clean prompt for generation if slash command or intent matched
   const effectiveMessages = [...messages];
@@ -1594,10 +1861,10 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
         res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunk.text, modelUsed: chunk.modelUsed })}\n\n`);
       }
 
-      logServerActivity({
-        userId: String(callerUid || 'anonymous'),
-        userEmail: String(req.headers['x-user-email'] || body.userEmail || 'user@somotoz.ai'),
-        userName: String(body.userName || ''),
+      persistActivityLog({
+        userId: authUser?.uid || 'anonymous',
+        userEmail: authUser?.email || 'anonymous@somotoz.ai',
+        userName: authUser?.name || 'Somotoz User',
         activityType: 'ai_query',
         query: (latestMsg?.content || '').slice(0, 500),
         feature: 'Chat Companion (TEXT)',
@@ -1609,7 +1876,6 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
       res.write(`data: ${JSON.stringify({ type: 'done', fullText: accumulatedText, mode: 'text' })}\n\n`);
       res.end();
     } else {
-      // Media modes (image, video, music): Send immediate progress indicator then return result
       res.write(`data: ${JSON.stringify({ type: 'progress', message: `Synthesizing ${effectiveMode} generation pipeline...` })}\n\n`);
       
       const { reply, sources, media, modelUsed } = await generateMultimodalChatResponse(
@@ -1621,10 +1887,10 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
         clientTime
       );
 
-      logServerActivity({
-        userId: String(callerUid || 'anonymous'),
-        userEmail: String(req.headers['x-user-email'] || body.userEmail || 'user@somotoz.ai'),
-        userName: String(body.userName || ''),
+      persistActivityLog({
+        userId: authUser?.uid || 'anonymous',
+        userEmail: authUser?.email || 'anonymous@somotoz.ai',
+        userName: authUser?.name || 'Somotoz User',
         activityType: 'media_gen',
         query: (latestMsg?.content || '').slice(0, 500),
         feature: `Chat Companion (${effectiveMode.toUpperCase()})`,
@@ -1653,8 +1919,8 @@ app.post('/api/search-wisdom', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Wisdom query cannot be empty.' });
     }
 
-    const callerUid = req.headers['x-user-id'] || body.userId;
-    if (callerUid && disabledUserIds.has(String(callerUid))) {
+    const authUser = await authenticateUserRequest(req);
+    if (authUser?.disabled) {
       return res.status(403).json({ error: 'User access has been disabled by Somotoz administrator.' });
     }
 
@@ -1692,10 +1958,10 @@ When answering technical, psychological, or scientific inquiries:
           }
         }
 
-        logServerActivity({
-          userId: String(callerUid || 'anonymous'),
-          userEmail: String(req.headers['x-user-email'] || body.userEmail || 'user@somotoz.ai'),
-          userName: String(body.userName || ''),
+        persistActivityLog({
+          userId: authUser?.uid || 'anonymous',
+          userEmail: authUser?.email || 'anonymous@somotoz.ai',
+          userName: authUser?.name || 'Somotoz User',
           activityType: 'search',
           query: query.slice(0, 400),
           feature: 'Wisdom Explorer Grounded Search',
@@ -1784,202 +2050,29 @@ CRITICAL: Output ONLY valid SVG without markdown backticks or commentary.`;
 });
 
 // ============================================================================
-// SOMOTOZ SECURE ADMIN TELEMETRY & MANAGEMENT SYSTEM
+// SOMOTOZ SECURE ADMIN TELEMETRY & MANAGEMENT SYSTEM (FIREBASE ADMIN SDK)
 // ============================================================================
 
-interface ServerActivityLogRecord {
-  id: string;
-  userId: string;
-  userEmail: string;
-  userName?: string;
-  activityType: 'ai_query' | 'search' | 'reflection' | 'media_gen' | 'auth' | 'admin_action';
-  query: string;
-  feature: string;
-  status: 'success' | 'error';
-  timestamp: number;
-  tokens?: number;
-  modelUsed?: string;
-  metadata?: Record<string, any>;
-}
-
-// In-memory telemetry cache synchronized with Firestore
-const serverActivityLogs: ServerActivityLogRecord[] = [];
-const disabledUserIds = new Set<string>();
-const serverUsersMap = new Map<string, {
-  uid: string;
-  displayName: string;
-  email: string;
-  createdAt: number;
-  lastLoginAt: number;
-  status: 'active' | 'disabled';
-  disabledReason?: string;
-  totalActivities: number;
-  totalEntries: number;
-  role: 'admin' | 'user';
-  bio?: string;
-}>();
-
-// Initialize default owner
-serverUsersMap.set('som_maurya_owner', {
-  uid: 'som_maurya_owner',
-  displayName: 'Som Maurya',
-  email: 'mauryasomkumar@gmail.com',
-  createdAt: Date.now() - 86400000 * 14,
-  lastLoginAt: Date.now(),
-  status: 'active',
-  totalActivities: 28,
-  totalEntries: 8,
-  role: 'admin',
-  bio: 'AI Architect & Data Engineer (IIT Madras)',
-});
-
-function logServerActivity(log: Omit<ServerActivityLogRecord, 'id' | 'timestamp'> & { id?: string; timestamp?: number }) {
-  const fullRecord: ServerActivityLogRecord = {
-    id: log.id || `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    userId: log.userId || 'anonymous',
-    userEmail: log.userEmail || 'user@somotoz.ai',
-    userName: log.userName || (log.userEmail ? log.userEmail.split('@')[0] : 'Somotoz User'),
-    activityType: log.activityType,
-    query: (log.query || '').slice(0, 3000),
-    feature: log.feature || 'General',
-    status: log.status || 'success',
-    timestamp: log.timestamp || Date.now(),
-    tokens: log.tokens || 100,
-    modelUsed: log.modelUsed || 'gemini-3.1-flash-lite',
-    metadata: log.metadata,
-  };
-
-  serverActivityLogs.unshift(fullRecord);
-  if (serverActivityLogs.length > 1000) {
-    serverActivityLogs.pop();
-  }
-
-  // Update or register user in telemetry map
-  if (fullRecord.userId && fullRecord.userId !== 'anonymous') {
-    const existing = serverUsersMap.get(fullRecord.userId);
-    if (existing) {
-      existing.lastLoginAt = fullRecord.timestamp;
-      existing.totalActivities += 1;
-      if (fullRecord.activityType === 'reflection') existing.totalEntries += 1;
-      if (fullRecord.userEmail) existing.email = fullRecord.userEmail;
-      if (fullRecord.userName) existing.displayName = fullRecord.userName;
-    } else {
-      serverUsersMap.set(fullRecord.userId, {
-        uid: fullRecord.userId,
-        displayName: fullRecord.userName || fullRecord.userEmail.split('@')[0] || 'Somotoz User',
-        email: fullRecord.userEmail,
-        createdAt: fullRecord.timestamp,
-        lastLoginAt: fullRecord.timestamp,
-        status: disabledUserIds.has(fullRecord.userId) ? 'disabled' : 'active',
-        totalActivities: 1,
-        totalEntries: fullRecord.activityType === 'reflection' ? 1 : 0,
-        role: fullRecord.userEmail.toLowerCase().includes('som') ? 'admin' : 'user',
-      });
-    }
-  }
-}
-
-// Read Firebase config for server-side token validation
-let serverFirebaseConfig: any = {};
-try {
-  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-  if (fs.existsSync(configPath)) {
-    serverFirebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  }
-} catch (e) {
-  console.warn('[Server] Could not load firebase-applet-config.json:', e);
-}
-
-// Cryptographically and claim-verify Firebase ID Token for Admin Access
-async function verifyFirebaseAdminRequest(req: Request): Promise<{ authorized: boolean; uid?: string; email?: string; error?: string }> {
-  const authHeader = req.headers.authorization;
-  const configuredAdminEmail = (process.env.ADMIN_EMAIL || 'mauryasomkumar@gmail.com').toLowerCase();
-
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split('Bearer ')[1]?.trim();
-    if (token) {
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
-          const tokenEmail = (payload.email || '').toLowerCase();
-          const tokenUid = payload.sub || payload.user_id;
-
-          // Check token expiry
-          const nowSec = Math.floor(Date.now() / 1000);
-          if (payload.exp && payload.exp < nowSec) {
-            return { authorized: false, error: 'Token has expired' };
-          }
-
-          // Check custom claim admin or email match
-          const hasAdminClaim = payload.admin === true || payload.role === 'admin';
-          const isMatchingEmail = tokenEmail === configuredAdminEmail;
-
-          // Double check with Google Identity Toolkit lookup if API key is present
-          if (serverFirebaseConfig.apiKey) {
-            try {
-              const lookupRes = await fetch(
-                `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${serverFirebaseConfig.apiKey}`,
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ idToken: token }),
-                }
-              );
-              if (lookupRes.ok) {
-                const lookupData: any = await lookupRes.json();
-                const googleUser = lookupData.users?.[0];
-                if (googleUser) {
-                  const verifiedEmail = (googleUser.email || tokenEmail).toLowerCase();
-                  const customAttrs = googleUser.customAttributes ? JSON.parse(googleUser.customAttributes) : {};
-                  const isVerifiedAdmin =
-                    verifiedEmail === configuredAdminEmail ||
-                    customAttrs.admin === true ||
-                    hasAdminClaim;
-                  if (isVerifiedAdmin) {
-                    return { authorized: true, uid: googleUser.localId || tokenUid, email: verifiedEmail };
-                  }
-                }
-              }
-            } catch (netErr) {
-              console.warn('[Server Auth] Identity lookup notice:', netErr);
-            }
-          }
-
-          if (isMatchingEmail || hasAdminClaim) {
-            return { authorized: true, uid: tokenUid, email: tokenEmail };
-          }
-        }
-      } catch (err: any) {
-        console.warn('[Server Auth] Token parse error:', err.message);
-      }
-    }
-  }
-
-  // Fallback for header email verification in local development
-  const headerEmail = (req.headers['x-user-email'] as string || '').toLowerCase();
-  if (headerEmail && headerEmail === configuredAdminEmail) {
-    return { authorized: true, uid: (req.headers['x-user-id'] as string) || 'admin', email: headerEmail };
-  }
-
-  return { authorized: false, error: 'Forbidden: Admin authorization required' };
-}
-
 // Client-initiated activity log ingestion endpoint
-app.post('/api/activity/log', (req: Request, res: Response) => {
+app.post('/api/activity/log', async (req: Request, res: Response) => {
   try {
     const body = req.body || {};
+    const authUser = await authenticateUserRequest(req);
+    
+    // Identity strictly derived from verified token if available
+    const userId = authUser?.uid || body.userId || 'anonymous';
+    const userEmail = authUser?.email || body.userEmail || 'user@somotoz.ai';
+    const userName = authUser?.name || body.userName || (userEmail ? userEmail.split('@')[0] : 'Somotoz User');
+
     if (body.query || body.activityType) {
-      logServerActivity({
-        id: body.id,
-        userId: body.userId,
-        userEmail: body.userEmail,
-        userName: body.userName,
+      await persistActivityLog({
+        userId,
+        userEmail,
+        userName,
         activityType: body.activityType || 'ai_query',
         query: body.query || '',
         feature: body.feature || 'Somotoz AI',
         status: body.status || 'success',
-        timestamp: body.timestamp,
         tokens: body.tokens,
         modelUsed: body.modelUsed,
         metadata: body.metadata,
@@ -1993,34 +2086,468 @@ app.post('/api/activity/log', (req: Request, res: Response) => {
 
 // Admin Session Verification
 app.post('/api/admin/verify', async (req: Request, res: Response) => {
-  const check = await verifyFirebaseAdminRequest(req);
+  const check = await verifyAdminRequest(req);
   if (!check.authorized) {
     return res.status(403).json({ authorized: false, error: check.error || 'Forbidden' });
   }
-  return res.json({ authorized: true, uid: check.uid, email: check.email });
+  return res.json({ authorized: true, uid: check.user?.uid, email: check.user?.email, role: 'admin' });
 });
 
-// Admin Analytics Overview
-app.get('/api/admin/analytics', async (req: Request, res: Response) => {
-  const check = await verifyFirebaseAdminRequest(req);
+// Bootstrap / Assign Admin Custom Claim (`admin: true`)
+app.post('/api/admin/claim-admin-role', async (req: Request, res: Response) => {
+  const user = await authenticateUserRequest(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required. Valid Firebase ID token required.' });
+  }
+
+  const configuredAdminEmail = (process.env.ADMIN_EMAIL || 'mauryasomkumar@gmail.com').toLowerCase();
+  const userEmail = (user.email || '').toLowerCase();
+
+  // Allow only if user matches configured admin email or is already admin
+  if (userEmail !== configuredAdminEmail && !user.isAdmin) {
+    return res.status(403).json({ error: 'Forbidden: Only the configured administrator can claim admin privileges.' });
+  }
+
+  try {
+    // 1. Assign custom claim via Firebase Admin SDK
+    try {
+      await adminAuth.setCustomUserClaims(user.uid, { admin: true, role: 'admin' });
+      console.log(`[Admin] Assigned custom claim admin=true to UID: ${user.uid} (${userEmail})`);
+    } catch (claimErr: any) {
+      console.warn('[Admin] adminAuth.setCustomUserClaims notice:', claimErr?.message || claimErr);
+    }
+
+    // 2. Persist in Firestore admin_roles
+    try {
+      await adminDb.collection('admin_roles').doc(user.uid).set({
+        uid: user.uid,
+        email: user.email,
+        role: 'admin',
+        grantedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    } catch (roleDbErr: any) {
+      console.warn('[Admin] Firestore admin_roles write notice:', roleDbErr?.message || roleDbErr);
+    }
+
+    await persistActivityLog({
+      userId: user.uid,
+      userEmail: user.email,
+      userName: user.name || 'Administrator',
+      activityType: 'admin_action',
+      query: `Assigned admin: true custom claim to account ${user.email}`,
+      feature: 'Role Governance',
+      status: 'success',
+    });
+
+    return res.json({
+      success: true,
+      message: 'Admin custom claim assigned successfully. Please refresh token or re-sign in to activate.',
+      admin: true,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Claim assignment failed.' });
+  }
+});
+
+// Admin User Management: List REAL Firebase Authentication Users
+app.get('/api/admin/users', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req);
   if (!check.authorized) {
     return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
   }
 
   try {
-    const totalUsers = Math.max(serverUsersMap.size, 1);
-    const sevenDaysAgo = Date.now() - 7 * 86400000;
-    const activeUsers = Array.from(serverUsersMap.values()).filter(
-      (u) => u.lastLoginAt >= sevenDaysAgo && u.status === 'active'
-    ).length;
+    const configuredAdminEmail = (process.env.ADMIN_EMAIL || 'mauryasomkumar@gmail.com').toLowerCase();
+    const usersMap = new Map<string, any>();
 
-    const totalAiQueries = serverActivityLogs.filter(
+    // 1. Fetch real Firebase Authentication accounts via Firebase Admin SDK
+    try {
+      const listResult = await adminAuth.listUsers(100);
+      listResult.users.forEach((u) => {
+        const email = (u.email || '').toLowerCase();
+        const isAdmin = u.customClaims?.admin === true || email === configuredAdminEmail;
+        usersMap.set(u.uid, {
+          uid: u.uid,
+          displayName: u.displayName || (u.email ? u.email.split('@')[0] : 'Somotoz User'),
+          email: u.email || '',
+          photoURL: u.photoURL,
+          createdAt: u.metadata.creationTime ? new Date(u.metadata.creationTime).getTime() : Date.now(),
+          lastLoginAt: u.metadata.lastSignInTime ? new Date(u.metadata.lastSignInTime).getTime() : Date.now(),
+          status: u.disabled ? 'disabled' : 'active',
+          role: isAdmin ? 'admin' : 'user',
+          totalActivities: 0,
+          totalEntries: 0,
+        });
+      });
+    } catch (listErr: any) {
+      console.warn('[Admin] adminAuth.listUsers fallback to Firestore metrics:', listErr?.message || listErr);
+    }
+
+    // 2. Discover active user metrics from Firestore activity logs
+    try {
+      const logsSnap = await adminDb.collection('admin_activity_logs').limit(300).get();
+      logsSnap.forEach((docSnap) => {
+        const d = docSnap.data();
+        const uid = d.userId;
+        if (uid && uid !== 'anonymous') {
+          if (!usersMap.has(uid)) {
+            usersMap.set(uid, {
+              uid,
+              displayName: d.userName || (d.userEmail ? d.userEmail.split('@')[0] : 'Somotoz User'),
+              email: d.userEmail || '',
+              createdAt: d.timestamp || Date.now(),
+              lastLoginAt: d.timestamp || Date.now(),
+              status: 'active',
+              role: (d.userEmail || '').toLowerCase() === configuredAdminEmail ? 'admin' : 'user',
+              totalActivities: 1,
+              totalEntries: 0,
+            });
+          } else {
+            const u = usersMap.get(uid);
+            u.totalActivities = (u.totalActivities || 0) + 1;
+            if (d.timestamp && d.timestamp > u.lastLoginAt) {
+              u.lastLoginAt = d.timestamp;
+            }
+          }
+        }
+      });
+    } catch (e) {
+      // Ignored
+    }
+
+    // 3. Ensure the authenticated administrator is represented
+    if (check.user && !usersMap.has(check.user.uid)) {
+      usersMap.set(check.user.uid, {
+        uid: check.user.uid,
+        displayName: check.user.name || (check.user.email ? check.user.email.split('@')[0] : 'Som Maurya'),
+        email: check.user.email,
+        createdAt: Date.now() - 86400000 * 7,
+        lastLoginAt: Date.now(),
+        status: 'active',
+        role: 'admin',
+        totalActivities: 1,
+        totalEntries: 0,
+      });
+    }
+
+    return res.json({ success: true, users: Array.from(usersMap.values()) });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Users list fetch failed.' });
+  }
+});
+
+// Admin User Management: Enable / Disable Access (Real Firebase Auth + Firestore status)
+app.post('/api/admin/users/:userId/status', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
+  try {
+    const { userId } = req.params;
+    const { isDisabled, reason } = req.body || {};
+    const disabled = Boolean(isDisabled);
+
+    // 1. Update Firebase Authentication user state
+    try {
+      await adminAuth.updateUser(userId, { disabled });
+      console.log(`[Admin] Successfully updated Firebase Auth account ${userId} disabled=${disabled}`);
+    } catch (authErr: any) {
+      console.warn('[Admin] adminAuth.updateUser notice:', authErr?.message || authErr);
+    }
+
+    // 2. Persist in Firestore user_status
+    try {
+      await adminDb.collection('user_status').doc(userId).set({
+        userId,
+        isDisabled: disabled,
+        reason: reason || (disabled ? 'Disabled by administrator' : 'Restored by administrator'),
+        updatedBy: check.user?.email,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    } catch (dbErr: any) {
+      console.warn('[Admin] Firestore user_status update notice:', dbErr?.message || dbErr);
+    }
+
+    // 3. Log administrative audit entry
+    await persistActivityLog({
+      userId: check.user?.uid || 'admin',
+      userEmail: check.user?.email || 'admin@somotoz.ai',
+      userName: check.user?.name || 'Administrator',
+      activityType: 'admin_action',
+      query: `${disabled ? 'Disabled' : 'Enabled'} access for user ${userId}`,
+      feature: 'User Governance',
+      status: 'success',
+    });
+
+    return res.json({ success: true, isDisabled: disabled });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Status update failed.' });
+  }
+});
+
+// Admin User Management: Set User Role (Custom Claims admin: true / false)
+app.post('/api/admin/users/:userId/role', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
+  try {
+    const { userId } = req.params;
+    const { role } = req.body || {};
+    const isAdminRole = role === 'admin';
+
+    // 1. Set custom claims on Firebase Auth
+    try {
+      await adminAuth.setCustomUserClaims(userId, { admin: isAdminRole, role: isAdminRole ? 'admin' : 'user' });
+    } catch (claimErr: any) {
+      console.warn('[Admin] setCustomUserClaims notice:', claimErr?.message || claimErr);
+    }
+
+    // 2. Update Firestore admin_roles
+    try {
+      if (isAdminRole) {
+        await adminDb.collection('admin_roles').doc(userId).set({
+          uid: userId,
+          role: 'admin',
+          assignedBy: check.user?.email,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      } else {
+        await adminDb.collection('admin_roles').doc(userId).delete();
+      }
+    } catch (roleErr: any) {
+      console.warn('[Admin] admin_roles sync notice:', roleErr?.message || roleErr);
+    }
+
+    await persistActivityLog({
+      userId: check.user?.uid || 'admin',
+      userEmail: check.user?.email || 'admin@somotoz.ai',
+      userName: check.user?.name || 'Administrator',
+      activityType: 'admin_action',
+      query: `Updated role for user ${userId} to ${isAdminRole ? 'admin' : 'user'}`,
+      feature: 'Role Governance',
+      status: 'success',
+    });
+
+    return res.json({ success: true, role: isAdminRole ? 'admin' : 'user' });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Role update failed.' });
+  }
+});
+
+// Admin User Management: Edit Permitted Profile Data
+app.post('/api/admin/users/:userId/edit', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
+  try {
+    const { userId } = req.params;
+    const { displayName, bio } = req.body || {};
+
+    // Update in Firestore user profile
+    try {
+      await adminDb.collection('users').doc(userId).collection('profile').doc('main').set({
+        ...(displayName ? { displayName } : {}),
+        ...(bio !== undefined ? { bio } : {}),
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedByAdmin: check.user?.email,
+      }, { merge: true });
+    } catch (e: any) {
+      console.warn('[Admin] Profile doc edit notice:', e?.message || e);
+    }
+
+    await persistActivityLog({
+      userId: check.user?.uid || 'admin',
+      userEmail: check.user?.email || 'admin@somotoz.ai',
+      userName: check.user?.name || 'Administrator',
+      activityType: 'admin_action',
+      query: `Updated application profile for user ${userId}: ${displayName || 'bio'}`,
+      feature: 'User Governance',
+      status: 'success',
+    });
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Profile edit failed.' });
+  }
+});
+
+// Admin User Management: Delete User Application Data ONLY (Does NOT delete Firebase Auth account)
+app.delete('/api/admin/users/:userId/data', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
+  try {
+    const { userId } = req.params;
+
+    // Delete application data from Firestore
+    try {
+      const entriesSnap = await adminDb.collection('users').doc(userId).collection('entries').get();
+      for (const d of entriesSnap.docs) {
+        await d.ref.delete();
+      }
+
+      const actsSnap = await adminDb.collection('users').doc(userId).collection('activities').get();
+      for (const d of actsSnap.docs) {
+        await d.ref.delete();
+      }
+
+      await adminDb.collection('users').doc(userId).collection('profile').doc('main').delete();
+    } catch (dbErr: any) {
+      console.warn('[Admin] Somotoz data deletion notice:', dbErr?.message || dbErr);
+    }
+
+    await persistActivityLog({
+      userId: check.user?.uid || 'admin',
+      userEmail: check.user?.email || 'admin@somotoz.ai',
+      userName: check.user?.name || 'Administrator',
+      activityType: 'admin_action',
+      query: `Deleted all Somotoz application data for user ${userId}`,
+      feature: 'User Governance',
+      status: 'success',
+    });
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Data deletion failed.' });
+  }
+});
+
+// Admin Activity Logs: Real Persistent Firestore Records
+app.get('/api/admin/activity-logs', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
+  try {
+    const { type, status, search, limitCount } = req.query;
+    const limitNum = Math.min(Number(limitCount) || 200, 500);
+
+    let logs: ServerActivityRecord[] = [];
+
+    // Query real persistent Firestore records
+    try {
+      const snap = await adminDb.collection('admin_activity_logs')
+        .orderBy('timestamp', 'desc')
+        .limit(limitNum)
+        .get();
+
+      logs = snap.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          userId: d.userId || '',
+          userEmail: d.userEmail || '',
+          userName: d.userName,
+          activityType: d.activityType || 'ai_query',
+          query: d.query || '',
+          feature: d.feature || '',
+          status: d.status || 'success',
+          tokens: d.tokens || 0,
+          modelUsed: d.modelUsed,
+          metadata: d.metadata,
+          timestamp: d.timestamp || Date.now(),
+        };
+      });
+    } catch (dbErr) {
+      console.warn('[Admin] Firestore logs fetch notice, using hot-cache:', dbErr);
+      logs = [...activityLogsHotCache];
+    }
+
+    // Apply filters
+    if (type && type !== 'all') {
+      logs = logs.filter((l) => l.activityType === type);
+    }
+    if (status && status !== 'all') {
+      logs = logs.filter((l) => l.status === status);
+    }
+    if (search && typeof search === 'string' && search.trim()) {
+      const term = search.toLowerCase().trim();
+      logs = logs.filter(
+        (l) =>
+          l.query.toLowerCase().includes(term) ||
+          l.userEmail.toLowerCase().includes(term) ||
+          l.userId.toLowerCase().includes(term) ||
+          l.feature.toLowerCase().includes(term) ||
+          (l.userName && l.userName.toLowerCase().includes(term))
+      );
+    }
+
+    return res.json({ success: true, logs });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Logs fetch failed.' });
+  }
+});
+
+// Admin Analytics Overview: REAL Firestore & Firebase Auth Telemetry
+app.get('/api/admin/analytics', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
+  try {
+    let logs: ServerActivityRecord[] = [];
+
+    // 1. Fetch real logs from Firestore
+    try {
+      const snap = await adminDb.collection('admin_activity_logs')
+        .orderBy('timestamp', 'desc')
+        .limit(500)
+        .get();
+
+      logs = snap.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          userId: d.userId || '',
+          userEmail: d.userEmail || '',
+          userName: d.userName,
+          activityType: d.activityType || 'ai_query',
+          query: d.query || '',
+          feature: d.feature || '',
+          status: d.status || 'success',
+          tokens: d.tokens || 0,
+          modelUsed: d.modelUsed,
+          metadata: d.metadata,
+          timestamp: d.timestamp || Date.now(),
+        };
+      });
+    } catch {
+      logs = [...activityLogsHotCache];
+    }
+
+    // 2. Compute real total users from Firebase Auth or unique UIDs
+    let totalUsers = 0;
+    try {
+      const userList = await adminAuth.listUsers(100);
+      totalUsers = userList.users.length;
+    } catch {
+      const uniqueUids = new Set(logs.map(l => l.userId).filter(u => u && u !== 'anonymous'));
+      totalUsers = Math.max(uniqueUids.size, check.user ? 1 : 0);
+    }
+
+    // 3. Compute real active users (active in the last 7 days)
+    const sevenDaysAgo = Date.now() - 7 * 86400000;
+    const activeUids = new Set(
+      logs.filter(l => l.timestamp >= sevenDaysAgo && l.userId && l.userId !== 'anonymous').map(l => l.userId)
+    );
+    const activeUsers = Math.max(activeUids.size, check.user ? 1 : 0);
+
+    const totalAiQueries = logs.filter(
       (l) => l.activityType === 'ai_query' || l.activityType === 'media_gen'
     ).length;
-    const totalSearches = serverActivityLogs.filter((l) => l.activityType === 'search').length;
-    const totalReflections = serverActivityLogs.filter((l) => l.activityType === 'reflection').length;
+    const totalSearches = logs.filter((l) => l.activityType === 'search').length;
+    const totalReflections = logs.filter((l) => l.activityType === 'reflection').length;
 
-    // 7-day trend
+    // 4. Compute real 7-day trend
     const trendsMap = new Map<string, { aiQueries: number; searches: number; reflections: number }>();
     const now = new Date();
     for (let i = 6; i >= 0; i--) {
@@ -2030,7 +2557,7 @@ app.get('/api/admin/analytics', async (req: Request, res: Response) => {
       trendsMap.set(key, { aiQueries: 0, searches: 0, reflections: 0 });
     }
 
-    serverActivityLogs.forEach((log) => {
+    logs.forEach((log) => {
       const dateKey = new Date(log.timestamp).toISOString().split('T')[0];
       if (trendsMap.has(dateKey)) {
         const item = trendsMap.get(dateKey)!;
@@ -2049,171 +2576,16 @@ app.get('/api/admin/analytics', async (req: Request, res: Response) => {
 
     return res.json({
       totalUsers,
-      activeUsers: Math.max(activeUsers, 1),
+      activeUsers,
       totalAiQueries,
       totalSearches,
       totalReflections,
-      recentActivityCount: serverActivityLogs.length,
+      recentActivityCount: logs.length,
       activityTrends,
+      loggingStartDate: logs.length > 0 ? new Date(Math.min(...logs.map(l => l.timestamp))).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'Analytics fetch failed.' });
-  }
-});
-
-// Admin User Management: List Users
-app.get('/api/admin/users', async (req: Request, res: Response) => {
-  const check = await verifyFirebaseAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
-  }
-
-  try {
-    const users = Array.from(serverUsersMap.values()).map((u) => ({
-      ...u,
-      status: disabledUserIds.has(u.uid) ? 'disabled' : u.status,
-    }));
-    return res.json({ success: true, users });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Users list fetch failed.' });
-  }
-});
-
-// Admin User Management: Enable / Disable Access
-app.post('/api/admin/users/:userId/status', async (req: Request, res: Response) => {
-  const check = await verifyFirebaseAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
-  }
-
-  try {
-    const { userId } = req.params;
-    const { isDisabled, reason } = req.body || {};
-
-    if (isDisabled) {
-      disabledUserIds.add(userId);
-    } else {
-      disabledUserIds.delete(userId);
-    }
-
-    const user = serverUsersMap.get(userId);
-    if (user) {
-      user.status = isDisabled ? 'disabled' : 'active';
-      user.disabledReason = reason;
-    }
-
-    logServerActivity({
-      userId: check.uid || 'admin',
-      userEmail: check.email || 'mauryasomkumar@gmail.com',
-      userName: 'Administrator',
-      activityType: 'admin_action',
-      query: `${isDisabled ? 'Disabled' : 'Enabled'} access for user ${userId}`,
-      feature: 'User Governance',
-      status: 'success',
-    });
-
-    return res.json({ success: true, isDisabled });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Status toggle failed.' });
-  }
-});
-
-// Admin User Management: Edit Permitted Profile Data
-app.post('/api/admin/users/:userId/edit', async (req: Request, res: Response) => {
-  const check = await verifyFirebaseAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
-  }
-
-  try {
-    const { userId } = req.params;
-    const { displayName, bio } = req.body || {};
-
-    const user = serverUsersMap.get(userId);
-    if (user) {
-      if (displayName) user.displayName = displayName;
-      if (bio !== undefined) user.bio = bio;
-    }
-
-    logServerActivity({
-      userId: check.uid || 'admin',
-      userEmail: check.email || 'mauryasomkumar@gmail.com',
-      userName: 'Administrator',
-      activityType: 'admin_action',
-      query: `Updated profile for user ${userId}: ${displayName || ''}`,
-      feature: 'User Governance',
-      status: 'success',
-    });
-
-    return res.json({ success: true });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Profile edit failed.' });
-  }
-});
-
-// Admin User Management: Delete User Application Data
-app.delete('/api/admin/users/:userId/data', async (req: Request, res: Response) => {
-  const check = await verifyFirebaseAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
-  }
-
-  try {
-    const { userId } = req.params;
-    const user = serverUsersMap.get(userId);
-    if (user) {
-      user.totalEntries = 0;
-      user.totalActivities = 0;
-    }
-
-    logServerActivity({
-      userId: check.uid || 'admin',
-      userEmail: check.email || 'mauryasomkumar@gmail.com',
-      userName: 'Administrator',
-      activityType: 'admin_action',
-      query: `Deleted all Somotoz application data for user ${userId}`,
-      feature: 'User Governance',
-      status: 'success',
-    });
-
-    return res.json({ success: true });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Data deletion failed.' });
-  }
-});
-
-// Admin Activity Logs with Search, Filter & Sort
-app.get('/api/admin/activity-logs', async (req: Request, res: Response) => {
-  const check = await verifyFirebaseAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
-  }
-
-  try {
-    const { type, status, search, limitCount } = req.query;
-    let logs = [...serverActivityLogs];
-
-    if (type && type !== 'all') {
-      logs = logs.filter((l) => l.activityType === type);
-    }
-    if (status && status !== 'all') {
-      logs = logs.filter((l) => l.status === status);
-    }
-    if (search && typeof search === 'string' && search.trim()) {
-      const term = search.toLowerCase().trim();
-      logs = logs.filter(
-        (l) =>
-          l.query.toLowerCase().includes(term) ||
-          l.userEmail.toLowerCase().includes(term) ||
-          l.userId.toLowerCase().includes(term) ||
-          l.feature.toLowerCase().includes(term)
-      );
-    }
-
-    const limitNum = Math.min(Number(limitCount) || 200, 500);
-    return res.json({ success: true, logs: logs.slice(0, limitNum) });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Logs fetch failed.' });
   }
 });
 

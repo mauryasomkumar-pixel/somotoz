@@ -377,14 +377,22 @@ export default function App() {
 
     setIsSubmittingAI(true);
     try {
-      // Step 1: Call Gemini API proxy endpoint with user identification headers
+      // Step 1: Call Gemini API proxy endpoint with verified token
+      const reqHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (auth.currentUser) {
+        try {
+          const idToken = await auth.currentUser.getIdToken();
+          reqHeaders['Authorization'] = `Bearer ${idToken}`;
+        } catch (tokErr) {
+          console.warn('Could not retrieve fresh token for reflection:', tokErr);
+        }
+      }
+
       const response = await fetch('/api/reflect', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': currentUser.uid,
-          'x-user-email': currentUser.email || '',
-        },
+        headers: reqHeaders,
         body: JSON.stringify({
           content,
           promptType,

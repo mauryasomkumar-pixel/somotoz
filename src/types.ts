@@ -113,9 +113,12 @@ export interface ManagedUser {
   photoURL?: string | null;
   createdAt: number;
   lastLoginAt: number;
+  lastActiveAt?: number;
   status: 'active' | 'disabled';
   disabledReason?: string;
   totalActivities: number;
+  totalAiQueries?: number;
+  totalSearches?: number;
   totalEntries: number;
   role: 'admin' | 'user';
   bio?: string;

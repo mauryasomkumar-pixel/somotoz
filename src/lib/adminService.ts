@@ -99,6 +99,53 @@ export async function verifyAdminStatusAsync(): Promise<boolean> {
 }
 
 /**
+ * Triggers server-side custom claim assignment for the administrator.
+ */
+export async function claimAdminRoleAsync(): Promise<{ success: boolean; message: string }> {
+  try {
+    const headers = await getAdminAuthHeaders();
+    const res = await fetch('/api/admin/claim-admin-role', {
+      method: 'POST',
+      headers,
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to claim admin role');
+    }
+    // Refresh user's Firebase ID token to pick up new claims
+    if (auth.currentUser) {
+      await auth.currentUser.getIdToken(true);
+    }
+    return { success: true, message: data.message || 'Admin custom claim assigned.' };
+  } catch (err: any) {
+    console.error('[Admin] Error claiming admin role:', err);
+    throw err;
+  }
+}
+
+/**
+ * Assigns admin or user role to a user.
+ */
+export async function assignUserRoleAsync(userId: string, role: 'admin' | 'user'): Promise<boolean> {
+  try {
+    const headers = await getAdminAuthHeaders();
+    const res = await fetch(`/api/admin/users/${userId}/role`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ role }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to update user role');
+    }
+    return true;
+  } catch (err: any) {
+    console.error('[Admin] Error assigning user role:', err);
+    throw err;
+  }
+}
+
+/**
  * Checks if a user's account is currently marked disabled by an administrator.
  */
 export async function checkUserIsDisabled(userId: string): Promise<boolean> {

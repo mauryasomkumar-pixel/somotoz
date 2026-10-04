@@ -1056,4 +1056,119 @@
   }
 }
 
+/* ========================================================================= */
+/* UNIVERSAL ADMIN DASHBOARD THEME CONTRAST SYSTEM (DAY, NIGHT, EYE-CARE)   */
+/* ========================================================================= */
+
+.admin-dashboard {
+  color: var(--text-primary);
+}
+
+.admin-dashboard .theme-card {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.admin-dashboard .theme-surface {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.admin-dashboard .theme-input {
+  background-color: var(--bg-input) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.admin-dashboard .theme-input::placeholder {
+  color: var(--text-muted) !important;
+}
+
+.admin-dashboard table th {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-secondary) !important;
+  border-color: var(--border-color) !important;
+}
+
+.admin-dashboard table td {
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+.admin-dashboard table tr:hover td {
+  background-color: var(--bg-elevated) !important;
+}
+
+/* In Day & Eye-Comfort modes, enforce readable high-contrast texts & surfaces */
+[data-theme="white"] .admin-dashboard,
+[data-theme="day"] .admin-dashboard,
+[data-theme="mix"] .admin-dashboard,
+[data-theme="eye-comfort"] .admin-dashboard {
+  color: var(--text-primary);
+}
+
+[data-theme="white"] .admin-dashboard .text-white,
+[data-theme="day"] .admin-dashboard .text-white,
+[data-theme="mix"] .admin-dashboard .text-white,
+[data-theme="eye-comfort"] .admin-dashboard .text-white {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="white"] .admin-dashboard .text-\[\#EDEDED\],
+[data-theme="day"] .admin-dashboard .text-\[\#EDEDED\],
+[data-theme="mix"] .admin-dashboard .text-\[\#EDEDED\],
+[data-theme="eye-comfort"] .admin-dashboard .text-\[\#EDEDED\] {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="white"] .admin-dashboard .text-\[\#A1A1AA\],
+[data-theme="day"] .admin-dashboard .text-\[\#A1A1AA\],
+[data-theme="mix"] .admin-dashboard .text-\[\#A1A1AA\],
+[data-theme="eye-comfort"] .admin-dashboard .text-\[\#A1A1AA\] {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="white"] .admin-dashboard .bg-\[\#090916\]\/95,
+[data-theme="white"] .admin-dashboard .bg-\[\#090916\],
+[data-theme="white"] .admin-dashboard .bg-\[\#090914\],
+[data-theme="white"] .admin-dashboard .bg-\[\#0E0E1C\],
+[data-theme="white"] .admin-dashboard .bg-\[\#0D0D18\],
+[data-theme="white"] .admin-dashboard .bg-black\/80,
+[data-theme="white"] .admin-dashboard .bg-black\/60,
+[data-theme="white"] .admin-dashboard .bg-black,
+[data-theme="day"] .admin-dashboard .bg-\[\#090916\]\/95,
+[data-theme="day"] .admin-dashboard .bg-\[\#090916\],
+[data-theme="day"] .admin-dashboard .bg-\[\#090914\],
+[data-theme="day"] .admin-dashboard .bg-\[\#0E0E1C\],
+[data-theme="day"] .admin-dashboard .bg-\[\#0D0D18\],
+[data-theme="day"] .admin-dashboard .bg-black\/80,
+[data-theme="day"] .admin-dashboard .bg-black\/60,
+[data-theme="day"] .admin-dashboard .bg-black {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="mix"] .admin-dashboard .bg-\[\#090916\]\/95,
+[data-theme="mix"] .admin-dashboard .bg-\[\#090916\],
+[data-theme="mix"] .admin-dashboard .bg-\[\#090914\],
+[data-theme="mix"] .admin-dashboard .bg-\[\#0E0E1C\],
+[data-theme="mix"] .admin-dashboard .bg-\[\#0D0D18\],
+[data-theme="mix"] .admin-dashboard .bg-black\/80,
+[data-theme="mix"] .admin-dashboard .bg-black\/60,
+[data-theme="mix"] .admin-dashboard .bg-black,
+[data-theme="eye-comfort"] .admin-dashboard .bg-\[\#090916\]\/95,
+[data-theme="eye-comfort"] .admin-dashboard .bg-\[\#090916\],
+[data-theme="eye-comfort"] .admin-dashboard .bg-\[\#090914\],
+[data-theme="eye-comfort"] .admin-dashboard .bg-\[\#0E0E1C\],
+[data-theme="eye-comfort"] .admin-dashboard .bg-\[\#0D0D18\],
+[data-theme="eye-comfort"] .admin-dashboard .bg-black\/80,
+[data-theme="eye-comfort"] .admin-dashboard .bg-black\/60,
+[data-theme="eye-comfort"] .admin-dashboard .bg-black {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-color) !important;
+}
+
+
 

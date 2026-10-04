@@ -54,13 +54,21 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = () => {
 
     try {
       const currentUser = auth.currentUser;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (currentUser) {
+        try {
+          const idToken = await currentUser.getIdToken();
+          headers['Authorization'] = `Bearer ${idToken}`;
+        } catch (e) {
+          console.warn('Could not fetch fresh ID token for search:', e);
+        }
+      }
+
       const res = await fetch('/api/search-wisdom', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': currentUser?.uid || '',
-          'x-user-email': currentUser?.email || '',
-        },
+        headers,
         body: JSON.stringify({ query: q }),
       });
 
