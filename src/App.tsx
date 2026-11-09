@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, onIdTokenChanged, User } from 'firebase/auth';
 import {
   collection,
   doc,
@@ -15,15 +15,17 @@ import { auth, db, signInWithGoogle, logoutUser, cleanForFirestore } from './lib
 import { JournalEntry, UserProfile, ViewMode, GenerationMode, AIReflectionResponse, UserActivityLog } from './types';
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './components/LandingPage';
-import { CommandSidebar } from './components/CommandSidebar';
+import { NavigationRail } from './components/NavigationRail';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { ReflectionEditor } from './components/ReflectionEditor';
 import { ReflectionDetail } from './components/ReflectionDetail';
 import { ChatCompanion } from './components/ChatCompanion';
 import { Somochat } from './components/Somochat';
-import { WisdomExplorer } from './components/WisdomExplorer';
-import { SoundscapePlayer } from './components/SoundscapePlayer';
+import { DiscoverView } from './components/DiscoverView';
+import { ProfileView } from './components/ProfileView';
+import { FirstTimeTour } from './components/FirstTimeTour';
+import { OnboardingModal } from './components/OnboardingModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { ProfileModal } from './components/ProfileModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
@@ -56,6 +58,8 @@ export default function App() {
 
   // Profile Modal State
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
 
   // UI state
   const [isSidebarOpenMobile, setIsSidebarOpenMobile] = useState<boolean>(false);
@@ -103,20 +107,36 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Silent background token refresh: refreshes token silently if session is near expiry
+    const unsubscribeToken = onIdTokenChanged(auth, async (user: User | null) => {
+      if (user) {
+        try {
+          await user.getIdToken();
+        } catch (e) {
+          console.warn('Silent token background refresh notice:', e);
+        }
+      }
+    });
+
     const unsubscribe = onAuthStateChanged(
       auth,
       async (user: User | null) => {
         if (user) {
-          // Check if custom user profile document exists in Firestore
+          // Check if custom user profile document exists in Firestore (users/{uid} or users/{uid}/profile/main)
           let customProfile: Partial<UserProfile> = {};
           try {
-            const profileDocRef = doc(db, 'users', user.uid, 'profile', 'main');
-            const profileSnap = await getDoc(profileDocRef);
-            if (profileSnap.exists()) {
-              customProfile = profileSnap.data() as Partial<UserProfile>;
+            const userSnap = await getDoc(doc(db, 'users', user.uid));
+            if (userSnap.exists()) {
+              customProfile = userSnap.data() as Partial<UserProfile>;
+            } else {
+              const profileDocRef = doc(db, 'users', user.uid, 'profile', 'main');
+              const profileSnap = await getDoc(profileDocRef);
+              if (profileSnap.exists()) {
+                customProfile = profileSnap.data() as Partial<UserProfile>;
+              }
             }
           } catch (e) {
-            console.warn('Could not read user profile from firestore, using auth defaults', e);
+            console.warn('Could not read user profile from firestore:', e);
           }
 
           // Check if this account has been disabled by Somotoz administrator
@@ -127,18 +147,43 @@ export default function App() {
             console.warn('Could not verify user status:', e);
           }
 
+          // Verify admin role via server/token custom claim
+          let userIsAdmin = false;
+          try {
+            userIsAdmin = checkIsAdmin({ email: user.email });
+          } catch (e) {
+            console.warn('Could not verify admin status:', e);
+          }
+
+          // Check onboarding: If user completed onboarding, never ask again.
+          const isUserOnboarded = customProfile.isOnboarded === true;
+          setShowOnboarding(!isUserOnboarded);
+
           setCurrentUser({
             uid: user.uid,
-            displayName: customProfile.displayName || user.displayName || 'Som Maurya',
-            email: customProfile.email || user.email || 'mauryasomkumar@gmail.com',
+            username: customProfile.username,
+            displayName: customProfile.displayName || user.displayName || (user.email ? user.email.split('@')[0] : 'Somotoz User'),
+            email: customProfile.email || user.email || '',
             photoURL: customProfile.photoURL || user.photoURL,
             phoneNumber: customProfile.phoneNumber || null,
-            bio: customProfile.bio || 'AI Architect & Data Engineer',
+            bio: customProfile.bio || '',
+            dateOfBirth: customProfile.dateOfBirth,
+            isAdult: customProfile.isAdult,
+            isOnboarded: isUserOnboarded,
+            mood: customProfile.mood || 'peaceful',
+            theme: customProfile.theme,
+            gender: customProfile.gender,
+            interests: customProfile.interests,
+            usernameLastChangedAt: customProfile.usernameLastChangedAt,
+            status: customProfile.status || 'active',
+            isAdmin: userIsAdmin,
+            role: userIsAdmin ? 'admin' : 'member',
           });
           setAuthError(null);
         } else {
           setCurrentUser(null);
           setIsUserDisabled(false);
+          setShowOnboarding(false);
           setEntries([]);
           setActivityLogs([]);
           setSelectedEntryId(null);
@@ -153,7 +198,10 @@ export default function App() {
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      unsubscribeToken();
+    };
   }, []);
 
   // 2. Real-time Firestore Subscriptions for User's Entries
@@ -288,13 +336,17 @@ export default function App() {
     // Simulate network delay for real-world feel
     await new Promise((resolve) => setTimeout(resolve, 600));
 
-    // Save to Firestore
+    // Save to Firestore (strip base theme; persist only mood/accent)
     try {
+      const dataToSave = { ...updatedData };
+      delete (dataToSave as any).theme;
+      delete (dataToSave as any).baseMode;
+
       const profileDocRef = doc(db, 'users', currentUser.uid, 'profile', 'main');
       await setDoc(
         profileDocRef,
         cleanForFirestore({
-          ...updatedData,
+          ...dataToSave,
           uid: currentUser.uid,
           updatedAt: Date.now(),
         }),
@@ -566,17 +618,22 @@ export default function App() {
     addToast('success', 'Access Granted', `Neural workspace online. Welcome, ${user.displayName || 'Engineer'}!`);
   };
 
-  // Render Skeleton while checking initial auth status
+  // Render Loading Skeleton while checking persistent auth status and profile
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen bg-[#000000] flex flex-col items-center justify-center space-y-4 font-mono">
-        <div className="w-12 h-12 bg-black border border-[#00FF41] flex items-center justify-center text-[#00FF41] shadow-[4px_4px_0px_0px_#00FF41] animate-pulse">
-          <Terminal className="w-6 h-6" />
+      <div className="min-h-screen bg-[var(--bg-primary)] flex flex-col items-center justify-center p-6 space-y-4 font-sans select-none">
+        <div className="w-14 h-14 rounded-3xl bg-[var(--accent-color)]/20 text-[var(--accent-color)] flex items-center justify-center animate-pulse">
+          <div className="w-8 h-8 rounded-2xl bg-[var(--accent-color)] text-black flex items-center justify-center font-bold text-sm shadow-sm">
+            S
+          </div>
         </div>
-        <p className="text-xs font-mono text-[#00FF41] flex items-center gap-2">
-          <Loader2 className="w-4 h-4 animate-spin text-[#00FF41]" />
-          INITIALIZING SOMOTOZ NEURAL KERNEL...
-        </p>
+        <div className="space-y-1 text-center">
+          <h2 className="text-sm font-bold text-[var(--text-primary)]">Loading Somotoz</h2>
+          <p className="text-xs text-[var(--text-secondary)]">Checking authentication and syncing your profile...</p>
+        </div>
+        <div className="w-48 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+          <div className="h-full bg-[var(--accent-color)] w-1/2 animate-pulse rounded-full" />
+        </div>
       </div>
     );
   }
@@ -628,7 +685,7 @@ export default function App() {
   }
 
   const isJournalView = viewMode === 'write' || viewMode === 'view' || viewMode === 'edit';
-  const userName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Som Maurya';
+  const userName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Somotoz User';
 
   // Render Authenticated Dashboard & Engineering Workspace
   return (
@@ -645,38 +702,21 @@ export default function App() {
           setViewMode('write');
         }}
         onLogout={handleLogout}
-        onOpenProfile={() => setIsProfileModalOpen(true)}
-        onToggleSidebar={() => setIsSidebarOpenMobile(!isSidebarOpenMobile)}
-        isSidebarOpen={isSidebarOpenMobile}
+        onOpenProfile={() => setViewMode('profile')}
       />
 
-      {/* Main Workspace Layout (Sidebar + Main Content Area) */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main Workspace Layout (Single Navigation Rail + Content Area) */}
+      <div className="flex-1 flex overflow-hidden relative">
         
-        {/* Command Sidebar for Quick Multi-Modal Navigation */}
-        <CommandSidebar
+        {/* ONE Navigation: Left rail on laptop, 5-item bottom bar on mobile */}
+        <NavigationRail
           currentView={viewMode}
-          currentChatMode={activeChatMode}
           onSelectView={handleNavigate}
-          onNewReflection={() => {
-            setSelectedEntryId(null);
-            setViewMode('write');
-          }}
-          onLogout={handleLogout}
-          onOpenProfile={() => setIsProfileModalOpen(true)}
           user={currentUser}
-          entryCount={entries.length}
-          entries={entries}
-          onSelectEntry={(entry) => {
-            setSelectedEntryId(entry.id);
-            setViewMode('view');
-          }}
-          onDeleteEntry={handleRequestDelete}
-          isOpenMobile={isSidebarOpenMobile}
-          onCloseMobile={() => setIsSidebarOpenMobile(false)}
+          onLogout={handleLogout}
         />
 
-        {/* Secondary Journal Entry List Sidebar when inside Journal Views */}
+        {/* Journal Entry List Sidebar when inside Journal Views */}
         {isJournalView && (
           <Sidebar
             entries={entries}
@@ -718,13 +758,32 @@ export default function App() {
             </div>
           )}
 
-          {/* 2. SOMOCHAT E2EE GEN-Z MESSAGING VIEW */}
+          {/* 2. SOMOCHAT REAL-TIME HUMAN MESSAGING VIEW (18+ ONLY) */}
           {viewMode === 'somochat' && (
-            <Somochat
-              currentUser={currentUser}
-              onShowToast={addToast}
-              onLogActivity={(mode, action, tokens) => logActivity(mode as any, action, tokens)}
-            />
+            currentUser?.isAdult === false ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto my-auto">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 mb-4">
+                  <ShieldAlert className="w-7 h-7" />
+                </div>
+                <h2 className="text-lg font-bold text-[var(--text-primary)] mb-2">Adults Only (18+)</h2>
+                <p className="text-xs text-[var(--text-secondary)] mb-6 leading-relaxed">
+                  SomoChat and social features are available only for adults aged 18 and older. Your account does not meet the minimum age requirement.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('dashboard')}
+                  className="px-4 py-2 bg-[var(--accent-color)] text-black font-semibold rounded-xl text-xs hover:opacity-90 transition-opacity cursor-pointer"
+                >
+                  Return to Dashboard
+                </button>
+              </div>
+            ) : (
+              <Somochat
+                currentUser={currentUser}
+                onShowToast={addToast}
+                onLogActivity={(mode, action, tokens) => logActivity(mode as any, action, tokens)}
+              />
+            )
           )}
 
           {/* 3. JOURNAL WRITE VIEW */}
@@ -771,26 +830,27 @@ export default function App() {
             </div>
           )}
 
-          {/* Fallback if in view mode without selected entry */}
+          {/* Fallback if in view mode without selected entry: friendly message and ONE button */}
           {viewMode === 'view' && !selectedEntry && (
-            <div className="h-full flex flex-col items-center justify-center p-8 text-center text-[#737373] font-mono">
-              <div className="w-12 h-12 bg-black border border-[#262626] flex items-center justify-center mb-3">
-                <BookOpen className="w-6 h-6 text-[#00FF41]" />
+            <div className="h-full flex flex-col items-center justify-center p-8 text-center text-[var(--text-secondary)] font-sans">
+              <div className="w-12 h-12 rounded-full bg-[var(--bg-elevated)] text-[var(--accent-color)] flex items-center justify-center mb-3">
+                <BookOpen className="w-6 h-6" />
               </div>
-              <h3 className="text-sm font-bold text-[#EDEDED]">NO NOTE SELECTED</h3>
-              <p className="text-xs text-[#737373] mt-1 max-w-sm font-sans">
-                Select an entry from the sidebar to view details, or start a new note.
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">No note selected</h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-sm">
+                Select a journal note from the sidebar list, or write a new reflection.
               </p>
               <button
+                type="button"
                 onClick={() => setViewMode('write')}
-                className="mt-4 px-4 py-2 bg-[#00FF41] hover:bg-[#00E038] text-black font-mono font-bold text-xs shadow-[2px_2px_0px_0px_#262626] cursor-pointer"
+                className="mt-4 px-4 py-2 bg-[var(--accent-color)] text-black font-semibold text-xs rounded-xl hover:opacity-90 transition-opacity cursor-pointer"
               >
                 Write New Note
               </button>
             </div>
           )}
 
-          {/* 5. MULTIMODAL SYNTHESIS CHAT VIEW */}
+          {/* 5. ASK AI VIEW */}
           {viewMode === 'chat' && (
             <div className="h-full flex-1 flex flex-col min-h-0">
               <ChatCompanion
@@ -802,17 +862,26 @@ export default function App() {
             </div>
           )}
 
-          {/* 6. WISDOM SEARCH EXPLORER VIEW */}
-          {viewMode === 'wisdom' && (
+          {/* 6. DISCOVER VIEW (Knowledge Hub + Soundscapes + Quotes) */}
+          {(viewMode === 'discover' || viewMode === 'wisdom' || viewMode === 'soundscapes') && (
             <div className="max-w-6xl mx-auto">
-              <WisdomExplorer />
+              <DiscoverView />
             </div>
           )}
 
-          {/* 7. NEURAL SOUNDSCAPES & 432HZ SYNTH PLAYER */}
-          {viewMode === 'soundscapes' && (
-            <div className="max-w-5xl mx-auto">
-              <SoundscapePlayer />
+          {/* 7. PROFILE & SETTINGS VIEW */}
+          {viewMode === 'profile' && (
+            <div className="max-w-4xl mx-auto">
+              <ProfileView
+                user={currentUser}
+                onLogout={handleLogout}
+                onNavigate={handleNavigate}
+                onOpenTour={() => setIsTourOpen(true)}
+                onProfileUpdated={(updated) => {
+                  setCurrentUser(updated);
+                  addToast('success', 'Profile Updated', 'Your settings have been saved.');
+                }}
+              />
             </div>
           )}
 
@@ -828,6 +897,24 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* 4-Step Onboarding Modal for New / Incomplete Users */}
+      <OnboardingModal
+        currentUser={currentUser}
+        isOpen={showOnboarding}
+        onComplete={(updatedProfile) => {
+          setCurrentUser(updatedProfile);
+          setShowOnboarding(false);
+          addToast('success', 'Profile Created', `Welcome to Somotoz, @${updatedProfile.username}!`);
+        }}
+        onLogout={handleLogout}
+      />
+
+      {/* First-Time Feature Tour (Chats, Ask AI, Journal) */}
+      <FirstTimeTour
+        forceOpen={isTourOpen}
+        onComplete={() => setIsTourOpen(false)}
+      />
 
       {/* Profile & Settings Modal */}
       <ProfileModal

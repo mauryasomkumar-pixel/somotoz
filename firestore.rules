@@ -54,6 +54,31 @@ service cloud.firestore {
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow write: if isAdmin();
     }
+
+    // Safety & User Conduct Reports (18+ & moderation)
+    // - Authenticated users can create reports strictly bound to their own reporterId
+    // - Only verified admins can read, list, update, and manage reports
+    match /somo_reports/{reportId} {
+      allow create: if isSignedIn() && request.resource.data.reporterId == request.auth.uid;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Username Registry for live availability checking
+    // - Any authenticated user can read to check availability
+    // - Can only be created by the owning user
+    match /usernames/{username} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    // Public Profiles (Only username, photo, bio, mood - never real name, email, or phone)
+    // - Readable by all authenticated users for human directory in SomoChat
+    // - Writable only by the owner or admin
+    match /public_profiles/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
   }
 }
 

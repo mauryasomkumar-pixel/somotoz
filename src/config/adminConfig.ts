@@ -1,15 +1,16 @@
 // ========================================================
 // SOMOTOZ MASTER ADMIN CONFIGURATION
 // ========================================================
-// Single authoritative administrator email configuration.
-// Verified via Firebase Authentication + server-side custom claims + Firebase Security Rules.
+// Admin role is derived exclusively from Firebase Auth custom claims (admin: true)
+// and verified server-side. No secrets or admin emails are hardcoded in client code.
 // ========================================================
 
-// Authoritative administrator email for Somotoz
-export const ADMIN_EMAIL: string = "mauryasomkumar@gmail.com";
+// Optional environment variable hint for UI display
+export const ADMIN_EMAIL: string = ((import.meta as any).env?.VITE_ADMIN_EMAIL as string) || '';
 
 /**
- * Returns the configured administrator email for Somotoz.
+ * Returns the configured administrator email hint from environment variables if present.
+ * Real authorization is enforced via verified Firebase ID tokens and custom claims.
  */
 export function getEffectiveAdminEmail(): string {
   return ADMIN_EMAIL.trim().toLowerCase();

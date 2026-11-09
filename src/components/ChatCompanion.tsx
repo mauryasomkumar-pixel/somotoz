@@ -1046,21 +1046,36 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
             </div>
           )}
 
-          {/* Unified Input Box with Real-Time Intent Pill & Chamfered Border */}
-          <div className="relative flex items-center bg-[var(--bg-input)] border border-[var(--border-color)] focus-within:border-[var(--border-active)] clip-cyber-card shadow-sm transition-all rounded-lg">
-            <div className="hidden sm:flex items-center pl-3 pr-1 text-xs text-[var(--border-active)] shrink-0">
-              <span
-                className={`px-2.5 py-1 bg-[var(--bg-secondary)] border text-[10px] uppercase font-bold flex items-center gap-1 clip-badge-poly transition-colors ${
-                  detectedIntent.mode !== 'text' || detectedIntent.isExplicitSlash
-                    ? 'border-[var(--border-active)] text-[var(--border-active)] shadow-sm'
-                    : 'border-[var(--border-color)] text-[var(--text-secondary)]'
-                }`}
-              >
-                <Zap className={`w-3 h-3 ${detectedIntent.mode !== 'text' ? 'text-[var(--border-active)] animate-pulse' : 'text-[var(--text-muted)]'}`} />
-                {detectedIntent.badgeLabel}
-              </span>
-            </div>
+          {/* Clean Mode Selection Chips: Chat, Image, Video, Music */}
+          <div className="flex items-center gap-1.5 px-1 pb-1 overflow-x-auto no-scrollbar select-none">
+            {[
+              { id: 'text' as const, label: 'Chat', icon: MessageSquare },
+              { id: 'image' as const, label: 'Image', icon: ImageIcon },
+              { id: 'video' as const, label: 'Video', icon: Film },
+              { id: 'music' as const, label: 'Music', icon: Music },
+            ].map((chip) => {
+              const isSelected = selectedMode === chip.id;
+              const ChipIcon = chip.icon;
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => setSelectedMode(chip.id)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[var(--accent-color)] text-black shadow-xs'
+                      : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-color)]'
+                  }`}
+                >
+                  <ChipIcon className="w-3.5 h-3.5" />
+                  <span>{chip.label}</span>
+                </button>
+              );
+            })}
+          </div>
 
+          {/* Unified Single Input Box */}
+          <div className="relative flex items-center bg-[var(--bg-input)] border border-[var(--border-color)] focus-within:border-[var(--border-active)] rounded-2xl shadow-sm transition-all">
             <input
               ref={inputRef}
               type="text"
@@ -1070,17 +1085,17 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
                 isListening
                   ? 'Listening to speech... speak clearly...'
                   : attachments.length > 0
-                  ? "Ask instructions for attached files, generate notes, or tap Send..."
+                  ? 'Ask instructions for attached files or tap Send...'
                   : selectedMode === 'image'
-                  ? "Describe the visual illustration (e.g. 'Futuristic AI neural network matrix')..."
+                  ? 'Describe the image you want to create...'
                   : selectedMode === 'video'
-                  ? "Describe the motion sequence (e.g. 'Cyberpunk neon flight over metropolis')..."
+                  ? 'Describe the scene to simulate (60 FPS)...'
                   : selectedMode === 'music'
-                  ? "Describe the melody (e.g. 'Calming 432Hz ambient focus synthesizer')..."
-                  : "Ask anything, attach files/images, type commands, or tap Mic..."
+                  ? 'Describe the melody or ambient mood...'
+                  : 'Ask anything, attach files, or tap Mic...'
               }
               disabled={isLoading}
-              className="flex-1 px-3 sm:px-4 py-3 bg-transparent text-sm sm:text-base text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none font-sans"
+              className="flex-1 px-4 py-3 bg-transparent text-sm sm:text-base text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none font-sans"
             />
 
             <div className="flex items-center space-x-1.5 pr-2">

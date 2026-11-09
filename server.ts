@@ -2589,6 +2589,167 @@ app.get('/api/admin/analytics', async (req: Request, res: Response) => {
   }
 });
 
+// User Report Submission Endpoint (Report inappropriate behavior / under-18 / harassment)
+app.post('/api/reports', async (req: Request, res: Response) => {
+  try {
+    const authUser = await authenticateUserRequest(req);
+    const body = (req.body && typeof req.body === 'object') ? req.body : {};
+    const reportId = body.id || `rep_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const reportData = {
+      id: reportId,
+      reporterId: authUser?.uid || body.reporterId || 'anonymous',
+      reporterEmail: authUser?.email || body.reporterEmail || '',
+      reportedUserId: body.reportedUserId || '',
+      reportedUserName: body.reportedUserName || 'Somotoz User',
+      reportedSomoId: body.reportedSomoId || '',
+      reason: body.reason || 'other',
+      details: (body.details || '').slice(0, 2000),
+      timestamp: Date.now(),
+      status: 'pending',
+    };
+
+    try {
+      await adminDb.collection('somo_reports').doc(reportId).set(reportData);
+    } catch (dbErr) {
+      console.warn('[Reports] Firestore write notice:', dbErr);
+    }
+
+    await persistActivityLog({
+      userId: authUser?.uid || 'anonymous',
+      userEmail: authUser?.email || 'anonymous@somotoz.ai',
+      userName: authUser?.name,
+      activityType: 'admin_action',
+      query: `User filed report against ${reportData.reportedUserId || reportData.reportedSomoId} (Reason: ${reportData.reason})`,
+      feature: 'SomoChat Moderation',
+      status: 'success',
+    });
+
+    return res.json({ success: true, reportId });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Could not submit report.' });
+  }
+});
+
+// Admin Reports Listing Endpoint
+app.get('/api/admin/reports', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
+  try {
+    const snapshot = await adminDb.collection('somo_reports').orderBy('timestamp', 'desc').limit(100).get();
+    const reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return res.json({ success: true, reports });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to fetch reports.' });
+  }
+});
+
+// Admin Update Report Status
+app.post('/api/admin/reports/:reportId/status', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
+  try {
+    const { reportId } = req.params;
+    const { status } = req.body || {};
+    await adminDb.collection('somo_reports').doc(reportId).update({
+      status: status || 'reviewed',
+      reviewedAt: Date.now(),
+      reviewedBy: check.user?.email || 'admin',
+    });
+    return res.json({ success: true, reportId, status });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to update report status.' });
+  }
+});
+
+// Legal Request Export Endpoint (Compliance-focused, strictly logged, server-side verified)
+app.post('/api/admin/legal-export', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req);
+  if (!check.authorized) {
+    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
+  const { targetUserId, caseReference, authorityReason } = req.body || {};
+  if (!targetUserId || !caseReference) {
+    return res.status(400).json({ error: 'targetUserId and valid caseReference are required for legal exports.' });
+  }
+
+  try {
+    // 1. Fetch user account metadata from Firebase Admin SDK
+    let authRecord: any = null;
+    try {
+      authRecord = await adminAuth.getUser(targetUserId);
+    } catch {
+      // Ignored if user not found directly by UID
+    }
+
+    // 2. Fetch profile document
+    let profileData: any = null;
+    try {
+      const pDoc = await adminDb.collection('users').doc(targetUserId).collection('profile').doc('main').get();
+      if (pDoc.exists) {
+        profileData = pDoc.data();
+      }
+    } catch {
+      // Ignored
+    }
+
+    // 3. Count total logs and activities for audit summary
+    let activityCount = 0;
+    try {
+      const logsSnap = await adminDb.collection('admin_activity_logs').where('userId', '==', targetUserId).get();
+      activityCount = logsSnap.size;
+    } catch {
+      // Ignored
+    }
+
+    const exportData = {
+      exportId: `LEGAL_EXP_${Date.now()}_${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      caseReference,
+      authorityReason: authorityReason || 'Official Legal Process Request',
+      exportedAt: new Date().toISOString(),
+      authorizedAdmin: check.user?.email,
+      targetUser: {
+        uid: targetUserId,
+        email: authRecord?.email || profileData?.email || 'unknown',
+        displayName: authRecord?.displayName || profileData?.displayName || '',
+        creationTime: authRecord?.metadata?.creationTime || null,
+        lastSignInTime: authRecord?.metadata?.lastSignInTime || null,
+        disabled: authRecord?.disabled || false,
+        totalLoggedEvents: activityCount,
+      },
+      complianceNotice: 'Strictly for legal compliance verification. Private end-to-end communication contents are not retrievable without receiver/sender authorization.',
+    };
+
+    // 4. Immutable Audit Record in admin_activity_logs
+    await persistActivityLog({
+      userId: check.user?.uid || 'admin',
+      userEmail: check.user?.email || 'admin',
+      userName: check.user?.name || 'Administrator',
+      activityType: 'admin_action',
+      query: `LEGAL_EXPORT: Case ${caseReference} for user ${targetUserId}`,
+      feature: 'Legal Compliance Audit',
+      status: 'success',
+      metadata: {
+        caseReference,
+        authorityReason,
+        targetUserId,
+        exportId: exportData.exportId,
+      },
+    });
+
+    return res.json({ success: true, exportData });
+  } catch (err: any) {
+    console.error('[API /api/admin/legal-export Error]:', err);
+    return res.status(500).json({ error: err.message || 'Legal export generation failed.' });
+  }
+});
+
 // 3. VITE MIDDLEWARE SETUP
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {

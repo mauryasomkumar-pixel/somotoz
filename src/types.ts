@@ -69,11 +69,40 @@ export interface JournalEntry {
 
 export interface UserProfile {
   uid: string;
+  username?: string;
   displayName: string | null;
   email: string | null;
   photoURL: string | null;
   phoneNumber?: string | null;
   bio?: string | null;
+  dateOfBirth?: string;
+  isAdult?: boolean;
+  isOnboarded?: boolean;
+  mood?: string;
+  accentColor?: string;
+  accentTheme?: string;
+  theme?: 'white' | 'black' | 'mix';
+  gender?: string;
+  interests?: string[];
+  usernameLastChangedAt?: number;
+  deletionScheduledAt?: number;
+  status?: 'active' | 'scheduled_for_deletion' | 'disabled';
+  isAdmin?: boolean;
+  role?: 'admin' | 'member';
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export type BaseThemeMode = 'auto' | 'day' | 'night' | 'eye-comfort';
+
+export interface PublicUserProfile {
+  uid: string;
+  username: string;
+  photoURL?: string | null;
+  bio?: string;
+  mood?: string;
+  accentColor?: string;
+  isAdult: boolean;
   updatedAt?: number;
 }
 
@@ -87,7 +116,7 @@ export interface UserActivityLog {
   metadata?: Record<string, any>;
 }
 
-export type ViewMode = 'dashboard' | 'chat' | 'somochat' | 'write' | 'view' | 'edit' | 'wisdom' | 'soundscapes' | 'admin';
+export type ViewMode = 'dashboard' | 'chat' | 'somochat' | 'write' | 'view' | 'edit' | 'wisdom' | 'soundscapes' | 'admin' | 'discover' | 'profile';
 
 export type ActivityType = 'ai_query' | 'search' | 'reflection' | 'media_gen' | 'auth' | 'admin_action';
 
@@ -164,6 +193,9 @@ export interface SomoUser {
   customBadge?: string;
   colorTheme?: string;
   isSuspended?: boolean;
+  dateOfBirth?: string;
+  isAdult?: boolean;
+  mood?: string;
 }
 
 export type SomoConnectionStatus = 'none' | 'pending_outgoing' | 'pending_incoming' | 'accepted' | 'blocked';
@@ -269,5 +301,25 @@ export interface SomoChannel {
   lastTimestamp?: number;
 }
 
+export interface SomoReport {
+  id: string;
+  reporterId: string;
+  reporterEmail?: string;
+  reportedUserId: string;
+  reportedUserName?: string;
+  reportedSomoId?: string;
+  reason: 'harassment' | 'spam' | 'inappropriate_content' | 'underage' | 'other';
+  details?: string;
+  timestamp: number;
+  status: 'pending' | 'reviewed' | 'action_taken' | 'dismissed';
+}
 
-
+export interface LegalExportLog {
+  id: string;
+  adminId: string;
+  adminEmail: string;
+  targetUserId: string;
+  caseReference: string;
+  authorityReason: string;
+  timestamp: number;
+}

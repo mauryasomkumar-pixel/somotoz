@@ -201,7 +201,7 @@ export const DynamicWelcomeBanner: React.FC<DynamicWelcomeBannerProps> = ({ user
 
   const resolvedDisplayName = userName && userName.trim().length > 0 
     ? userName 
-    : 'Somkumar Maurya';
+    : 'Somotoz User';
 
   return (
     <motion.div
@@ -311,7 +311,7 @@ export const DynamicWelcomeBanner: React.FC<DynamicWelcomeBannerProps> = ({ user
                 <span>{timeOfDayGreeting} // Active Session</span>
                 <span>•</span>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00F0FF] via-[#A855F7] to-[#FF007A] font-bold">
-                  IIT Madras Data Science &amp; Computational Thinking
+                  Creative &amp; Mindful Workspace
                 </span>
               </div>
               <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight font-display flex items-center flex-wrap gap-x-2">

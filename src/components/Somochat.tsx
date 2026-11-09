@@ -71,6 +71,7 @@ import { SomochatAuthGateway } from './somochat/SomochatAuthGateway';
 import { SomochatRequestsModal } from './somochat/SomochatRequestsModal';
 import { SomochatAdminConsole } from './somochat/SomochatAdminConsole';
 import { SomochatPrivacyModal } from './somochat/SomochatPrivacyModal';
+import { submitUserReportAsync } from '../lib/adminService';
 
 interface SomochatProps {
   currentUser: UserProfile | null;
@@ -106,16 +107,70 @@ export const Somochat: React.FC<SomochatProps> = ({
   // 2. AUTHENTICATION & ACTIVE SESSION STATE
   // ============================================================================
   const [currentAuthUser, setCurrentAuthUser] = useState<SomoRegisteredAccount | null>(() => {
+    if (currentUser) {
+      const userSomoId = `SOMO-${(currentUser.username || currentUser.uid).toUpperCase().slice(0, 14)}`;
+      return {
+        id: currentUser.uid,
+        somoId: userSomoId,
+        name: currentUser.username ? `@${currentUser.username}` : (currentUser.displayName || 'Somotoz User'),
+        username: currentUser.username,
+        email: '', // Never expose real email to peers
+        avatar: currentUser.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${currentUser.uid}`,
+        role: (currentUser.isAdmin || currentUser.role === 'admin') ? 'admin' : 'member',
+        bio: currentUser.bio || 'Mindful Somotoz Member',
+        mood: currentUser.mood || 'peaceful',
+        isAdult: currentUser.isAdult !== false,
+        status: 'online',
+        statusText: currentUser.bio || 'Connecting on Somotoz',
+        publicKey: `pk_${currentUser.uid.slice(0, 8)}`,
+        joinedAt: currentUser.createdAt || Date.now(),
+        passwordHash: '',
+        privacySettings: DEFAULT_PRIVACY_SETTINGS,
+      };
+    }
     const saved = localStorage.getItem('somotoz_current_somo_auth');
     if (saved) {
       try {
         return JSON.parse(saved);
       } catch (e) {}
     }
-    // Default to Som Maurya (Master Admin) if user is logged in
-    const defaultAdmin = INITIAL_REGISTERED_ACCOUNTS.find((a) => a.somoId === 'SOMO-SOM-001') || INITIAL_REGISTERED_ACCOUNTS[0];
-    return defaultAdmin;
+    return null;
   });
+
+  // Automatically keep currentAuthUser synchronized with saved profile
+  useEffect(() => {
+    if (currentUser) {
+      const userSomoId = `SOMO-${(currentUser.username || currentUser.uid).toUpperCase().slice(0, 14)}`;
+      const acc: SomoRegisteredAccount = {
+        id: currentUser.uid,
+        somoId: userSomoId,
+        name: currentUser.username ? `@${currentUser.username}` : (currentUser.displayName || 'Somotoz User'),
+        username: currentUser.username,
+        email: '', // Never expose real email to peers
+        avatar: currentUser.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${currentUser.uid}`,
+        role: (currentUser.isAdmin || currentUser.role === 'admin') ? 'admin' : 'member',
+        bio: currentUser.bio || 'Mindful Somotoz Member',
+        mood: currentUser.mood || 'peaceful',
+        isAdult: currentUser.isAdult !== false,
+        status: 'online',
+        statusText: currentUser.bio || 'Connecting on Somotoz',
+        publicKey: `pk_${currentUser.uid.slice(0, 8)}`,
+        joinedAt: currentUser.createdAt || Date.now(),
+        passwordHash: '',
+        privacySettings: DEFAULT_PRIVACY_SETTINGS,
+      };
+      setCurrentAuthUser(acc);
+      setRegisteredAccounts((prev) => {
+        const idx = prev.findIndex((a) => a.somoId === userSomoId);
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = { ...updated[idx], ...acc };
+          return updated;
+        }
+        return [acc, ...prev];
+      });
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     if (currentAuthUser) {
@@ -205,6 +260,12 @@ export const Somochat: React.FC<SomochatProps> = ({
   const directory: SomoUser[] = useMemo(() => {
     return registeredAccounts.map(({ passwordHash, privacySettings, subAdminPermissions, ...user }) => user);
   }, [registeredAccounts]);
+
+  // User Report Modal State (Rule 4: Users can block and report anyone)
+  const [reportingPeer, setReportingPeer] = useState<SomoUser | null>(null);
+  const [reportReason, setReportReason] = useState<'harassment' | 'spam' | 'inappropriate_content' | 'underage' | 'other'>('harassment');
+  const [reportDetails, setReportDetails] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
   // ============================================================================
   // 4. MESSAGES STORE & SERVER-SIDE CIPHER REPOSITORY
@@ -634,25 +695,21 @@ export const Somochat: React.FC<SomochatProps> = ({
     });
   }, [directory, currentAuthUser, chatRequests]);
 
-  // If user is not authenticated in Somochat, show the Gateway
+  // Loading skeleton while profile loads - SomoChat opens directly with saved profile
   if (!currentAuthUser) {
     return (
-      <SomochatAuthGateway
-        onLoginSuccess={(account) => {
-          setCurrentAuthUser(account);
-          setRegisteredAccounts((prev) => {
-            if (!prev.some((a) => a.somoId === account.somoId)) {
-              return [...prev, account];
-            }
-            return prev;
-          });
-        }}
-        registeredAccounts={registeredAccounts}
-        onRegisterAccount={(newAcc) => {
-          setRegisteredAccounts((prev) => [...prev, newAcc]);
-        }}
-        onShowToast={onShowToast}
-      />
+      <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-4 font-sans select-none min-h-[400px]">
+        <div className="w-14 h-14 rounded-3xl bg-[var(--accent-color)]/15 text-[var(--accent-color)] flex items-center justify-center animate-pulse shadow-sm">
+          <MessageSquare className="w-7 h-7" />
+        </div>
+        <div className="text-center space-y-1">
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">Loading your chat profile</h3>
+          <p className="text-xs text-[var(--text-secondary)]">Connecting to safe, encrypted conversations...</p>
+        </div>
+        <div className="w-48 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+          <div className="h-full bg-[var(--accent-color)] w-2/3 animate-pulse rounded-full" />
+        </div>
+      </div>
     );
   }
 
@@ -1016,9 +1073,22 @@ export const Somochat: React.FC<SomochatProps> = ({
                 ) : null}
               </div>
 
-              {/* Peer Actions Menu */}
+              {/* Peer Actions Menu (Block and Report) */}
               {activePeer && (
                 <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportingPeer(activePeer);
+                      setReportReason('harassment');
+                      setReportDetails('');
+                    }}
+                    className="px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-colors"
+                    title={`Report ${activePeer.name}`}
+                  >
+                    <AlertTriangle className="w-3 h-3" />
+                    <span>Report</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -1781,6 +1851,111 @@ export const Somochat: React.FC<SomochatProps> = ({
                     </p>
                   </div>
                 )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* MODAL 6: REPORT USER                                                      */}
+      {/* ========================================================================= */}
+      <AnimatePresence>
+        {reportingPeer && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-5 shadow-2xl relative"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2 text-amber-400">
+                  <AlertTriangle className="w-5 h-5" />
+                  <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                    Report {reportingPeer.name}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReportingPeer(null)}
+                  className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-xs text-[var(--text-secondary)] mb-4 leading-relaxed">
+                We take user safety seriously. Reports are sent directly to the Somotoz moderation team for review.
+              </p>
+
+              <div className="space-y-3 mb-5">
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
+                    Reason *
+                  </label>
+                  <select
+                    value={reportReason}
+                    onChange={(e) => setReportReason(e.target.value as any)}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] outline-none"
+                  >
+                    <option value="harassment">Harassment or bullying</option>
+                    <option value="spam">Spam or unwanted advertising</option>
+                    <option value="inappropriate_content">Inappropriate content</option>
+                    <option value="underage">Underage user (under 18)</option>
+                    <option value="other">Other safety concern</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
+                    Additional Details (Optional)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={reportDetails}
+                    onChange={(e) => setReportDetails(e.target.value)}
+                    placeholder="Provide details to help our team investigate..."
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl p-2.5 text-xs text-[var(--text-primary)] outline-none resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setReportingPeer(null)}
+                  className="flex-1 py-2 rounded-xl border border-[var(--border-color)] text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-input)] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmittingReport}
+                  onClick={async () => {
+                    setIsSubmittingReport(true);
+                    try {
+                      await submitUserReportAsync({
+                        reporterId: currentUser?.uid || 'anonymous',
+                        reporterEmail: currentUser?.email || '',
+                        reportedUserId: reportingPeer.id,
+                        reportedUserName: reportingPeer.name,
+                        reportedSomoId: reportingPeer.somoId,
+                        reason: reportReason,
+                        details: reportDetails,
+                      });
+                      onShowToast('success', 'Report Submitted', 'Thank you for letting us know. Our team will review this report.');
+                      setReportingPeer(null);
+                    } catch (e: any) {
+                      onShowToast('error', 'Report Error', e.message || 'Could not submit report.');
+                    } finally {
+                      setIsSubmittingReport(false);
+                    }
+                  }}
+                  className="flex-1 py-2 rounded-xl bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingReport ? 'Submitting...' : 'Submit Report'}
+                </button>
               </div>
             </motion.div>
           </div>

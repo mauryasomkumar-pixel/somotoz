@@ -212,10 +212,10 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = () => {
       )}
 
       {/* Featured Topics Section */}
-      <div className="space-y-3 font-mono">
+      <div className="space-y-3 font-sans">
         <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-2">
-          <BookOpen className="w-3.5 h-3.5 text-[#A855F7]" />
-          <span>Curated Cognitive Explorations</span>
+          <BookOpen className="w-3.5 h-3.5 text-[var(--accent-color)]" />
+          <span>Featured Topics</span>
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -228,34 +228,34 @@ export const WisdomExplorer: React.FC<WisdomExplorerProps> = () => {
               <button
                 key={index}
                 onClick={() => handleSearch(topic.query)}
-                className="p-5 bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--border-active)] text-left transition-all duration-300 cursor-pointer clip-cyber-card hover:translate-y-[-2px] group flex flex-col justify-between shadow-xs"
+                className="p-5 bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--border-active)] text-left transition-all duration-300 cursor-pointer rounded-2xl hover:translate-y-[-2px] group flex flex-col justify-between shadow-xs"
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span
-                      className="text-[10px] font-mono px-2 py-0.5 bg-[var(--bg-secondary)] border clip-badge-poly font-bold"
+                      className="text-[10px] px-2 py-0.5 bg-[var(--bg-secondary)] border rounded-md font-bold"
                       style={{ color: accentColor, borderColor: `${accentColor}60` }}
                     >
                       {topic.category}
                     </span>
                     <div
-                      className="p-1.5 bg-[var(--bg-secondary)] border text-[var(--text-primary)] transition-all clip-badge-poly group-hover:scale-110"
+                      className="p-1.5 bg-[var(--bg-secondary)] border text-[var(--text-primary)] transition-all rounded-lg group-hover:scale-110"
                       style={{ borderColor: accentColor, color: accentColor }}
                     >
                       <Icon className="w-3.5 h-3.5" />
                     </div>
                   </div>
-                  <h4 className="text-xs sm:text-sm font-bold text-[var(--text-primary)] group-hover:text-[var(--border-active)] transition-colors font-mono">
+                  <h4 className="text-xs sm:text-sm font-bold text-[var(--text-primary)] group-hover:text-[var(--border-active)] transition-colors">
                     {topic.title}
                   </h4>
-                  <p className="text-[11px] text-[var(--text-secondary)] mt-1 line-clamp-2 font-sans">
+                  <p className="text-[11px] text-[var(--text-secondary)] mt-1 line-clamp-2">
                     {topic.query}
                   </p>
                 </div>
 
-                <div className="pt-3 mt-2 flex items-center justify-between text-[10px] text-[var(--text-muted)] group-hover:text-[var(--border-active)]">
-                  <span>Explore Heuristic</span>
-                  <ArrowRight className="w-3 h-3 group-hover:translate-x-1.5 transition-transform text-[var(--border-active)]" />
+                <div className="pt-3 mt-2 flex items-center justify-between text-[11px] text-[var(--text-muted)] group-hover:text-[var(--border-active)]">
+                  <span>Explore topic</span>
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform text-[var(--border-active)]" />
                 </div>
               </button>
             );

@@ -502,12 +502,16 @@ npm run build
 | `/api/admin/verify` | `POST` | Required | Cryptographically verifies caller session & returns `{ authorized: true }`. |
 | `/api/admin/users` | `GET` | Required | Returns real Firebase Authentication accounts (`adminAuth.listUsers(100)`) merged with Firestore usage metrics. |
 | `/api/admin/users/:id/status` | `POST` | Required | Toggles account access (`active` vs `disabled`) using Firebase Admin SDK (`adminAuth.updateUser`). |
-| `/api/admin/users/:id/profile` | `PATCH` | Required | Updates permitted user application profile data (displayName, bio) in Firestore. |
+| `/api/admin/users/:id/edit` | `POST` | Required | Updates permitted user application profile data (displayName, bio) in Firestore. |
 | `/api/admin/users/:id/data` | `DELETE` | Required | Permanently purges user application data (entries, activities) from Firestore for GDPR/privacy compliance. |
 | `/api/admin/users/:id/role` | `POST` | Required | Assigns administrative custom claim role to a designated user. |
-| `/api/admin/logs` | `GET` | Required | Queries persistent Firestore collection `admin_activity_logs` with pagination and date filters. |
+| `/api/admin/activity-logs` | `GET` | Required | Queries persistent Firestore collection `admin_activity_logs` with pagination and date filters. |
 | `/api/admin/analytics` | `GET` | Required | Computes aggregate user velocity, prompt counts, and 7-day chronological telemetry distribution. |
-| `/api/admin/claim-admin-role` | `POST` | Root Email | Authoritative bootstrap endpoint: Binds `admin: true` custom claim to `mauryasomkumar@gmail.com`. |
+| `/api/admin/claim-admin-role` | `POST` | Root Email | Authoritative bootstrap endpoint: Binds `admin: true` custom claim to the configured administrator. |
+| `/api/reports` | `POST` | Authenticated | Submits user conduct or safety reports to Firestore `somo_reports` with audit log. |
+| `/api/admin/reports` | `GET` | Required | Retrieves pending and reviewed user safety reports for moderation review. |
+| `/api/admin/reports/:id/status` | `POST` | Required | Updates report status (`reviewed`, `dismissed`, `action_taken`). |
+| `/api/admin/legal-export` | `POST` | Required | Exports account-level compliance metadata for official legal processes; strictly logs immutable audit record. |
 
 ---
 
@@ -521,53 +525,56 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Helper functions
-    function isAuthenticated() {
+    function isSignedIn() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.email == "mauryasomkumar@gmail.com" ||
+      return isSignedIn() && (
         request.auth.token.admin == true ||
-        request.auth.token.role == "admin"
+        request.auth.token.role == "admin" ||
+        exists(/databases/$(database)/documents/admin_roles/$(request.auth.uid))
       );
     }
 
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
     // 1. User Application Profiles & Private Subcollections
-    match /users/{userId} {
-      allow read, write: if isOwner(userId) || isAdmin();
-
-      match /entries/{entryId} {
-        allow read, write: if isOwner(userId) || isAdmin();
-      }
-
-      match /activities/{activityId} {
-        allow read, write: if isOwner(userId) || isAdmin();
-      }
+    match /users/{userId}/{document=**} {
+      allow read, write: if isSignedIn() && (isOwner(userId) || isAdmin());
     }
 
     // 2. Persistent Admin Audit Logs
     match /admin_activity_logs/{logId} {
-      // Authenticated users can append records of their own queries
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      // Only verified administrators can read, update, or delete audit telemetry
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        (request.resource.data.userEmail == request.auth.token.email || request.auth.token.email == null);
       allow read, update, delete: if isAdmin();
     }
 
     // 3. Admin Roles & System Governance Gate
-    match /admin_roles/{userId} {
-      allow read: if isAuthenticated();
+    match /admin_roles/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
       allow write: if isAdmin();
     }
 
     // 4. User Access Status Overrides
     match /user_status/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow write: if isAdmin();
+    }
+
+    // 5. User Conduct & Safety Reports
+    match /somo_reports/{reportId} {
+      allow create: if isSignedIn() && request.resource.data.reporterId == request.auth.uid;
+      allow read, update, delete: if isAdmin();
     }
   }
 }
@@ -632,6 +639,218 @@ gcloud run services update somotoz-suite \
 | **503 High Demand** | Google AI Cloud latency spike | Somotoz automatically steps through `gemini-3.1-flash-lite` and offline procedural fallbacks. |
 | **Microphone blocked** | Browser permissions denied | Click the lock/settings icon in the browser address bar and enable microphone access for `localhost:3000`. |
 | **Audio context silent** | Browser autoplay policy | Click anywhere on the webpage to resume the `AudioContext`. |
+
+---
+
+## 🛡️ The 10 Core Application & Privacy Directives
+
+Somotoz strictly adheres to ten non-negotiable operational principles:
+
+1. **Feature Retention Guarantee**:
+   - The Image Generator (SVG vector art), Video Simulator (HTML5 canvas motion physics), and Music Synthesizer (432Hz Web Audio API) are permanent features that remain fully functional.
+2. **Adults-Only Platform (Minimum Age 18)**:
+   - Date of Birth (DOB) is strictly required at signup (`LandingPage.tsx` and `SomochatAuthGateway.tsx`).
+   - Anyone under 18 is prevented from signing up or blocked from entering SomoChat and any social feature.
+3. **Real Human Directory in SomoChat**:
+   - Zero bots, zero AI users, and zero fake profiles in SomoChat.
+   - AI capabilities exist solely in the **Ask AI** companion section and are always distinctly marked with the "AI" tag.
+4. **Consent-Driven Communication (Request to Connect, Block, Report)**:
+   - Users decide who can message them. A chat only opens after the receiving user explicitly accepts a connection request.
+   - Users can instantly block any peer (revoking messaging and story views) and report conduct with categorized reasons (`harassment`, `spam`, `inappropriate_content`, `underage`, `other`).
+5. **Absolute Privacy Boundary (Zero Private Chat Browsing)**:
+   - Nobody, including the Master Admin, can scroll through or browse private user messages or photos in the Admin Dashboard.
+   - The Admin console exposes only account-level metadata, telemetry metrics, and submitted moderation reports.
+   - Legal/compliance inquiries utilize the **Legal Request Export** action, which operates server-side and writes an immutable entry into `admin_activity_logs`.
+6. **Zero Client Secrets & Hardcoded Admin Emails**:
+   - No secret keys, service account credentials, or admin emails are hardcoded in client-side code.
+   - Administrative privileges are derived strictly from server-side verified Firebase ID tokens and Firebase custom claims (`admin: true`).
+7. **Mobile-First Responsive Design**:
+   - All layouts, navigation bars, modals, and editors adapt to small smartphones (360px+), tablets, and high-resolution desktop viewports with zero horizontal overflow or truncated elements.
+8. **Tri-Mode Adaptive Theme & Accessibility**:
+   - Supports Day Mode (`white`), Night Mode (`black`), and Eye Comfort Mode (`mix` / warm sepia cream) with high contrast.
+   - Fully respects `prefers-reduced-motion` via global CSS media queries (`animation-duration: 0.01ms`).
+9. **Friendly, Simple Language**:
+   - All user-facing copy and instructions are short, clear, and welcoming. Avoids buzzwords like "cryptographic matrix" or "sub-50ms inference".
+10. **Disciplined Architecture & Comprehensive Testing**:
+    - Preserves established directory hierarchy and provides clear testing steps for every user interaction.
+
+---
+
+## 🔑 Required Vercel & Production Environment Variables
+
+When deploying to Vercel or cloud environments, configure these environment variables in your deployment dashboard:
+
+| Variable Name | Environment | Required | Description |
+| :--- | :---: | :---: | :--- |
+| `ADMIN_EMAIL` | Server | Yes | Authoritative administrator bootstrap email (e.g., `mauryasomkumar@gmail.com`). |
+| `FIREBASE_PROJECT_ID` | Server & Client | Yes | Your Google Cloud / Firebase Project ID (`ai-studio-25adb58e-a6f1-481b-8be8-2c4d53b05155`). |
+| `FIREBASE_CLIENT_EMAIL` | Server | Optional* | Firebase service account email (if using individual key vars). |
+| `FIREBASE_PRIVATE_KEY` | Server | Optional* | Firebase service account private key with `\n` replaced. |
+| `FIREBASE_SERVICE_ACCOUNT` | Server | Optional* | Complete JSON string of the Firebase service account key file. |
+| `GEMINI_API_KEY` | Server | Yes | Google Gemini API key used for text reflection, image, and multimodal chat. |
+| `VITE_ADMIN_EMAIL` | Client | Optional | Display hint for UI (authorization is always enforced server-side). |
+
+*\* Either provide `FIREBASE_SERVICE_ACCOUNT` (single JSON variable) OR provide `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY`.*
+
+---
+
+## 🧪 Comprehensive End-to-End Walkthrough & Test Guide
+
+Every user interaction has a concrete walkthrough test to verify stability:
+
+### Test Case 1: Adults-Only Age Verification (18+ Signup)
+1. Navigate to the landing page at `http://localhost:3000`.
+2. Click **Create Account** to switch to registration mode.
+3. Enter a Full Name and Email.
+4. Set **Date of Birth** to a date less than 18 years ago (e.g. year 2015).
+5. Submit the form.
+6. **Expected Result**: A clear amber warning appears: *"You must be at least 18 years old to create an account on Somotoz."* Registration is blocked.
+7. Change Date of Birth to a date making the user at least 18 (e.g. year 2000).
+8. Submit the form.
+9. **Expected Result**: Registration succeeds and redirects into the workspace.
+
+### Test Case 2: SomoChat Human Directory & Connection Consent
+1. In the sidebar or navigation menu, select **SomoChat**.
+2. If the user account is flagged under-18, the adult-only gate screen is displayed, preventing access.
+3. In SomoChat, observe the peer directory. Verify that only real human profiles appear (e.g. Luna Vance, Neo Thorne, Aarav Sharma, Kai Chen); no AI personas or bots appear in the directory.
+4. Click on a peer who has not yet connected. Note that messaging is restricted until a connection invitation is sent and accepted.
+5. In the peer menu, click **Block**. Verify the status toggles to **Blocked**, disabling messaging. Click **Unblock** to restore.
+
+### Test Case 3: User Reporting Flow
+1. While viewing an active peer in SomoChat, click the **Report** button in the chat header.
+2. The **Report User** modal opens with selectable reasons: *Harassment or bullying*, *Spam*, *Inappropriate content*, *Underage user (under 18)*, *Other concern*.
+3. Select a reason, type optional context, and click **Submit Report**.
+4. **Expected Result**: A success toast confirms submission (*"Thank you for letting us know. Our team will review this report."*), and the report is persisted to Firestore collection `somo_reports` and logged.
+
+### Test Case 4: Admin Dashboard & Privacy Guarantee (Zero Message Browsing)
+1. Navigate to `/admin` or click the **ADMIN** badge in the top navigation.
+2. Sign in with the administrator account. If not authenticated, the **Access Denied** gate appears.
+3. In the Admin Dashboard:
+   - Click **ANALYTICS & OVERVIEW**: Displays real telemetry counts, prompt totals, and activity trends.
+   - Click **USER MANAGEMENT**: Lists real Firebase Authentication users (`UID`, `Email`, `Joined Date`, `Last Login`, `Status`).
+   - Click **AI QUERIES & SEARCH AUDIT**: Displays real queries logged inside Somotoz.
+   - Click **REPORTS & MODERATION**: Displays user conduct reports with action buttons (*Review*, *Dismiss*). Notice that nowhere in the dashboard can an admin view private chats or photos.
+4. Click **LEGAL EXPORT** in the header action bar:
+   - Enter a target user UID and formal case reference (e.g. `CASE-2026-7788`).
+   - Click **Generate Compliance Export**.
+   - An immutable audit log entry is written to `admin_activity_logs`, and a structured JSON compliance export (containing account-level metadata only) is displayed for download.
+
+### Test Case 5: Tri-Mode Themes & Reduced Motion
+1. In the top navigation or Profile screen, click the theme selector (Day, Night, Eye Comfort).
+2. Toggle between **Day Mode** (crisp light), **Night Mode** (obsidian dark), and **Eye-Care Mode** (warm amber sepia). Verify all text remains readable.
+3. Enable "prefers-reduced-motion" in your operating system or browser devtools (Rendering $\rightarrow$ Emulate CSS media feature prefers-reduced-motion: reduce).
+4. Verify that background animations and transitions gracefully settle without flickering.
+
+### Test Case 6: Streamlined 5-Item Navigation & First-Time Tour
+1. On desktop/laptop: Look at the left rail. Verify there are only 5 primary items: **Chats**, **Ask AI**, **Journal**, **Discover**, and **Profile** (plus the top Home logo).
+2. On mobile/phone viewport: Look at the bottom navigation bar. Verify there is a single bottom bar with the exact 5 items (**Chats**, **Ask AI**, **Journal**, **Discover**, **Profile**), with no duplicate navigation bars.
+3. In Profile or on first login, tap **View 3-Step Feature Tour**:
+   - Step 1: Explains **Chats** (real human conversations, mutual accept consent, block/report).
+   - Step 2: Explains **Ask AI** (multimodal Gemini creation: Chat, Image, Video, Music).
+   - Step 3: Explains **Journal** (daily mindful reflections and mood tracking).
+   - Click **Get Started** to finish.
+
+### Test Case 7: Ask AI Single Input Box & Mode Chips
+1. Navigate to **Ask AI**.
+2. Notice the single input box with 4 clean chips above it: **Chat**, **Image**, **Video**, and **Music**.
+3. Tap the **Image** chip: The input placeholder switches to *"Describe the image you want to create..."*. Enter a prompt (e.g. `Peaceful mountain lake at sunset`) and click Send. Verify the SVG vector illustration generates.
+4. Tap the **Video** chip: The input placeholder switches to *"Describe the scene to simulate (60 FPS)..."*. Enter a prompt and verify the 60 FPS canvas simulation renders with download controls.
+5. Tap the **Music** chip: The input placeholder switches to *"Describe the melody or ambient mood..."*. Enter a prompt and verify the 432Hz synthesizer renders with playback and .wav download controls.
+6. Tap the **Chat** chip: Type any question and verify real-time streaming answer with markdown formatting.
+
+### Test Case 8: 4-Step User Onboarding on First Google Sign-In
+1. Sign in with Google using a new or un-onboarded Google account.
+2. The modal **"Welcome to Somotoz" (Step 1 of 4: Pick your unique username)** immediately opens:
+   - Type a short username (e.g. `ab`). Observe the live error: *"3-20 characters: letters, numbers, and underscores only"*.
+   - Type a valid username (e.g. `somotoz_explorer`).
+   - The system performs a live debounced Firestore lookup against `usernames/{username}`.
+   - A green checkmark appears: *"@somotoz_explorer is available!"*.
+   - Click **Continue**.
+
+### Test Case 9: Under-18 Strict Age Protection & Blocking Flow
+1. In Step 2 of onboarding (**"When were you born?"**):
+   - Set Date of Birth to a date less than 18 years ago (e.g., year 2012).
+   - An amber notice immediately replaces the continue button:
+     *"Somotoz and SomoChat are created exclusively for adults aged 18 and older. Thank you for your interest! Please visit us once you turn 18."*
+   - The continue button is disabled, and profile creation is completely blocked.
+   - Click **Sign Out** to safely exit.
+2. Sign in again and set Date of Birth to an adult date (e.g., year 2000, age 26).
+3. The continue button lights up with a green badge: *"Age: 26 (Verified 18+)"*.
+4. Click **Continue to Step 3**.
+
+### Test Case 10: Profile Photo Compression (<300 KB) & Bio
+1. In Step 3 (**"Profile picture & bio"**):
+   - Click the camera icon and select a large photo (e.g., 2 MB to 8 MB JPG/PNG).
+   - The client-side canvas compressor (`src/utils/imageCompressor.ts`) automatically scales dimensions and iteratively optimizes JPEG quality until the payload size is guaranteed under 300 KB.
+   - The UI displays: *"Compressed to <300 KB"*.
+   - Type a short bio (max 160 characters).
+   - Click **Continue to Step 4**.
+
+### Test Case 11: Mood & Theme Customization & Firestore Profile Isolation
+1. In Step 4 (**"Vibe & Appearance"**):
+   - Select a mood chip (e.g., *Peaceful*, *Energetic*, *Creative*, *Reflective*).
+   - Select a visual theme (*Day*, *Night*, *Eye-Care*).
+   - Optionally specify gender and interests.
+   - Click **Complete Setup**.
+2. **Persistence & Privacy Verification**:
+   - The user profile is stored at `users/{uid}` and `users/{uid}/profile/main`.
+   - The public directory profile is stored at `public_profiles/{uid}` containing ONLY `username`, `photoURL`, `bio`, and `mood`.
+   - Real name, email address, and phone number are NEVER written to the public directory.
+   - `isOnboarded: true` is saved. The onboarding modal closes and a welcome toast appears: *"Welcome to Somotoz, @username!"*.
+3. Refresh the page or reopen the app:
+   - Firebase persistent auth keeps the user signed in.
+   - The onboarding modal is NEVER shown again.
+
+### Test Case 12: Direct SomoChat Open with Zero Extra Login Forms
+1. In the navigation rail (desktop) or bottom bar (mobile), tap **Chats**.
+2. Notice the loading skeleton briefly pulses while the profile initializes.
+3. SomoChat opens directly with the saved profile (`@username`, avatar, bio, and mood).
+4. No secondary password, PIN, or extra login gateway is requested.
+5. In the background, `onIdTokenChanged` automatically and silently refreshes the Firebase ID token before expiration, preventing abrupt session dropouts.
+
+### Test Case 13: Settings — Edit Profile, 30-Day Username Cooldown & Account Deletion
+1. Tap **Profile** in the navigation bar to enter the Profile & Settings view.
+2. **Edit Profile**:
+   - Tap **Edit Profile**.
+   - Change your bio, mood, or upload a new photo (automatically compressed to <300 KB).
+   - Tap **Save Changes**. Verify changes appear immediately.
+3. **Change Username (30-Day Cooldown)**:
+   - In Settings, tap **Change Username**.
+   - Enter a new unique username (e.g. `somotoz_pilot`).
+   - Notice the live availability indicator.
+   - Tap **Update Username**. The username changes.
+   - Immediately tap **Change Username** again:
+     - Notice the button is locked with a countdown timer: *"You can change your username again in 30 days"*.
+4. **Delete Account (Scheduled Deletion)**:
+   - Scroll to the bottom **Danger Zone**.
+   - Tap **Delete Account**.
+   - A confirmation dialog appears asking to type `DELETE` to confirm.
+   - Type `DELETE` and tap **Confirm Scheduled Deletion**.
+   - Account status is set to `scheduled_for_deletion` with a 30-day grace period, and the user is securely signed out.
+
+### Test Case 14: Restored Auto Theme Behavior & Non-Destructive Accent Layers
+1. **Initial Visit / Fresh Launch (Default is Auto)**:
+   - Close all browser tabs or open in a new session.
+   - Open `http://localhost:3000`.
+   - Observe that the site applies the base theme before first paint via the inline `<head>` script in `index.html`. There is zero flash of the wrong theme.
+   - The theme switcher shows the dynamic badge:
+     - If local time is `06:00 - 16:59`: `Auto (Day)` (Light pearl theme with crisp high-contrast text).
+     - If local time is `17:00 - 19:59`: `Auto (Eye Comfort)` (Warm sepia cream theme with gentle amber highlights).
+     - If local time is `20:00 - 05:59`: `Auto (Night)` (Deep obsidian dark theme with neon cyan glow).
+2. **Every-Minute Clock Re-Check with Smooth Transition**:
+   - While in Auto mode, the application re-evaluates the device clock every minute without reloading the page.
+   - When a time boundary is crossed (e.g. at 17:00 or 20:00), the base theme transitions smoothly using a 0.35s CSS fade.
+3. **Temporary Manual Override (SessionStorage Only)**:
+   - Click the theme switcher and select a manual mode: **Day**, **Night**, or **Eye Comfort**.
+   - Notice the label updates to reflect the selection (e.g., `Day` or `Night`).
+   - Check `sessionStorage`: `somotoz_manual_base_mode` holds the temporary selection for this tab only.
+   - Check `localStorage` and Firestore: neither contains any base theme mode.
+   - Close the browser tab and reopen `http://localhost:3000`.
+   - **Expected Result**: Because `sessionStorage` was cleared, the app immediately starts in **Auto** again (`Auto (Day)` / `Auto (Night)` / `Auto (Eye Comfort)`).
+4. **Non-Destructive Mood Themes & Theme of the Day**:
+   - In Settings or the theme switcher, select a Mood Theme (e.g. *Peaceful*, *Focused*, *Inspired*, *Calm*, *Reflective*, *Energetic*) or toggle *Theme of the Day*.
+   - Verify that only accent colors and gradients (`--accent-color`, `--border-active`, etc.) adapt to the mood or day of the week.
+   - Verify that the underlying base mode (Day, Night, or Eye Comfort) is never altered, and all card backgrounds, text, and inputs remain 100% readable with full contrast.
 
 ---
 

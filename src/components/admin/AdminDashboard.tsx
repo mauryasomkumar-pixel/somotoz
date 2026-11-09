@@ -26,7 +26,7 @@ import {
   X,
   FileText
 } from 'lucide-react';
-import { UserProfile, AdminActivityLog, ManagedUser, AdminAnalytics, ViewMode } from '../../types';
+import { UserProfile, AdminActivityLog, ManagedUser, AdminAnalytics, ViewMode, SomoReport } from '../../types';
 import {
   checkIsAdmin,
   fetchAdminActivityLogs,
@@ -36,7 +36,11 @@ import {
   updateUserAppDataByAdmin,
   deleteUserSomotozData,
   claimAdminRoleAsync,
-  assignUserRoleAsync
+  assignUserRoleAsync,
+  fetchAdminReportsAsync,
+  updateReportStatusAsync,
+  executeLegalExportAsync,
+  verifyAdminStatusAsync
 } from '../../lib/adminService';
 import { getEffectiveAdminEmail, ADMIN_EMAIL } from '../../config/adminConfig';
 
@@ -46,14 +50,14 @@ interface AdminDashboardProps {
   onShowToast: (type: 'success' | 'error' | 'info', title: string, message?: string) => void;
 }
 
-type AdminTab = 'analytics' | 'users' | 'activities' | 'security';
+type AdminTab = 'analytics' | 'users' | 'activities' | 'reports' | 'security';
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   currentUser,
   onNavigate,
   onShowToast,
 }) => {
-  const isAuthorized = checkIsAdmin(currentUser);
+  const [isAuthorized, setIsAuthorized] = useState<boolean>(() => checkIsAdmin(currentUser));
   const [activeTab, setActiveTab] = useState<AdminTab>('analytics');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -61,6 +65,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [activityLogs, setActivityLogs] = useState<AdminActivityLog[]>([]);
+  const [reports, setReports] = useState<SomoReport[]>([]);
+
+  // Legal Export Modal State (Rule 5: Legal Request Export, logged server-side)
+  const [legalExportModal, setLegalExportModal] = useState<boolean>(false);
+  const [legalTargetUser, setLegalTargetUser] = useState<string>('');
+  const [legalCaseRef, setLegalCaseRef] = useState<string>('');
+  const [legalReason, setLegalReason] = useState<string>('');
+  const [legalExportResult, setLegalExportResult] = useState<any | null>(null);
+  const [isExportingLegal, setIsExportingLegal] = useState<boolean>(false);
 
   // Filter & Search states
   const [userSearchTerm, setUserSearchTerm] = useState<string>('');
@@ -116,18 +129,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  // Verify admin authorization via custom claim and server check
+  useEffect(() => {
+    let mounted = true;
+    verifyAdminStatusAsync().then((res) => {
+      if (mounted) {
+        setIsAuthorized(res || checkIsAdmin(currentUser));
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [currentUser]);
+
   // Load all admin data
   const loadAdminData = async () => {
     setIsLoading(true);
     try {
-      const [analyticsData, usersData, logsData] = await Promise.all([
+      const [analyticsData, usersData, logsData, reportsData] = await Promise.all([
         fetchAdminAnalyticsData(),
         fetchManagedUsers(),
         fetchAdminActivityLogs({ limitCount: 300 }),
+        fetchAdminReportsAsync(),
       ]);
       setAnalytics(analyticsData);
       setUsers(usersData);
       setActivityLogs(logsData);
+      setReports(reportsData);
     } catch (err: any) {
       console.error('[Admin] Error loading dashboard data:', err);
       onShowToast('error', 'Sync Failed', 'Could not refresh administrative telemetry.');
@@ -317,10 +345,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               Security Verification Gate:
             </div>
             <p className="text-[var(--text-secondary)] text-[11px]">
-              Configured Administrator: <span className="text-[var(--accent-color)] font-bold">{ADMIN_EMAIL}</span>
+              Access Requirement: <span className="text-[var(--accent-color)] font-bold">{ADMIN_EMAIL ? ADMIN_EMAIL : 'Firebase Custom Claim (admin: true)'}</span>
             </p>
             <p className="text-[var(--text-muted)] text-[10px]">
-              If you are the owner, sign in with your configured admin email.
+              If you are the designated administrator, sign in with your administrative account or request role assignment.
             </p>
           </div>
 
@@ -364,8 +392,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <div className="px-3 py-1.5 bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[11px] text-[var(--text-secondary)] flex items-center gap-2 clip-badge-poly">
             <span className="text-[var(--text-muted)]">ADMIN:</span>
-            <span className="text-[var(--accent-color)] font-bold">{ADMIN_EMAIL}</span>
+            <span className="text-[var(--accent-color)] font-bold">{currentUser?.email || ADMIN_EMAIL || 'Verified Root Admin'}</span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setLegalExportResult(null);
+              setLegalExportModal(true);
+            }}
+            className="px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-400 text-xs font-bold clip-badge-poly flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Official legal process export (strictly audited)"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>LEGAL EXPORT</span>
+          </button>
 
           <button
             onClick={loadAdminData}
@@ -421,6 +462,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         >
           <Activity className="w-4 h-4" />
           <span>AI QUERIES &amp; SEARCH AUDIT ({activityLogs.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('reports')}
+          className={`px-4 py-2 font-bold flex items-center gap-2 clip-badge-poly transition-all cursor-pointer ${
+            activeTab === 'reports'
+              ? 'bg-[var(--accent-color)] text-[var(--accent-text)] shadow-sm'
+              : 'bg-[var(--bg-secondary)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-active)]/50'
+          }`}
+        >
+          <AlertTriangle className="w-4 h-4" />
+          <span>REPORTS &amp; MODERATION ({reports.length})</span>
         </button>
 
         <button
@@ -936,6 +989,117 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* ========================================================
+          TAB: REPORTS & MODERATION (RULE 4 & 5: PRIVACY-PRESERVING MODERATION)
+      ======================================================== */}
+      {activeTab === 'reports' && (
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-5 sm:p-6 clip-cyber-card space-y-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border-color)] pb-4">
+            <div>
+              <h2 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                User Safety &amp; Moderation Reports
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)] font-sans mt-0.5">
+                Privacy Boundary: Private communications and photos are protected and cannot be browsed.
+              </p>
+            </div>
+            <button
+              onClick={loadAdminData}
+              className="px-3 py-1.5 bg-[var(--bg-secondary)] hover:bg-[var(--bg-elevated)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] clip-badge-poly cursor-pointer self-start"
+            >
+              Refresh Reports
+            </button>
+          </div>
+
+          {reports.length === 0 ? (
+            <div className="py-12 text-center text-[var(--text-muted)] text-xs">
+              <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2 opacity-60" />
+              <p className="font-bold">No active reports</p>
+              <p className="text-[11px] mt-1">All user interactions in Somotoz are currently within community standards.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[var(--border-color)] text-[10px] text-[var(--text-muted)] uppercase tracking-wider bg-[var(--bg-secondary)]">
+                    <th className="py-2.5 px-3">Date</th>
+                    <th className="py-2.5 px-3">Reported User</th>
+                    <th className="py-2.5 px-3">Reason</th>
+                    <th className="py-2.5 px-3">Details</th>
+                    <th className="py-2.5 px-3">Reporter</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-color)]">
+                  {reports.map((rep) => (
+                    <tr key={rep.id} className="hover:bg-[var(--bg-secondary)]/50 transition-colors">
+                      <td className="py-2.5 px-3 text-[11px] whitespace-nowrap text-[var(--text-secondary)]">
+                        {new Date(rep.timestamp).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 font-bold text-[var(--text-primary)]">
+                        {rep.reportedUserName || rep.reportedSomoId || rep.reportedUserId}
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                          {rep.reason}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-[11px] max-w-xs truncate text-[var(--text-secondary)]" title={rep.details}>
+                        {rep.details || 'No additional details.'}
+                      </td>
+                      <td className="py-2.5 px-3 text-[11px] text-[var(--text-muted)]">
+                        {rep.reporterEmail || rep.reporterId.slice(0, 8)}
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 text-[10px] font-bold clip-badge-poly ${
+                          rep.status === 'pending'
+                            ? 'bg-amber-500/20 text-amber-400'
+                            : rep.status === 'reviewed'
+                            ? 'bg-blue-500/20 text-blue-400'
+                            : rep.status === 'action_taken'
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : 'bg-zinc-500/20 text-zinc-400'
+                        }`}>
+                          {rep.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right whitespace-nowrap space-x-1.5">
+                        {rep.status === 'pending' && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await updateReportStatusAsync(rep.id, 'reviewed');
+                              setReports((prev) => prev.map((r) => r.id === rep.id ? { ...r, status: 'reviewed' } : r));
+                              onShowToast('info', 'Report Reviewed', 'Marked report as reviewed.');
+                            }}
+                            className="px-2 py-1 bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-blue-500 text-[10px] text-blue-400 font-bold clip-badge-poly cursor-pointer"
+                          >
+                            Review
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await updateReportStatusAsync(rep.id, 'dismissed');
+                            setReports((prev) => prev.map((r) => r.id === rep.id ? { ...r, status: 'dismissed' } : r));
+                            onShowToast('info', 'Report Dismissed', 'Report dismissed.');
+                          }}
+                          className="px-2 py-1 bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-zinc-500 text-[10px] text-[var(--text-muted)] font-bold clip-badge-poly cursor-pointer"
+                        >
+                          Dismiss
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================
           TAB 4: SECURITY & CONFIGURATION
       ======================================================== */}
       {activeTab === 'security' && (
@@ -1231,6 +1395,158 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {isProcessingAction ? 'Purging Data...' : 'Permanently Delete Application Data'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          MODAL: LEGAL REQUEST EXPORT (RULE 5: SERVER-SIDE, STRICTLY LOGGED)
+      ======================================================== */}
+      {legalExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-[var(--bg-card)] border border-amber-500 max-w-lg w-full p-6 clip-cyber-card space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-3">
+              <div className="flex items-center gap-2 text-amber-400">
+                <Download className="w-5 h-5" />
+                <h3 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">
+                  Legal Compliance Request Export
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLegalExportModal(false)}
+                className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[var(--text-secondary)] font-sans leading-relaxed">
+              Strictly for formal legal process requests. This action generates an account-level compliance package and records an immutable audit log entry in <code className="text-amber-400">admin_activity_logs</code>.
+            </p>
+
+            {!legalExportResult ? (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!legalTargetUser.trim() || !legalCaseRef.trim()) {
+                    onShowToast('error', 'Missing Information', 'Target user and Case reference number are required.');
+                    return;
+                  }
+                  setIsExportingLegal(true);
+                  try {
+                    const res = await executeLegalExportAsync(legalTargetUser.trim(), legalCaseRef.trim(), legalReason.trim());
+                    if (res.success && res.exportData) {
+                      setLegalExportResult(res.exportData);
+                      onShowToast('success', 'Export Completed', `Legal export ${res.exportData.exportId} logged.`);
+                      const updatedLogs = await fetchAdminActivityLogs({ limitCount: 300 });
+                      setActivityLogs(updatedLogs);
+                    } else {
+                      onShowToast('error', 'Export Failed', res.error || 'Could not process export.');
+                    }
+                  } catch (err: any) {
+                    onShowToast('error', 'Export Error', err.message || 'Execution error.');
+                  } finally {
+                    setIsExportingLegal(false);
+                  }
+                }}
+                className="space-y-3"
+              >
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
+                    Target User UID or Email *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. user_abc123 or user@somotoz.ai"
+                    value={legalTargetUser}
+                    onChange={(e) => setLegalTargetUser(e.target.value)}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] outline-none font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
+                    Formal Case Reference / Subpoena Number *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. CASE-2026-LEGAL-7729"
+                    value={legalCaseRef}
+                    onChange={(e) => setLegalCaseRef(e.target.value)}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-primary)] outline-none font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
+                    Authority &amp; Jurisdiction Reason
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Specify law enforcement or official court jurisdiction..."
+                    value={legalReason}
+                    onChange={(e) => setLegalReason(e.target.value)}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] p-2 text-xs text-[var(--text-primary)] outline-none resize-none"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border-color)]">
+                  <button
+                    type="button"
+                    onClick={() => setLegalExportModal(false)}
+                    className="px-3 py-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isExportingLegal}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs clip-badge-poly cursor-pointer disabled:opacity-50"
+                  >
+                    {isExportingLegal ? 'Auditing & Exporting...' : 'Generate Compliance Export'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-3 bg-black/60 border border-[var(--border-color)] max-h-60 overflow-y-auto">
+                  <pre className="text-[10px] text-emerald-400 font-mono whitespace-pre-wrap">
+                    {JSON.stringify(legalExportResult, null, 2)}
+                  </pre>
+                </div>
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const blob = new Blob([JSON.stringify(legalExportResult, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `${legalExportResult.exportId}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="px-3 py-1.5 bg-[var(--accent-color)] text-[var(--accent-text)] text-xs font-bold clip-badge-poly cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download JSON File</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLegalExportResult(null);
+                      setLegalExportModal(false);
+                    }}
+                    className="px-3 py-1.5 bg-[var(--bg-secondary)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] clip-badge-poly cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

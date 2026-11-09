@@ -240,6 +240,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
 
+  // Age verification state (Minimum age 18)
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [ageError, setAgeError] = useState<string | null>(null);
+
   // Floating Label Focus States
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
@@ -251,9 +255,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const portalRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0, isHovered: false });
 
-  // Terminal Decoded Headings with Elite Hackathon Narrative
+  // Terminal Decoded Headings with friendly simple copy
   const decodedHeroTitle = useTerminalDecode('SOMOTOZ AI SUITE', 80, 30);
-  const decodedBadge = useTerminalDecode('SOMOTOZ // COGNITIVE ARCHITECTURE & MULTIMODAL CORE', 40, 20);
+  const decodedBadge = useTerminalDecode('SOMOTOZ // CREATIVE & MINDFUL WORKSPACE', 40, 20);
 
   const handlePortalMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!portalRef.current) return;
@@ -269,6 +273,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     setMousePos((prev) => ({ ...prev, isHovered: false }));
   };
 
+  // Age check helper (Minimum age is 18)
+  const checkAgeIsAtLeast18 = (dob: string): boolean => {
+    if (!dob) return false;
+    const birthDate = new Date(dob);
+    if (isNaN(birthDate.getTime())) return false;
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age >= 18;
+  };
+
   // Filtered Country Codes
   const filteredCountries = useMemo(() => {
     if (!countrySearch.trim()) return COUNTRY_CODES;
@@ -278,17 +296,33 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     );
   }, [countrySearch]);
 
-  // Handle Form Submission with Decryption & Cinematic Success Redirect
+  // Handle Form Submission with Adult Verification
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (authMode === 'register') {
+      if (!dateOfBirth) {
+        setAgeError('Please enter your date of birth. Somotoz is for adults aged 18 and older.');
+        return;
+      }
+      if (!checkAgeIsAtLeast18(dateOfBirth)) {
+        setAgeError('You must be at least 18 years old to create an account on Somotoz.');
+        return;
+      }
+    }
+
+    setAgeError(null);
     const userDisplayName = fullName.trim() || email.split('@')[0] || 'Somotoz User';
     const userEmail = email.trim() || 'user@somotoz.ai';
+    const isAdultUser = authMode === 'register' ? checkAgeIsAtLeast18(dateOfBirth) : true;
     const userProfile: UserProfile = {
       uid: 'user_' + Math.random().toString(36).substring(2, 9),
       displayName: userDisplayName,
       email: userEmail,
       photoURL: null,
+      phoneNumber: phoneNumber ? `${selectedCountry.dial} ${phoneNumber}` : null,
+      dateOfBirth: authMode === 'register' ? dateOfBirth : undefined,
+      isAdult: isAdultUser,
     };
 
     setActiveDecryptedUser(userProfile);
@@ -558,9 +592,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     isLight ? 'text-[#0284C7]' : isMix ? 'text-[#D97706]' : 'text-[#00F0FF]'
                   }`}
                 >
-                  Som Maurya (IIT Madras Data Science &amp; Computational Thinking)
+                  Som Maurya
                 </strong>
-                . An enterprise-grade autonomous cognitive architecture built to obliterate legacy SaaS bottlenecks, featuring sub-50ms neural inference, multi-modal vector generation, real-time 60FPS motion physics simulation, and 432Hz harmonic frequency synthesis.
+                . A mindful, creative workspace for thoughtful journaling, peaceful AI reflections, generative art, and private conversations with friends.
               </p>
 
               {/* Sub-headline */}
@@ -1291,6 +1325,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     </div>
                   )}
 
+                  {ageError && (
+                    <div className="mb-4 p-3 bg-amber-500/15 border border-amber-500 text-amber-500 text-xs font-mono clip-badge-poly flex items-center gap-2">
+                      <span>⚠️</span>
+                      <span>{ageError}</span>
+                    </div>
+                  )}
+
                   {/* Manual Inputs Form with Floating Labels */}
                   <form onSubmit={handleFormSubmit} className="space-y-4 text-left font-sans">
                     {/* Full Name (Only in Register Mode) */}
@@ -1333,6 +1374,54 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                             }`}
                           >
                             Full Name
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Date of Birth (Required for 18+ Verification) */}
+                    {authMode === 'register' && (
+                      <div className="relative">
+                        <div
+                          className={`relative border clip-badge-poly transition-all duration-200 ${
+                            isLight
+                              ? 'bg-white border-[#CBD5E1] focus-within:border-[#0284C7]'
+                              : isMix
+                              ? 'bg-[#FFFDF9] border-[#D8CEBF] focus-within:border-[#D97706]'
+                              : 'bg-black border-[#252538] focus-within:border-[#00F0FF]'
+                          }`}
+                        >
+                          <input
+                            id="dateOfBirth"
+                            type="date"
+                            value={dateOfBirth}
+                            onChange={(e) => {
+                              setDateOfBirth(e.target.value);
+                              setAgeError(null);
+                            }}
+                            onFocus={() => setFocusedField('dateOfBirth')}
+                            onBlur={() => setFocusedField(null)}
+                            required
+                            max={new Date().toISOString().split('T')[0]}
+                            className={`w-full px-3.5 pt-5 pb-2 bg-transparent text-xs font-mono focus:outline-none ${
+                              isLight ? 'text-[#090D16]' : isMix ? 'text-[#231E19]' : 'text-[#EDEDED]'
+                            }`}
+                          />
+                          <label
+                            htmlFor="dateOfBirth"
+                            className={`absolute left-3.5 transition-all duration-200 pointer-events-none font-mono text-xs ${
+                              focusedField === 'dateOfBirth' || dateOfBirth
+                                ? `top-1.5 text-[10px] font-bold ${
+                                    isLight ? 'text-[#0284C7]' : isMix ? 'text-[#D97706]' : 'text-[#00F0FF]'
+                                  }`
+                                : isLight
+                                ? 'top-3.5 text-[#94A3B8]'
+                                : isMix
+                                ? 'top-3.5 text-[#A89F91]'
+                                : 'top-3.5 text-[#737373]'
+                            }`}
+                          >
+                            Date of Birth (Adults 18+ only)
                           </label>
                         </div>
                       </div>

@@ -64,9 +64,10 @@ export const SomochatAuthGateway: React.FC<SomochatAuthGatewayProps> = ({
   const [regUsername, setRegUsername] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
+  const [regDob, setRegDob] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
-  const [regBio, setRegBio] = useState('IIT Madras Data Science & Cyber Research Enthusiast ⚡');
+  const [regBio, setRegBio] = useState('Mindful conversationalist on Somotoz ✨');
   const [regSocial, setRegSocial] = useState('');
   const [regAvatar, setRegAvatar] = useState(AVATAR_PRESETS[0]);
   const [regIsHumanConfirmed, setRegIsHumanConfirmed] = useState(false);
@@ -162,6 +163,25 @@ export const SomochatAuthGateway: React.FC<SomochatAuthGatewayProps> = ({
       return;
     }
 
+    if (!regDob) {
+      onShowToast('error', 'Date of Birth Required', 'Please enter your date of birth. SomoChat is for adults aged 18 and older.');
+      return;
+    }
+
+    // Age validation check (Rule 2: Minimum age is 18)
+    const birthDate = new Date(regDob);
+    const today = new Date();
+    let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      calculatedAge--;
+    }
+
+    if (calculatedAge < 18) {
+      onShowToast('error', '18+ Adults Only', 'SomoChat is strictly for adults aged 18 and older.');
+      return;
+    }
+
     if (regPassword.length < 6) {
       onShowToast('error', 'Weak Password', 'Password must be at least 6 characters.');
       return;
@@ -198,7 +218,7 @@ export const SomochatAuthGateway: React.FC<SomochatAuthGatewayProps> = ({
       avatar: regAvatar,
       role: assignedRole,
       status: 'online',
-      statusText: 'Verified Real Human on Somotoz Grid ⚡',
+      statusText: 'Verified Real Human on Somotoz',
       publicKey: `pk_${Math.random().toString(36).substring(2, 12)}_auth`,
       bio: regBio.trim(),
       isVerified: true,
@@ -207,6 +227,8 @@ export const SomochatAuthGateway: React.FC<SomochatAuthGatewayProps> = ({
       colorTheme: isSomMaster ? '#00F0FF' : '#A855F7',
       passwordHash: hashSomoPassword(regPassword),
       privacySettings: DEFAULT_PRIVACY_SETTINGS,
+      dateOfBirth: regDob,
+      isAdult: true,
     };
 
     onRegisterAccount(newAccount);
@@ -232,11 +254,11 @@ export const SomochatAuthGateway: React.FC<SomochatAuthGatewayProps> = ({
           <h1 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] tracking-tight flex items-center justify-center gap-2">
             <span>SOMOCHAT GATEWAY</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#00FF41]/15 text-[#00FF41] border border-[#00FF41]/40 font-bold">
-              HUMAN ONLY
+              HUMAN ONLY (18+)
             </span>
           </h1>
           <p className="text-xs text-[var(--text-muted)] mt-1 max-w-md mx-auto">
-            Zero-AI real-time matrix with WhatsApp-style delivery receipts, server-side encrypted storage, and permanent verified Somo IDs.
+            Private real-time messaging with friends. Verified real humans only, strictly 18+.
           </p>
         </div>
 
@@ -472,6 +494,21 @@ export const SomochatAuthGateway: React.FC<SomochatAuthGatewayProps> = ({
                     <Phone className="w-3.5 h-3.5 text-[var(--text-muted)] absolute left-3 top-3" />
                   </div>
                 </div>
+              </div>
+
+              {/* Date of Birth (Adult Verification) */}
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                  Date of Birth (Must be 18+) *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={regDob}
+                  onChange={(e) => setRegDob(e.target.value)}
+                  max={new Date().toISOString().split('T')[0]}
+                  className="w-full px-3 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] focus:border-[#00F0FF] text-[var(--text-primary)] text-xs outline-none font-mono"
+                />
               </div>
 
               {/* Passwords */}

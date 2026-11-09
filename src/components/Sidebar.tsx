@@ -318,30 +318,48 @@ export const Sidebar: React.FC<SidebarProps> = memo(({
             }`}>
               <BookOpen className="w-5 h-5" />
             </div>
-            <p className={`text-xs font-bold font-mono ${textPrimaryClass}`}>
-              {entries.length === 0 ? 'NO NOTES RECORDED' : 'NO MATCHING NOTES'}
+            <p className={`text-xs font-bold ${textPrimaryClass}`}>
+              {entries.length === 0 ? 'No notes yet' : 'No matching notes'}
             </p>
-            <p className={`text-[11px] mt-1 max-w-[200px] font-sans ${textSecondaryClass}`}>
+            <p className={`text-[11px] mt-1 max-w-[200px] leading-relaxed ${textSecondaryClass}`}>
               {entries.length === 0
-                ? 'Your notes and reflections will appear here with AI insights.'
-                : 'Try adjusting your search terms or mood filters.'}
+                ? 'Your personal journal is waiting for your first mindful reflection.'
+                : 'No reflections matched your search or tag filters.'}
             </p>
-            {entries.length === 0 && (
+            {entries.length === 0 ? (
               <button
+                type="button"
                 onClick={() => {
                   onNewReflection();
                   onCloseMobile();
                 }}
-                className={`mt-4 px-4 py-2 font-mono font-bold text-xs flex items-center space-x-1.5 transition-all cursor-pointer clip-badge-poly ${
+                className={`mt-4 px-4 py-2 font-semibold text-xs flex items-center space-x-1.5 transition-all cursor-pointer rounded-xl ${
                   isLight
                     ? 'bg-sky-600 hover:bg-sky-700 text-white shadow-md'
                     : isMix
                     ? 'bg-amber-700 hover:bg-amber-800 text-white shadow-md'
-                    : 'bg-[#00FF41] hover:bg-[#00E038] text-black shadow-[0_0_15px_rgba(0,255,65,0.4)]'
+                    : 'bg-[#00F0FF] hover:bg-[#00D0DF] text-black shadow-sm'
                 }`}
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>WRITE FIRST NOTE</span>
+                <span>Write First Note</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedTag(null);
+                }}
+                className={`mt-4 px-4 py-2 font-semibold text-xs transition-all cursor-pointer rounded-xl ${
+                  isLight
+                    ? 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                    : isMix
+                    ? 'bg-[#E2DAC8] hover:bg-[#D9CEBA] text-[#231E19]'
+                    : 'bg-[var(--bg-elevated)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent-color)]'
+                }`}
+              >
+                Clear Filters
               </button>
             )}
           </div>

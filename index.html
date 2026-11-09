@@ -1,11 +1,49 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Somotoz - AI Multimodal Suite & Engineering Workspace</title>
     <meta name="description" content="Somotoz: AI multimodal workspace featuring text reasoning, image synthesis, video simulation, procedural audio, and journal intelligence. Developed by Som Maurya." />
     <meta name="google-site-verification" content="yW8VWj83f6ViaSL7I4Vh-59fDlVxaxc8n4MzNZDOYMk" />
+    
+    <!-- Pre-Paint Auto Theme Resolution (Zero Flash) -->
+    <script>
+      (function() {
+        try {
+          var manual = sessionStorage.getItem('somotoz_manual_base_mode');
+          var theme = 'black';
+          var hour = new Date().getHours();
+          var autoTheme = (hour >= 6 && hour < 17) ? 'white' : (hour >= 17 && hour < 20) ? 'mix' : 'black';
+
+          if (manual === 'day' || manual === 'white') {
+            theme = 'white';
+          } else if (manual === 'night' || manual === 'black') {
+            theme = 'black';
+          } else if (manual === 'eye-comfort' || manual === 'mix') {
+            theme = 'mix';
+          } else {
+            theme = autoTheme;
+          }
+
+          var root = document.documentElement;
+          root.setAttribute('data-theme', theme);
+
+          var classMap = {
+            black: ['theme-black', 'theme-night', 'dark'],
+            white: ['theme-white', 'theme-day', 'light', 'theme-day-mode'],
+            mix: ['theme-mix', 'theme-eye-comfort', 'theme-comfort', 'theme-eye-care']
+          };
+
+          root.classList.remove('dark', 'light', 'theme-black', 'theme-night', 'theme-white', 'theme-day', 'theme-day-mode', 'theme-mix', 'theme-eye-comfort', 'theme-comfort', 'theme-eye-care');
+          var classes = classMap[theme] || classMap.black;
+          classes.forEach(function(cls) {
+            root.classList.add(cls);
+          });
+        } catch (e) {}
+      })();
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
