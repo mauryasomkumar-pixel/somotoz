@@ -72,6 +72,8 @@ import { SomochatRequestsModal } from './somochat/SomochatRequestsModal';
 import { SomochatAdminConsole } from './somochat/SomochatAdminConsole';
 import { SomochatPrivacyModal } from './somochat/SomochatPrivacyModal';
 import { submitUserReportAsync } from '../lib/adminService';
+import { compressChatImage } from '../utils/imageCompressor';
+import { enqueueMessage, flushMessageQueue } from '../lib/offlineQueue';
 
 interface SomochatProps {
   currentUser: UserProfile | null;
@@ -449,6 +451,8 @@ export const Somochat: React.FC<SomochatProps> = ({
     const messageId = `somo_msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const encryptedPayload = encryptSomoPayload(rawContent || `[${mediaAttachment?.type.toUpperCase()}]`);
 
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
     const newMsg: SomoMessage = {
       id: messageId,
       senderId: currentAuthUser.id,
@@ -460,7 +464,7 @@ export const Somochat: React.FC<SomochatProps> = ({
       encryptedContent: encryptedPayload,
       isEncrypted: true,
       timestamp: Date.now(),
-      deliveryStatus: 'sending',
+      deliveryStatus: isOffline ? 'sending' : 'sent',
       mediaType: mediaAttachment?.type || 'text',
       mediaUrl: mediaAttachment?.url,
       mediaName: mediaAttachment?.name,
@@ -479,6 +483,20 @@ export const Somochat: React.FC<SomochatProps> = ({
     setInputMessage('');
     setMediaAttachment(null);
     setReplyingTo(null);
+
+    if (isOffline) {
+      enqueueMessage({
+        conversationId: activeChannelId,
+        senderUid: currentAuthUser.id,
+        type: (mediaAttachment?.type as any) || 'text',
+        text: rawContent,
+        mediaUrl: mediaAttachment?.url,
+        replyTo: replyingTo ? { id: replyingTo.id, text: replyingTo.content } : undefined,
+        createdAt: Date.now(),
+      });
+      onShowToast('info', 'Saved Offline', 'You are offline. Message queued and will auto-send once reconnected.');
+      return;
+    }
 
     // WhatsApp-Style delivery tick progressions
     setTimeout(() => {
@@ -503,6 +521,29 @@ export const Somochat: React.FC<SomochatProps> = ({
       onLogActivity('somochat', `Transmitted encrypted message to ${activeChannelId}`);
     }
   };
+
+  // Reconnection listener to flush offline message queue
+  useEffect(() => {
+    const handleReconnected = async () => {
+      const flushed = await flushMessageQueue(async (queued) => {
+        // Mark locally matching queued messages as delivered
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.content === queued.text && m.deliveryStatus === 'sending'
+              ? { ...m, deliveryStatus: 'sent' }
+              : m
+          )
+        );
+        return true;
+      });
+      if (flushed > 0) {
+        onShowToast('success', 'Back Online', `Sent ${flushed} queued message${flushed > 1 ? 's' : ''}.`);
+      }
+    };
+
+    window.addEventListener('online', handleReconnected);
+    return () => window.removeEventListener('online', handleReconnected);
+  }, [onShowToast]);
 
   // Send Connection Chat Request
   const handleSendChatRequest = (targetUser: SomoUser, noteText: string = '') => {
@@ -1298,35 +1339,46 @@ export const Somochat: React.FC<SomochatProps> = ({
             )}
 
             {/* ===================================================================== */}
-            {/* ANCHORED NON-CLIPPING INPUT DOCK                                      */}
+            {/* ANCHORED NON-CLIPPING INPUT DOCK (Safe Area & On-Screen Keyboard)      */}
             {/* ===================================================================== */}
-            <div className="p-3 sm:p-4 bg-[var(--bg-card)] border-t border-[var(--border-color)] shrink-0">
+            <div className="p-3 sm:p-4 bg-[var(--bg-card)] border-t border-[var(--border-color)] shrink-0 safe-nav-bottom">
               <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
                 
                 {/* Image attachment button */}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-2.5 rounded-xl bg-[var(--bg-input)] hover:bg-[var(--border-color)] text-[var(--text-secondary)] hover:text-[#00F0FF] transition-colors cursor-pointer"
+                  aria-label="Attach photo or image"
+                  className="p-2.5 rounded-xl bg-[var(--bg-input)] hover:bg-[var(--border-color)] text-[var(--text-secondary)] hover:text-[#00F0FF] transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target"
                 >
-                  <ImageIcon className="w-4 h-4" />
+                  <ImageIcon className="w-4 h-4" aria-hidden="true" />
                 </button>
                 <input
                   type="file"
                   ref={fileInputRef}
                   accept="image/*"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      const reader = new FileReader();
-                      reader.onload = () => {
+                      try {
+                        const { dataUrl } = await compressChatImage(file);
                         setMediaAttachment({
                           type: 'image',
-                          url: reader.result as string,
+                          url: dataUrl,
                           name: file.name,
                         });
-                      };
-                      reader.readAsDataURL(file);
+                      } catch (err) {
+                        console.error('Image compression failed:', err);
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          setMediaAttachment({
+                            type: 'image',
+                            url: reader.result as string,
+                            name: file.name,
+                          });
+                        };
+                        reader.readAsDataURL(file);
+                      }
                     }
                   }}
                   className="hidden"
@@ -1348,13 +1400,14 @@ export const Somochat: React.FC<SomochatProps> = ({
                       setIsRecordingAudio(true);
                     }
                   }}
-                  className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+                  aria-label={isRecordingAudio ? 'Stop recording voice note' : 'Record voice note'}
+                  className={`p-2.5 rounded-xl transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target ${
                     isRecordingAudio
                       ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/40'
                       : 'bg-[var(--bg-input)] hover:bg-[var(--border-color)] text-[var(--text-secondary)] hover:text-[#00F0FF]'
                   }`}
                 >
-                  <Mic className="w-4 h-4" />
+                  <Mic className="w-4 h-4" aria-hidden="true" />
                 </button>
 
                 {/* Input Text Box */}
@@ -1371,7 +1424,7 @@ export const Somochat: React.FC<SomochatProps> = ({
                         ? 'Messaging blocked for this peer'
                         : `Transmit to ${activeChannelId === 'GLOBAL_SPACE' ? '# global-matrix' : activePeer?.name}...`
                     }
-                    className="w-full px-4 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] focus:border-[#00F0FF] text-[var(--text-primary)] text-xs placeholder:text-[var(--text-muted)] outline-none transition-colors"
+                    className="w-full px-4 py-2.5 min-h-[44px] rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] focus:border-[#00F0FF] text-[var(--text-primary)] text-xs placeholder:text-[var(--text-muted)] outline-none transition-colors"
                   />
                 </div>
 
@@ -1382,9 +1435,10 @@ export const Somochat: React.FC<SomochatProps> = ({
                     (!inputMessage.trim() && !mediaAttachment) ||
                     (activePeer && activeChannelConnectionStatus === 'blocked')
                   }
-                  className="p-2.5 rounded-xl bg-gradient-to-r from-[#00F0FF] to-[#A855F7] text-black font-black hover:brightness-110 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-md shadow-[#00F0FF]/20"
+                  aria-label="Send message"
+                  className="p-2.5 rounded-xl bg-gradient-to-r from-[#00F0FF] to-[#A855F7] text-black font-black hover:brightness-110 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-md shadow-[#00F0FF]/20 min-h-[44px] min-w-[44px] flex items-center justify-center touch-target"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-4 h-4" aria-hidden="true" />
                 </button>
               </form>
             </div>

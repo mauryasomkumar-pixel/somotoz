@@ -256,6 +256,11 @@ interface ThemeContextType {
   isThemeOfTheDayActive: boolean;
   setIsThemeOfTheDayActive: (active: boolean) => void;
   themeOfTheDay: ThemeOfTheDayOption;
+
+  // Motion & Animation System
+  animationLevel: 'full' | 'light' | 'off';
+  isLowEndDevice: boolean;
+  isTabVisible: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -298,6 +303,27 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const themeOfTheDay = useMemo(() => getTodayTheme(), []);
+
+  // Motion & Animation states
+  const [animationLevel] = useState<'full' | 'light' | 'off'>('full');
+  const [isLowEndDevice] = useState<boolean>(() => {
+    if (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) {
+      return (navigator as any).hardwareConcurrency <= 4;
+    }
+    return false;
+  });
+  const [isTabVisible, setIsTabVisible] = useState<boolean>(() => {
+    if (typeof document !== 'undefined') return document.visibilityState === 'visible';
+    return true;
+  });
+
+  useEffect(() => {
+    const handleVis = () => {
+      setIsTabVisible(document.visibilityState === 'visible');
+    };
+    document.addEventListener('visibilitychange', handleVis);
+    return () => document.removeEventListener('visibilitychange', handleVis);
+  }, []);
 
   // Compute active base theme ('white' | 'black' | 'mix')
   const theme: AppTheme = useMemo(() => {
@@ -486,6 +512,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isThemeOfTheDayActive,
         setIsThemeOfTheDayActive,
         themeOfTheDay,
+        animationLevel,
+        isLowEndDevice,
+        isTabVisible,
       }}
     >
       {children}

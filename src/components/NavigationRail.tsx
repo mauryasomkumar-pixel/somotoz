@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { ViewMode, UserProfile } from '../types';
 import { checkIsAdmin } from '../lib/adminService';
+import { PWAInstallButton } from './pwa/PWAInstallButton';
 
 interface NavigationRailProps {
   currentView: ViewMode;
@@ -140,14 +141,20 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
             </button>
           )}
 
+          {/* PWA Install Button in desktop rail */}
+          <div className="w-full flex justify-center py-1">
+            <PWAInstallButton variant="button" className="!px-2 !py-2 !text-[11px]" />
+          </div>
+
           {onLogout && (
             <button
               type="button"
               onClick={onLogout}
               title="Sign Out"
-              className="p-2 text-[var(--text-secondary)] hover:text-rose-400 rounded-xl hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer"
+              aria-label="Sign out of Somotoz"
+              className="p-2.5 text-[var(--text-secondary)] hover:text-rose-400 rounded-xl hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-4 h-4" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -157,7 +164,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
           2. MOBILE BOTTOM BAR (visible on mobile, hidden on md and up)
          ========================================================================= */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--bg-card)]/95 backdrop-blur-lg border-t border-[var(--border-color)] px-2 py-1 flex items-center justify-around select-none shadow-lg"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--bg-card)]/95 backdrop-blur-lg border-t border-[var(--border-color)] px-2 pt-1 pb-[calc(0.6rem+env(safe-area-inset-bottom))] flex items-center justify-around select-none shadow-lg safe-nav-bottom"
         aria-label="Mobile Navigation"
       >
         {navItems.map((item) => {
@@ -167,7 +174,8 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
               key={item.label}
               type="button"
               onClick={() => onSelectView(item.id)}
-              className={`flex-1 min-h-[48px] py-1.5 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+              aria-label={item.label}
+              className={`flex-1 min-h-[48px] py-1 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer touch-target ${
                 item.active
                   ? 'text-[var(--accent-color)] font-semibold'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -178,7 +186,7 @@ export const NavigationRail: React.FC<NavigationRailProps> = ({
                   item.active ? 'scale-110 bg-[var(--accent-color)]/15' : ''
                 }`}
               >
-                <Icon className="w-5 h-5" />
+                <Icon className="w-5 h-5" aria-hidden="true" />
               </div>
               <span className="text-[10px] leading-none">{item.label}</span>
             </button>

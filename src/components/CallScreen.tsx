@@ -32,7 +32,19 @@ import {
   subscribeToCallDocument,
   subscribeToIceCandidates,
 } from '../lib/webrtcService';
-import { CHAT_THEMES, ThemeConfig } from './Somochat';
+
+export interface ThemeConfig {
+  id: string;
+  name: string;
+  previewBg: string;
+}
+
+export const CHAT_THEMES: Record<string, ThemeConfig> = {
+  aurora: { id: 'aurora', name: 'Aurora', previewBg: 'from-emerald-500 to-cyan-500' },
+  sunset: { id: 'sunset', name: 'Sunset', previewBg: 'from-amber-500 to-rose-500' },
+  midnight: { id: 'midnight', name: 'Midnight', previewBg: 'from-indigo-500 to-purple-600' },
+  cyberpunk: { id: 'cyberpunk', name: 'Cyberpunk', previewBg: 'from-fuchsia-500 to-cyan-400' },
+};
 
 interface CallScreenProps {
   currentUser: UserProfile;
@@ -656,20 +668,21 @@ export const CallScreen: React.FC<CallScreenProps> = ({
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. BOTTOM CONTROLS DOCK */}
+      {/* 3. BOTTOM CONTROLS DOCK (Safe Area & Touch Targets)                       */}
       {/* ========================================================================= */}
-      <div className="p-4 sm:p-6 pb-8 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-center gap-3 sm:gap-5 z-30">
+      <div className="p-3 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/90 via-black/60 to-transparent flex items-center justify-center gap-2 sm:gap-5 z-30 safe-bottom">
         {/* Incoming Call Accept & Decline Buttons */}
         {!isCaller && callStatus !== 'accepted' ? (
-          <div className="flex items-center gap-8 animate-in fade-in zoom-in duration-200">
+          <div className="flex items-center gap-6 sm:gap-8 animate-in fade-in zoom-in duration-200">
             {/* Decline */}
             <button
               type="button"
               onClick={handleDeclineCall}
-              className="flex flex-col items-center gap-2 group cursor-pointer"
+              aria-label="Decline incoming call"
+              className="flex flex-col items-center gap-2 group cursor-pointer min-h-[44px] touch-target"
             >
-              <div className="w-16 h-16 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-transform">
-                <PhoneOff className="w-7 h-7" />
+              <div className="w-14 sm:w-16 h-14 sm:h-16 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-transform">
+                <PhoneOff className="w-6 sm:w-7 h-6 sm:h-7" aria-hidden="true" />
               </div>
               <span className="text-xs font-semibold text-rose-300">Decline</span>
             </button>
@@ -678,27 +691,33 @@ export const CallScreen: React.FC<CallScreenProps> = ({
             <button
               type="button"
               onClick={handleAcceptCall}
-              className="flex flex-col items-center gap-2 group cursor-pointer"
+              aria-label="Accept incoming call"
+              className="flex flex-col items-center gap-2 group cursor-pointer min-h-[44px] touch-target"
             >
-              <div className="w-16 h-16 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-transform animate-bounce">
-                {activeCall.type === 'video' ? <Video className="w-7 h-7" /> : <Phone className="w-7 h-7" />}
+              <div className="w-14 sm:w-16 h-14 sm:h-16 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-transform animate-bounce">
+                {activeCall.type === 'video' ? (
+                  <Video className="w-6 sm:w-7 h-6 sm:h-7" aria-hidden="true" />
+                ) : (
+                  <Phone className="w-6 sm:w-7 h-6 sm:h-7" aria-hidden="true" />
+                )}
               </div>
               <span className="text-xs font-semibold text-emerald-300">Accept</span>
             </button>
           </div>
         ) : (
           /* Active Call Controls / Outgoing Calling Controls */
-          <div className="flex items-center gap-3 sm:gap-4 bg-zinc-900/90 border border-white/10 px-4 py-2.5 rounded-3xl backdrop-blur-md shadow-2xl">
+          <div className="flex items-center gap-2 sm:gap-4 bg-zinc-900/90 border border-white/10 px-3 sm:px-4 py-2 rounded-3xl backdrop-blur-md shadow-2xl flex-wrap justify-center max-w-full">
             {/* Mute Mic */}
             <button
               type="button"
               onClick={toggleMute}
-              className={`p-3 sm:p-3.5 rounded-2xl transition-all cursor-pointer ${
+              className={`p-2.5 sm:p-3.5 rounded-2xl transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target ${
                 isMuted ? 'bg-rose-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'
               }`}
+              aria-label={isMuted ? 'Unmute microphone' : 'Mute microphone'}
               title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
             >
-              {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              {isMuted ? <MicOff className="w-5 h-5" aria-hidden="true" /> : <Mic className="w-5 h-5" aria-hidden="true" />}
             </button>
 
             {/* Video Toggle (If video call) */}
@@ -707,22 +726,24 @@ export const CallScreen: React.FC<CallScreenProps> = ({
                 <button
                   type="button"
                   onClick={toggleVideo}
-                  className={`p-3 sm:p-3.5 rounded-2xl transition-all cursor-pointer ${
+                  className={`p-2.5 sm:p-3.5 rounded-2xl transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target ${
                     !isVideoEnabled ? 'bg-rose-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'
                   }`}
+                  aria-label={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
                   title={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
                 >
-                  {isVideoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                  {isVideoEnabled ? <Video className="w-5 h-5" aria-hidden="true" /> : <VideoOff className="w-5 h-5" aria-hidden="true" />}
                 </button>
 
                 {/* Flip Camera */}
                 <button
                   type="button"
                   onClick={flipCamera}
-                  className="p-3 sm:p-3.5 rounded-2xl bg-white/10 text-white hover:bg-white/20 transition-all cursor-pointer"
+                  className="p-2.5 sm:p-3.5 rounded-2xl bg-white/10 text-white hover:bg-white/20 transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target"
+                  aria-label="Switch camera"
                   title="Switch camera"
                 >
-                  <SwitchCamera className="w-5 h-5" />
+                  <SwitchCamera className="w-5 h-5" aria-hidden="true" />
                 </button>
               </>
             )}
@@ -731,22 +752,24 @@ export const CallScreen: React.FC<CallScreenProps> = ({
             <button
               type="button"
               onClick={toggleSpeaker}
-              className={`p-3 sm:p-3.5 rounded-2xl transition-all cursor-pointer ${
+              className={`p-2.5 sm:p-3.5 rounded-2xl transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-target ${
                 isSpeakerMuted ? 'bg-amber-500 text-black' : 'bg-white/10 text-white hover:bg-white/20'
               }`}
+              aria-label={isSpeakerMuted ? 'Unmute peer audio' : 'Mute peer audio'}
               title={isSpeakerMuted ? 'Unmute peer audio' : 'Mute peer audio'}
             >
-              {isSpeakerMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              {isSpeakerMuted ? <VolumeX className="w-5 h-5" aria-hidden="true" /> : <Volume2 className="w-5 h-5" aria-hidden="true" />}
             </button>
 
             {/* End Call Button */}
             <button
               type="button"
               onClick={handleEndCall}
-              className="p-3 sm:p-3.5 rounded-2xl bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all cursor-pointer shadow-lg ml-2"
+              className="p-2.5 sm:p-3.5 rounded-2xl bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all cursor-pointer shadow-lg sm:ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center touch-target"
+              aria-label="End call"
               title="End call"
             >
-              <PhoneOff className="w-5 h-5" />
+              <PhoneOff className="w-5 h-5" aria-hidden="true" />
             </button>
           </div>
         )}

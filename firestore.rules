@@ -7,78 +7,244 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper: Check if caller holds verified administrative authorization
-    function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.admin == true ||
-        request.auth.token.email == "mauryasomkumar@gmail.com" ||
-        exists(/databases/$(database)/documents/admin_roles/$(request.auth.uid))
-      );
+    // Helper: Check if caller is the owner of the document
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Default deny catch-all
+    // Helper: Verify caller holds verified administrative authorization via custom claims only
+    function isAdmin() {
+      return isSignedIn() &&
+        request.auth.token.admin == true &&
+        request.auth.token.email_verified == true;
+    }
+
+    // Default deny all access
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // User application data (entries, activities, profile)
-    // - Owner has full read and write access
-    // - Authorized Admin has management access
-    match /users/{userId}/{document=**} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    // =========================================================================
+    // 1. USER PRIVATE DATA & ENTRIES (users/{uid})
+    // Strictly owner-only read & write. Admin has NO client read access to private journals.
+    // =========================================================================
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.uid == userId
+        && (!('role' in request.resource.data) || request.resource.data.role != 'admin')
+        && (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false);
+      allow delete: if isOwner(userId);
+
+      // Subcollection: Private Journal Reflections & Entries
+      // Strictly owner-only. Zero client access for admin.
+      match /entries/{entryId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Subcollection: Private Profile Subdocument
+      match /profile/{subdoc} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Subcollection: Private Activities
+      match /activities/{activityId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Subcollection: Daily Usage Limits
+      match /daily_usage/{dayId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
-    // Activity and AI Query Audit Logs
-    // - Authenticated users can ONLY create log records strictly bound to their own verified UID and verified email
-    // - Normal users cannot read, list, update, or delete activity audit records
-    // - Only authorized administrators can read, list, and manage audit logs
-    match /admin_activity_logs/{logId} {
-      allow create: if isSignedIn() &&
-        request.resource.data.userId == request.auth.uid &&
-        (request.resource.data.userEmail == request.auth.token.email || request.auth.token.email == null);
-      allow read, update, delete: if isAdmin();
-    }
-
-    // Admin Roles collection
-    // - Normal users can only read their own role document to verify admin state
-    // - Only verified admins can read all roles or modify roles
-    match /admin_roles/{uid} {
-      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
-      allow write: if isAdmin();
-    }
-
-    // User account status (enable/disable flags)
-    // - Normal users can only read their own status
-    // - Only verified admins can read all or write/update status
-    match /user_status/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow write: if isAdmin();
-    }
-
-    // Safety & User Conduct Reports (18+ & moderation)
-    // - Authenticated users can create reports strictly bound to their own reporterId
-    // - Only verified admins can read, list, update, and manage reports
-    match /somo_reports/{reportId} {
-      allow create: if isSignedIn() && request.resource.data.reporterId == request.auth.uid;
-      allow read, update, delete: if isAdmin();
-    }
-
-    // Username Registry for live availability checking
-    // - Any authenticated user can read to check availability
-    // - Can only be created by the owning user
-    match /usernames/{username} {
+    // =========================================================================
+    // 2. PUBLIC PROFILES (publicProfiles/{uid} & public_profiles/{uid})
+    // Holding only public metadata (username, photo, bio, mood).
+    // Never show real name, email or phone to other users.
+    // =========================================================================
+    match /publicProfiles/{userId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create, update: if isOwner(userId)
+        && request.resource.data.uid == userId
+        && (!('email' in request.resource.data))
+        && (!('phoneNumber' in request.resource.data))
+        && (!('dateOfBirth' in request.resource.data))
+        && (!('role' in request.resource.data) || request.resource.data.role != 'admin')
+        && (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false);
+      allow delete: if isOwner(userId);
     }
 
-    // Public Profiles (Only username, photo, bio, mood - never real name, email, or phone)
-    // - Readable by all authenticated users for human directory in SomoChat
-    // - Writable only by the owner or admin
     match /public_profiles/{userId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create, update: if isOwner(userId)
+        && request.resource.data.uid == userId
+        && (!('email' in request.resource.data))
+        && (!('phoneNumber' in request.resource.data))
+        && (!('dateOfBirth' in request.resource.data))
+        && (!('role' in request.resource.data) || request.resource.data.role != 'admin')
+        && (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false);
+      allow delete: if isOwner(userId);
+    }
+
+    // =========================================================================
+    // 3. USERNAME REGISTRY (usernames/{username})
+    // Read availability for signed-in users. Written only by the claiming user.
+    // =========================================================================
+    match /usernames/{username} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && username.size() >= 3 && username.size() <= 20;
+      allow update, delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // =========================================================================
+    // 4. SERVER-ONLY ADMINISTRATIVE & AUDIT COLLECTIONS
+    // ZERO client access for normal users and admins.
+    // All reads and writes must pass through the Node.js Express server via Firebase Admin SDK.
+    // =========================================================================
+    match /admin_action_logs/{logId} {
+      allow read, write: if false;
+    }
+
+    match /admin_activity_logs/{logId} {
+      allow read, write: if false;
+    }
+
+    match /admin_roles/{uid} {
+      allow read, write: if false;
+    }
+
+    match /user_status/{userId} {
+      allow read, write: if false;
+    }
+
+    match /legal_exports/{exportId} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // 5. SAFETY & USER CONDUCT REPORTS (reports/{reportId} & somo_reports/{reportId})
+    // Users create reports with optional attached messages (up to 20).
+    // Admin reads/updates reports for moderation.
+    // =========================================================================
+    match /reports/{reportId} {
+      allow create: if isSignedIn()
+        && request.resource.data.reporterId == request.auth.uid;
+      allow read, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /somo_reports/{reportId} {
+      allow create: if isSignedIn()
+        && request.resource.data.reporterId == request.auth.uid;
+      allow read, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 6. CHAT REQUESTS (chatRequests/{requestId})
+    // Real-time connection gatekeeper: Only participants can read or interact.
+    // =========================================================================
+    match /chatRequests/{requestId} {
+      allow read: if isSignedIn() && (
+        resource.data.fromUid == request.auth.uid ||
+        resource.data.toUid == request.auth.uid
+      );
+
+      allow create: if isSignedIn()
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.toUid != request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      allow update: if isSignedIn() && (
+        (resource.data.toUid == request.auth.uid && request.resource.data.status in ['accepted', 'declined']) ||
+        (resource.data.fromUid == request.auth.uid && request.resource.data.status == 'declined')
+      );
+
+      allow delete: if isSignedIn() && (
+        resource.data.fromUid == request.auth.uid ||
+        resource.data.toUid == request.auth.uid
+      );
+    }
+
+    // =========================================================================
+    // 7. REAL-TIME CONVERSATIONS (conversations/{convId})
+    // Only the two participants can read or write.
+    // Admin has NO client access (no browsing private chats).
+    // =========================================================================
+    match /conversations/{convId} {
+      function isParticipant() {
+        return isSignedIn() && (request.auth.uid in resource.data.participants);
+      }
+
+      function willBeParticipant() {
+        return isSignedIn() && (request.auth.uid in request.resource.data.participants);
+      }
+
+      allow read: if isParticipant();
+
+      allow create: if willBeParticipant()
+        && request.resource.data.participants is list
+        && request.resource.data.participants.size() == 2;
+
+      allow update: if isParticipant();
+
+      allow delete: if isParticipant();
+
+      // Subcollection: Messages
+      // Paginated real-time stream.
+      // Sender UID must strictly match request.auth.uid on create.
+      match /messages/{messageId} {
+        function parentParticipants() {
+          return get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
+        }
+
+        function isParentParticipant() {
+          return isSignedIn() && (request.auth.uid in parentParticipants());
+        }
+
+        allow read: if isParentParticipant();
+
+        allow create: if isParentParticipant()
+          && request.resource.data.senderUid == request.auth.uid
+          && request.resource.data.type in ['text', 'image', 'voice', 'sticker', 'system']
+          && (!('text' in request.resource.data) || request.resource.data.text.size() <= 20000);
+
+        allow update: if isParentParticipant();
+
+        allow delete: if isParentParticipant() && (resource.data.senderUid == request.auth.uid);
+      }
+
+      // Subcollection: WebRTC Calls Signaling
+      match /calls/{callId} {
+        function parentParticipants() {
+          return get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
+        }
+
+        function isParentParticipant() {
+          return isSignedIn() && (request.auth.uid in parentParticipants());
+        }
+
+        allow read: if isParentParticipant();
+
+        allow create: if isParentParticipant()
+          && request.resource.data.callerUid == request.auth.uid
+          && request.resource.data.type in ['voice', 'video'];
+
+        allow update: if isParentParticipant();
+
+        allow delete: if isParentParticipant();
+
+        match /callerCandidates/{candidateId} {
+          allow read, write: if isParentParticipant();
+        }
+
+        match /calleeCandidates/{candidateId} {
+          allow read, write: if isParentParticipant();
+        }
+      }
     }
   }
 }
-

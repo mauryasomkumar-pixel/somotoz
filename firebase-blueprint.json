@@ -22,21 +22,47 @@
         "isFavorite": { "type": "boolean", "description": "Whether user marked entry as favorite" }
       }
     },
-    "AdminActivityLog": {
-      "path": "admin_activity_logs/{logId}",
+    "AdminActionLog": {
+      "path": "admin_action_logs/{logId}",
       "fields": {
-        "id": { "type": "string", "description": "Unique activity log identifier" },
-        "userId": { "type": "string", "description": "User UID who initiated the action" },
-        "userEmail": { "type": "string", "description": "User email address" },
-        "userName": { "type": "string", "description": "User display name" },
-        "activityType": { "type": "string", "description": "Type: ai_query, search, reflection, media_gen, auth, admin_action" },
-        "query": { "type": "string", "description": "Prompt or search query submitted inside Somotoz" },
-        "feature": { "type": "string", "description": "Feature or page used (Chat, Wisdom, Journal, etc.)" },
-        "status": { "type": "string", "description": "Execution status: success or error" },
-        "timestamp": { "type": "timestamp", "description": "Unix timestamp in ms" },
-        "tokens": { "type": "number", "description": "Token count estimate" },
-        "modelUsed": { "type": "string", "description": "Gemini or search model identifier" },
-        "metadata": { "type": "object", "description": "Optional application metadata" }
+        "id": { "type": "string", "description": "Action log identifier" },
+        "adminUid": { "type": "string", "description": "UID of admin who performed action" },
+        "adminEmail": { "type": "string", "description": "Email of admin who performed action" },
+        "action": { "type": "string", "description": "Action name (suspend, ban, dismiss, etc.)" },
+        "targetId": { "type": "string", "description": "Target user or report UID" },
+        "targetType": { "type": "string", "description": "Type of target: user, report, system" },
+        "note": { "type": "string", "description": "Mandatory rationale written by admin" },
+        "timestamp": { "type": "number", "description": "Unix timestamp in ms" }
+      }
+    },
+    "LegalExportLog": {
+      "path": "legal_exports/{exportId}",
+      "fields": {
+        "exportId": { "type": "string", "description": "Export identifier" },
+        "adminUid": { "type": "string", "description": "UID of admin who initiated export" },
+        "adminEmail": { "type": "string", "description": "Email of admin who initiated export" },
+        "targetUserId": { "type": "string", "description": "Target user UID exported" },
+        "orderReference": { "type": "string", "description": "Official legal order reference number" },
+        "requestingAuthority": { "type": "string", "description": "Requesting court or law enforcement authority" },
+        "orderDate": { "type": "string", "description": "Date of legal order" },
+        "dataScope": { "type": "string", "description": "Scope of data included in export" },
+        "timestamp": { "type": "number", "description": "Unix timestamp in ms" }
+      }
+    },
+    "Report": {
+      "path": "reports/{reportId}",
+      "fields": {
+        "id": { "type": "string", "description": "Report identifier" },
+        "reporterId": { "type": "string", "description": "UID of user who filed report" },
+        "reportedUserId": { "type": "string", "description": "UID of reported user" },
+        "reportedUserName": { "type": "string", "description": "Public username of reported user" },
+        "reason": { "type": "string", "enum": ["spam", "harassment", "fake_bot", "nudity", "underage", "other"], "description": "Reporting reason" },
+        "priority": { "type": "string", "enum": ["critical", "high", "normal"], "description": "Report priority (critical for underage)" },
+        "details": { "type": "string", "description": "User description of issue" },
+        "attachedMessages": { "type": "array", "description": "Up to 20 messages attached by reporter" },
+        "status": { "type": "string", "enum": ["pending", "dismissed", "warned", "suspended", "banned"], "description": "Resolution status" },
+        "moderatorNote": { "type": "string", "description": "Mandatory note entered by admin" },
+        "timestamp": { "type": "number", "description": "Timestamp created" }
       }
     },
     "AdminRole": {
@@ -52,10 +78,21 @@
       "path": "user_status/{userId}",
       "fields": {
         "userId": { "type": "string", "description": "User UID" },
-        "isDisabled": { "type": "boolean", "description": "Whether user access to Somotoz is disabled by admin" },
-        "disabledReason": { "type": "string", "description": "Reason for disabling access" },
+        "isDisabled": { "type": "boolean", "description": "Whether user access is disabled" },
+        "status": { "type": "string", "enum": ["active", "suspended", "banned", "scheduled_for_deletion"], "description": "Account moderation status" },
+        "disabledReason": { "type": "string", "description": "Reason for moderation action" },
         "updatedAt": { "type": "timestamp", "description": "Last status modification timestamp" },
         "updatedBy": { "type": "string", "description": "Admin UID who updated status" }
+      }
+    },
+    "Conversation": {
+      "path": "conversations/{id}",
+      "fields": {
+        "participants": { "type": "array", "items": { "type": "string" }, "description": "Array of 2 participant UIDs [uidA, uidB]" },
+        "lastMessage": { "type": "string", "description": "Last message preview" },
+        "lastMessageAt": { "type": "number", "description": "Timestamp of last message" },
+        "mutedBy": { "type": "array", "items": { "type": "string" }, "description": "List of UIDs who muted" },
+        "blockedBy": { "type": "array", "items": { "type": "string" }, "description": "List of UIDs who blocked" }
       }
     }
   }

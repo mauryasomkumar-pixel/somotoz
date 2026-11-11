@@ -1511,13 +1511,25 @@ export interface AuthenticatedUser {
   name?: string;
   isAdmin: boolean;
   disabled: boolean;
+  authTime: number; // in seconds from JWT auth_time / iat
   claims?: Record<string, any>;
+}
+
+/**
+ * Validates that the user's authentication session was established within the last 5 minutes (300 seconds).
+ * Required for all sensitive administrative actions (bans, suspensions, report actions, legal exports, data cleanup).
+ */
+export function checkRecentAuth(user?: AuthenticatedUser | null): boolean {
+  if (!user || !user.authTime) return false;
+  const nowSec = Math.floor(Date.now() / 1000);
+  return (nowSec - user.authTime) <= 300;
 }
 
 /**
  * Cryptographically verifies Firebase ID token server-side via official Firebase Admin SDK.
  * Fallback to Google Identity Toolkit REST API when service-account private key is not present.
  * Never trust unverified client headers (x-user-id, x-user-email).
+ * Admin check strictly requires custom claim `admin === true` and `email_verified === true`.
  */
 async function authenticateUserRequest(req: Request): Promise<AuthenticatedUser | null> {
   const authHeader = req.headers.authorization;
@@ -1527,16 +1539,12 @@ async function authenticateUserRequest(req: Request): Promise<AuthenticatedUser 
   const token = authHeader.split('Bearer ')[1]?.trim();
   if (!token) return null;
 
-  const configuredAdminEmail = (process.env.ADMIN_EMAIL || 'mauryasomkumar@gmail.com').toLowerCase();
-
   // 1. Official Firebase Admin SDK ID token verification
   try {
     const decoded = await adminAuth.verifyIdToken(token, true);
-    const tokenEmail = (decoded.email || '').toLowerCase();
-    const isAdmin =
-      decoded.admin === true ||
-      decoded.role === 'admin' ||
-      (tokenEmail === configuredAdminEmail && decoded.email_verified === true);
+    const authTime = Number(decoded.auth_time || decoded.iat || Math.floor(Date.now() / 1000));
+    // Admin check: strictly custom claim admin === true and email_verified === true
+    const isAdmin = decoded.admin === true && decoded.email_verified === true;
 
     return {
       uid: decoded.uid,
@@ -1544,6 +1552,7 @@ async function authenticateUserRequest(req: Request): Promise<AuthenticatedUser 
       name: decoded.name,
       isAdmin,
       disabled: false,
+      authTime,
       claims: decoded,
     };
   } catch (adminErr: any) {
@@ -1553,6 +1562,7 @@ async function authenticateUserRequest(req: Request): Promise<AuthenticatedUser 
         email: '',
         isAdmin: false,
         disabled: true,
+        authTime: 0,
       };
     }
 
@@ -1573,10 +1583,8 @@ async function authenticateUserRequest(req: Request): Promise<AuthenticatedUser 
           if (googleUser) {
             const verifiedEmail = (googleUser.email || '').toLowerCase();
             const customAttrs = googleUser.customAttributes ? JSON.parse(googleUser.customAttributes) : {};
-            const isAdmin =
-              customAttrs.admin === true ||
-              customAttrs.role === 'admin' ||
-              (verifiedEmail === configuredAdminEmail && googleUser.emailVerified === true);
+            const isAdmin = customAttrs.admin === true && googleUser.emailVerified === true;
+            const authTime = Math.floor(Date.now() / 1000);
 
             return {
               uid: googleUser.localId,
@@ -1584,6 +1592,7 @@ async function authenticateUserRequest(req: Request): Promise<AuthenticatedUser 
               name: googleUser.displayName,
               isAdmin,
               disabled: googleUser.disabled === true,
+              authTime,
               claims: customAttrs,
             };
           }
@@ -1599,20 +1608,32 @@ async function authenticateUserRequest(req: Request): Promise<AuthenticatedUser 
 
 /**
  * Enforces admin authorization:
- * Verifies ID token + custom claim admin == true (or configured bootstrap email).
+ * Verifies ID token + custom claim admin == true && email_verified == true.
+ * If requireRecentAuth is true, ensures authentication occurred within last 5 minutes.
  */
-async function verifyAdminRequest(req: Request): Promise<{ authorized: boolean; user?: AuthenticatedUser; error?: string }> {
+async function verifyAdminRequest(
+  req: Request,
+  requireRecentAuth: boolean = false
+): Promise<{ authorized: boolean; statusCode: number; user?: AuthenticatedUser; error?: string; reauthRequired?: boolean }> {
   const user = await authenticateUserRequest(req);
   if (!user) {
-    return { authorized: false, error: 'Unauthorized: Valid Firebase ID token required' };
+    return { authorized: false, statusCode: 401, error: 'Unauthorized: Valid Firebase ID token required' };
   }
   if (user.disabled) {
-    return { authorized: false, error: 'Forbidden: Account has been disabled by administrator' };
+    return { authorized: false, statusCode: 403, error: 'Forbidden: Account has been disabled by administrator' };
   }
   if (!user.isAdmin) {
-    return { authorized: false, error: 'Forbidden: Administrative privileges required' };
+    return { authorized: false, statusCode: 403, error: 'Forbidden: Administrative custom claim (admin: true) and verified email required' };
   }
-  return { authorized: true, user };
+  if (requireRecentAuth && !checkRecentAuth(user)) {
+    return {
+      authorized: false,
+      statusCode: 401,
+      reauthRequired: true,
+      error: 'REAUTH_REQUIRED: Recent re-authentication required (within last 5 minutes) before performing sensitive administrative actions.',
+    };
+  }
+  return { authorized: true, statusCode: 200, user };
 }
 
 // Persistent Activity Logging to Firestore `admin_activity_logs`
@@ -2084,13 +2105,150 @@ app.post('/api/activity/log', async (req: Request, res: Response) => {
   }
 });
 
-// Admin Session Verification
-app.post('/api/admin/verify', async (req: Request, res: Response) => {
-  const check = await verifyAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ authorized: false, error: check.error || 'Forbidden' });
+// Persistent Admin Action Logger (`admin_action_logs`)
+interface ServerAdminActionLog {
+  id: string;
+  adminUid: string;
+  adminEmail: string;
+  action: string;
+  targetId: string;
+  targetType: 'user' | 'report' | 'system';
+  targetUserName?: string;
+  note: string;
+  timestamp: number;
+  ipAddress?: string;
+  metadata?: Record<string, any>;
+}
+
+async function recordAdminActionLog(params: {
+  adminUid: string;
+  adminEmail: string;
+  action: string;
+  targetId: string;
+  targetType: 'user' | 'report' | 'system';
+  targetUserName?: string;
+  note: string;
+  req?: Request;
+  metadata?: Record<string, any>;
+}): Promise<void> {
+  try {
+    const logId = `act_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const ip = params.req
+      ? ((params.req.headers['x-forwarded-for'] as string) || params.req.socket.remoteAddress || '')
+      : '';
+    const logData: ServerAdminActionLog = {
+      id: logId,
+      adminUid: params.adminUid,
+      adminEmail: params.adminEmail,
+      action: params.action,
+      targetId: params.targetId,
+      targetType: params.targetType,
+      targetUserName: params.targetUserName || '',
+      note: params.note,
+      timestamp: Date.now(),
+      ipAddress: ip,
+      metadata: params.metadata || {},
+    };
+    await adminDb.collection('admin_action_logs').doc(logId).set(logData);
+  } catch (err) {
+    console.warn('[Admin Action Log] Notice:', err);
   }
-  return res.json({ authorized: true, uid: check.user?.uid, email: check.user?.email, role: 'admin' });
+}
+
+/**
+ * Executes retention cleanup for data older than retention window (default 90 days).
+ */
+async function runRetentionCleanup(adminEmail: string = 'system_scheduler'): Promise<{
+  deletedMessagesCount: number;
+  deletedAccountsCount: number;
+  retentionDays: number;
+}> {
+  const retentionDays = parseInt(process.env.DATA_RETENTION_DAYS || '90', 10);
+  const cutoffTime = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+  let deletedMessagesCount = 0;
+  let deletedAccountsCount = 0;
+
+  try {
+    // 1. Purge soft-deleted messages & expired messages older than retention cutoff
+    const convsSnap = await adminDb.collection('conversations').limit(100).get();
+    for (const convDoc of convsSnap.docs) {
+      try {
+        const msgsSnap = await convDoc.ref.collection('messages').get();
+        for (const msgDoc of msgsSnap.docs) {
+          const mData = msgDoc.data();
+          const shouldDeleteSoftDeleted = mData.deletedAt && mData.deletedAt <= cutoffTime;
+          const shouldDeleteExpired = mData.expireAt && mData.expireAt <= cutoffTime;
+          if (shouldDeleteSoftDeleted || shouldDeleteExpired) {
+            await msgDoc.ref.delete();
+            deletedMessagesCount++;
+          }
+        }
+      } catch (e) {
+        console.warn(`[Retention] Error cleaning conv ${convDoc.id}:`, e);
+      }
+    }
+
+    // 2. Purge accounts scheduled for deletion older than retention cutoff
+    const scheduledUsersSnap = await adminDb.collection('user_status')
+      .where('status', '==', 'scheduled_for_deletion')
+      .get();
+
+    for (const docSnap of scheduledUsersSnap.docs) {
+      const uData = docSnap.data();
+      const schedTime = uData.deletionScheduledAt || (uData.updatedAt ? uData.updatedAt.toMillis?.() : 0);
+      if (schedTime && schedTime <= cutoffTime) {
+        const uid = docSnap.id;
+        try {
+          await adminAuth.deleteUser(uid);
+        } catch {
+          // Ignored if already deleted
+        }
+        await docSnap.ref.delete();
+        deletedAccountsCount++;
+      }
+    }
+
+    // Record retention action log
+    await recordAdminActionLog({
+      adminUid: 'system',
+      adminEmail,
+      action: 'retention_cleanup',
+      targetId: 'system_retention',
+      targetType: 'system',
+      note: `Automated retention cleanup purged ${deletedMessagesCount} messages and ${deletedAccountsCount} accounts older than ${retentionDays} days.`,
+      metadata: { deletedMessagesCount, deletedAccountsCount, retentionDays, cutoffTime },
+    });
+  } catch (err) {
+    console.warn('[Retention Cleanup] Execution notice:', err);
+  }
+
+  return { deletedMessagesCount, deletedAccountsCount, retentionDays };
+}
+
+// Scheduled retention cleanup runner (Runs every 12 hours)
+setInterval(() => {
+  runRetentionCleanup('system_cron').catch((err) => {
+    console.warn('[Retention Cron] Background error:', err);
+  });
+}, 12 * 60 * 60 * 1000);
+
+// Admin Session & Privilege Verification
+app.post('/api/admin/verify', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req, false);
+  if (!check.authorized || !check.user) {
+    return res.status(check.statusCode || 403).json({
+      authorized: false,
+      error: check.error || 'Forbidden: Administrative privileges required',
+    });
+  }
+  return res.json({
+    authorized: true,
+    uid: check.user.uid,
+    email: check.user.email,
+    isAdmin: check.user.isAdmin,
+    authTime: check.user.authTime,
+    isRecentAuth: checkRecentAuth(check.user),
+  });
 });
 
 // Bootstrap / Assign Admin Custom Claim (`admin: true`)
@@ -2100,12 +2258,12 @@ app.post('/api/admin/claim-admin-role', async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Authentication required. Valid Firebase ID token required.' });
   }
 
-  const configuredAdminEmail = (process.env.ADMIN_EMAIL || 'mauryasomkumar@gmail.com').toLowerCase();
+  const configuredAdminEmail = (process.env.ADMIN_BOOTSTRAP_EMAIL || process.env.ADMIN_EMAIL || 'mauryasomkumar@gmail.com').toLowerCase();
   const userEmail = (user.email || '').toLowerCase();
 
-  // Allow only if user matches configured admin email or is already admin
+  // Allow claiming if matches bootstrap email or if user is already an admin
   if (userEmail !== configuredAdminEmail && !user.isAdmin) {
-    return res.status(403).json({ error: 'Forbidden: Only the configured administrator can claim admin privileges.' });
+    return res.status(403).json({ error: 'Forbidden: Only the configured administrator can bootstrap admin privileges.' });
   }
 
   try {
@@ -2129,19 +2287,20 @@ app.post('/api/admin/claim-admin-role', async (req: Request, res: Response) => {
       console.warn('[Admin] Firestore admin_roles write notice:', roleDbErr?.message || roleDbErr);
     }
 
-    await persistActivityLog({
-      userId: user.uid,
-      userEmail: user.email,
-      userName: user.name || 'Administrator',
-      activityType: 'admin_action',
-      query: `Assigned admin: true custom claim to account ${user.email}`,
-      feature: 'Role Governance',
-      status: 'success',
+    await recordAdminActionLog({
+      adminUid: user.uid,
+      adminEmail: user.email,
+      action: 'role_change',
+      targetId: user.uid,
+      targetType: 'user',
+      targetUserName: user.name,
+      note: `Bootstrapped admin custom claim for ${user.email}`,
+      req,
     });
 
     return res.json({
       success: true,
-      message: 'Admin custom claim assigned successfully. Please refresh token or re-sign in to activate.',
+      message: 'Admin custom claim assigned successfully. Please refresh token or re-authenticate to activate.',
       admin: true,
     });
   } catch (error: any) {
@@ -2149,423 +2308,109 @@ app.post('/api/admin/claim-admin-role', async (req: Request, res: Response) => {
   }
 });
 
-// Admin User Management: List REAL Firebase Authentication Users
-app.get('/api/admin/users', async (req: Request, res: Response) => {
-  const check = await verifyAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+// Admin Analytics Overview (COUNTS ONLY - Zero Prompt Text, Zero Private Chat Content)
+app.get('/api/admin/analytics', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req, false);
+  if (!check.authorized || !check.user) {
+    return res.status(check.statusCode || 403).json({ error: check.error || 'Forbidden: Admin authorization required' });
   }
 
   try {
-    const configuredAdminEmail = (process.env.ADMIN_EMAIL || 'mauryasomkumar@gmail.com').toLowerCase();
-    const usersMap = new Map<string, any>();
+    // 1. Count users from Firebase Auth
+    let totalUsers = 0;
+    let activeUsers = 0;
+    let dailyActiveUsers = 0;
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
 
-    // 1. Fetch real Firebase Authentication accounts via Firebase Admin SDK
     try {
-      const listResult = await adminAuth.listUsers(100);
-      listResult.users.forEach((u) => {
-        const email = (u.email || '').toLowerCase();
-        const isAdmin = u.customClaims?.admin === true || email === configuredAdminEmail;
-        usersMap.set(u.uid, {
-          uid: u.uid,
-          displayName: u.displayName || (u.email ? u.email.split('@')[0] : 'Somotoz User'),
-          email: u.email || '',
-          photoURL: u.photoURL,
-          createdAt: u.metadata.creationTime ? new Date(u.metadata.creationTime).getTime() : Date.now(),
-          lastLoginAt: u.metadata.lastSignInTime ? new Date(u.metadata.lastSignInTime).getTime() : Date.now(),
-          status: u.disabled ? 'disabled' : 'active',
-          role: isAdmin ? 'admin' : 'user',
-          totalActivities: 0,
-          totalEntries: 0,
-        });
+      const userList = await adminAuth.listUsers(500);
+      totalUsers = userList.users.length;
+      userList.users.forEach((u) => {
+        const lastSignIn = u.metadata.lastSignInTime ? new Date(u.metadata.lastSignInTime).getTime() : 0;
+        if (lastSignIn >= sevenDaysAgo) activeUsers++;
+        if (lastSignIn >= oneDayAgo) dailyActiveUsers++;
       });
-    } catch (listErr: any) {
-      console.warn('[Admin] adminAuth.listUsers fallback to Firestore metrics:', listErr?.message || listErr);
+    } catch {
+      totalUsers = 1;
+      activeUsers = 1;
+      dailyActiveUsers = 1;
     }
 
-    // 2. Discover active user metrics from Firestore activity logs
+    // 2. Count reports and statuses
+    let totalReports = 0;
+    let pendingReports = 0;
+    let resolvedReports = 0;
+    let underageReports = 0;
+
     try {
-      const logsSnap = await adminDb.collection('admin_activity_logs').limit(300).get();
-      logsSnap.forEach((docSnap) => {
-        const d = docSnap.data();
-        const uid = d.userId;
-        if (uid && uid !== 'anonymous') {
-          if (!usersMap.has(uid)) {
-            usersMap.set(uid, {
-              uid,
-              displayName: d.userName || (d.userEmail ? d.userEmail.split('@')[0] : 'Somotoz User'),
-              email: d.userEmail || '',
-              createdAt: d.timestamp || Date.now(),
-              lastLoginAt: d.timestamp || Date.now(),
-              status: 'active',
-              role: (d.userEmail || '').toLowerCase() === configuredAdminEmail ? 'admin' : 'user',
-              totalActivities: 1,
-              totalEntries: 0,
-            });
-          } else {
-            const u = usersMap.get(uid);
-            u.totalActivities = (u.totalActivities || 0) + 1;
-            if (d.timestamp && d.timestamp > u.lastLoginAt) {
-              u.lastLoginAt = d.timestamp;
-            }
-          }
-        }
+      const repSnap = await adminDb.collection('reports').get();
+      totalReports = repSnap.size;
+      repSnap.forEach((doc) => {
+        const d = doc.data();
+        if (d.status === 'pending') pendingReports++;
+        else resolvedReports++;
+        if (d.reason === 'underage') underageReports++;
       });
-    } catch (e) {
+    } catch {
+      // Fallback somo_reports
+      try {
+        const fallbackRepSnap = await adminDb.collection('somo_reports').get();
+        totalReports = fallbackRepSnap.size;
+        fallbackRepSnap.forEach((doc) => {
+          const d = doc.data();
+          if (d.status === 'pending') pendingReports++;
+          else resolvedReports++;
+          if (d.reason === 'underage') underageReports++;
+        });
+      } catch {
+        // Ignored
+      }
+    }
+
+    // 3. Count suspended / banned users
+    let suspendedUsers = 0;
+    let bannedUsers = 0;
+    try {
+      const statusSnap = await adminDb.collection('user_status').get();
+      statusSnap.forEach((doc) => {
+        const st = doc.data()?.status;
+        if (st === 'suspended') suspendedUsers++;
+        else if (st === 'banned') bannedUsers++;
+      });
+    } catch {
       // Ignored
     }
 
-    // 3. Ensure the authenticated administrator is represented
-    if (check.user && !usersMap.has(check.user.uid)) {
-      usersMap.set(check.user.uid, {
-        uid: check.user.uid,
-        displayName: check.user.name || (check.user.email ? check.user.email.split('@')[0] : 'Som Maurya'),
-        email: check.user.email,
-        createdAt: Date.now() - 86400000 * 7,
-        lastLoginAt: Date.now(),
-        status: 'active',
-        role: 'admin',
-        totalActivities: 1,
-        totalEntries: 0,
-      });
-    }
+    // 4. AI Usage - COUNTS ONLY (strictly metadata, zero prompt text)
+    let totalReflectionsCount = 0;
+    let totalChatMessagesCount = 0;
+    let totalWisdomQueriesCount = 0;
 
-    return res.json({ success: true, users: Array.from(usersMap.values()) });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Users list fetch failed.' });
-  }
-});
-
-// Admin User Management: Enable / Disable Access (Real Firebase Auth + Firestore status)
-app.post('/api/admin/users/:userId/status', async (req: Request, res: Response) => {
-  const check = await verifyAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
-  }
-
-  try {
-    const { userId } = req.params;
-    const { isDisabled, reason } = req.body || {};
-    const disabled = Boolean(isDisabled);
-
-    // 1. Update Firebase Authentication user state
     try {
-      await adminAuth.updateUser(userId, { disabled });
-      console.log(`[Admin] Successfully updated Firebase Auth account ${userId} disabled=${disabled}`);
-    } catch (authErr: any) {
-      console.warn('[Admin] adminAuth.updateUser notice:', authErr?.message || authErr);
-    }
-
-    // 2. Persist in Firestore user_status
-    try {
-      await adminDb.collection('user_status').doc(userId).set({
-        userId,
-        isDisabled: disabled,
-        reason: reason || (disabled ? 'Disabled by administrator' : 'Restored by administrator'),
-        updatedBy: check.user?.email,
-        updatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
-    } catch (dbErr: any) {
-      console.warn('[Admin] Firestore user_status update notice:', dbErr?.message || dbErr);
-    }
-
-    // 3. Log administrative audit entry
-    await persistActivityLog({
-      userId: check.user?.uid || 'admin',
-      userEmail: check.user?.email || 'admin@somotoz.ai',
-      userName: check.user?.name || 'Administrator',
-      activityType: 'admin_action',
-      query: `${disabled ? 'Disabled' : 'Enabled'} access for user ${userId}`,
-      feature: 'User Governance',
-      status: 'success',
-    });
-
-    return res.json({ success: true, isDisabled: disabled });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Status update failed.' });
-  }
-});
-
-// Admin User Management: Set User Role (Custom Claims admin: true / false)
-app.post('/api/admin/users/:userId/role', async (req: Request, res: Response) => {
-  const check = await verifyAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
-  }
-
-  try {
-    const { userId } = req.params;
-    const { role } = req.body || {};
-    const isAdminRole = role === 'admin';
-
-    // 1. Set custom claims on Firebase Auth
-    try {
-      await adminAuth.setCustomUserClaims(userId, { admin: isAdminRole, role: isAdminRole ? 'admin' : 'user' });
-    } catch (claimErr: any) {
-      console.warn('[Admin] setCustomUserClaims notice:', claimErr?.message || claimErr);
-    }
-
-    // 2. Update Firestore admin_roles
-    try {
-      if (isAdminRole) {
-        await adminDb.collection('admin_roles').doc(userId).set({
-          uid: userId,
-          role: 'admin',
-          assignedBy: check.user?.email,
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
-      } else {
-        await adminDb.collection('admin_roles').doc(userId).delete();
-      }
-    } catch (roleErr: any) {
-      console.warn('[Admin] admin_roles sync notice:', roleErr?.message || roleErr);
-    }
-
-    await persistActivityLog({
-      userId: check.user?.uid || 'admin',
-      userEmail: check.user?.email || 'admin@somotoz.ai',
-      userName: check.user?.name || 'Administrator',
-      activityType: 'admin_action',
-      query: `Updated role for user ${userId} to ${isAdminRole ? 'admin' : 'user'}`,
-      feature: 'Role Governance',
-      status: 'success',
-    });
-
-    return res.json({ success: true, role: isAdminRole ? 'admin' : 'user' });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Role update failed.' });
-  }
-});
-
-// Admin User Management: Edit Permitted Profile Data
-app.post('/api/admin/users/:userId/edit', async (req: Request, res: Response) => {
-  const check = await verifyAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
-  }
-
-  try {
-    const { userId } = req.params;
-    const { displayName, bio } = req.body || {};
-
-    // Update in Firestore user profile
-    try {
-      await adminDb.collection('users').doc(userId).collection('profile').doc('main').set({
-        ...(displayName ? { displayName } : {}),
-        ...(bio !== undefined ? { bio } : {}),
-        updatedAt: FieldValue.serverTimestamp(),
-        updatedByAdmin: check.user?.email,
-      }, { merge: true });
-    } catch (e: any) {
-      console.warn('[Admin] Profile doc edit notice:', e?.message || e);
-    }
-
-    await persistActivityLog({
-      userId: check.user?.uid || 'admin',
-      userEmail: check.user?.email || 'admin@somotoz.ai',
-      userName: check.user?.name || 'Administrator',
-      activityType: 'admin_action',
-      query: `Updated application profile for user ${userId}: ${displayName || 'bio'}`,
-      feature: 'User Governance',
-      status: 'success',
-    });
-
-    return res.json({ success: true });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Profile edit failed.' });
-  }
-});
-
-// Admin User Management: Delete User Application Data ONLY (Does NOT delete Firebase Auth account)
-app.delete('/api/admin/users/:userId/data', async (req: Request, res: Response) => {
-  const check = await verifyAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
-  }
-
-  try {
-    const { userId } = req.params;
-
-    // Delete application data from Firestore
-    try {
-      const entriesSnap = await adminDb.collection('users').doc(userId).collection('entries').get();
-      for (const d of entriesSnap.docs) {
-        await d.ref.delete();
-      }
-
-      const actsSnap = await adminDb.collection('users').doc(userId).collection('activities').get();
-      for (const d of actsSnap.docs) {
-        await d.ref.delete();
-      }
-
-      await adminDb.collection('users').doc(userId).collection('profile').doc('main').delete();
-    } catch (dbErr: any) {
-      console.warn('[Admin] Somotoz data deletion notice:', dbErr?.message || dbErr);
-    }
-
-    await persistActivityLog({
-      userId: check.user?.uid || 'admin',
-      userEmail: check.user?.email || 'admin@somotoz.ai',
-      userName: check.user?.name || 'Administrator',
-      activityType: 'admin_action',
-      query: `Deleted all Somotoz application data for user ${userId}`,
-      feature: 'User Governance',
-      status: 'success',
-    });
-
-    return res.json({ success: true });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Data deletion failed.' });
-  }
-});
-
-// Admin Activity Logs: Real Persistent Firestore Records
-app.get('/api/admin/activity-logs', async (req: Request, res: Response) => {
-  const check = await verifyAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
-  }
-
-  try {
-    const { type, status, search, limitCount } = req.query;
-    const limitNum = Math.min(Number(limitCount) || 200, 500);
-
-    let logs: ServerActivityRecord[] = [];
-
-    // Query real persistent Firestore records
-    try {
-      const snap = await adminDb.collection('admin_activity_logs')
-        .orderBy('timestamp', 'desc')
-        .limit(limitNum)
-        .get();
-
-      logs = snap.docs.map(doc => {
+      const logsSnap = await adminDb.collection('admin_activity_logs').limit(500).get();
+      logsSnap.forEach((doc) => {
         const d = doc.data();
-        return {
-          id: doc.id,
-          userId: d.userId || '',
-          userEmail: d.userEmail || '',
-          userName: d.userName,
-          activityType: d.activityType || 'ai_query',
-          query: d.query || '',
-          feature: d.feature || '',
-          status: d.status || 'success',
-          tokens: d.tokens || 0,
-          modelUsed: d.modelUsed,
-          metadata: d.metadata,
-          timestamp: d.timestamp || Date.now(),
-        };
-      });
-    } catch (dbErr) {
-      console.warn('[Admin] Firestore logs fetch notice, using hot-cache:', dbErr);
-      logs = [...activityLogsHotCache];
-    }
-
-    // Apply filters
-    if (type && type !== 'all') {
-      logs = logs.filter((l) => l.activityType === type);
-    }
-    if (status && status !== 'all') {
-      logs = logs.filter((l) => l.status === status);
-    }
-    if (search && typeof search === 'string' && search.trim()) {
-      const term = search.toLowerCase().trim();
-      logs = logs.filter(
-        (l) =>
-          l.query.toLowerCase().includes(term) ||
-          l.userEmail.toLowerCase().includes(term) ||
-          l.userId.toLowerCase().includes(term) ||
-          l.feature.toLowerCase().includes(term) ||
-          (l.userName && l.userName.toLowerCase().includes(term))
-      );
-    }
-
-    return res.json({ success: true, logs });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Logs fetch failed.' });
-  }
-});
-
-// Admin Analytics Overview: REAL Firestore & Firebase Auth Telemetry
-app.get('/api/admin/analytics', async (req: Request, res: Response) => {
-  const check = await verifyAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
-  }
-
-  try {
-    let logs: ServerActivityRecord[] = [];
-
-    // 1. Fetch real logs from Firestore
-    try {
-      const snap = await adminDb.collection('admin_activity_logs')
-        .orderBy('timestamp', 'desc')
-        .limit(500)
-        .get();
-
-      logs = snap.docs.map(doc => {
-        const d = doc.data();
-        return {
-          id: doc.id,
-          userId: d.userId || '',
-          userEmail: d.userEmail || '',
-          userName: d.userName,
-          activityType: d.activityType || 'ai_query',
-          query: d.query || '',
-          feature: d.feature || '',
-          status: d.status || 'success',
-          tokens: d.tokens || 0,
-          modelUsed: d.modelUsed,
-          metadata: d.metadata,
-          timestamp: d.timestamp || Date.now(),
-        };
+        if (d.activityType === 'reflection') totalReflectionsCount++;
+        else if (d.activityType === 'ai_query' || d.activityType === 'media_gen') totalChatMessagesCount++;
+        else if (d.activityType === 'search') totalWisdomQueriesCount++;
       });
     } catch {
-      logs = [...activityLogsHotCache];
+      // Ignored
     }
 
-    // 2. Compute real total users from Firebase Auth or unique UIDs
-    let totalUsers = 0;
-    try {
-      const userList = await adminAuth.listUsers(100);
-      totalUsers = userList.users.length;
-    } catch {
-      const uniqueUids = new Set(logs.map(l => l.userId).filter(u => u && u !== 'anonymous'));
-      totalUsers = Math.max(uniqueUids.size, check.user ? 1 : 0);
-    }
+    const totalAiQueries = totalChatMessagesCount + totalWisdomQueriesCount + totalReflectionsCount;
 
-    // 3. Compute real active users (active in the last 7 days)
-    const sevenDaysAgo = Date.now() - 7 * 86400000;
-    const activeUids = new Set(
-      logs.filter(l => l.timestamp >= sevenDaysAgo && l.userId && l.userId !== 'anonymous').map(l => l.userId)
-    );
-    const activeUsers = Math.max(activeUids.size, check.user ? 1 : 0);
-
-    const totalAiQueries = logs.filter(
-      (l) => l.activityType === 'ai_query' || l.activityType === 'media_gen'
-    ).length;
-    const totalSearches = logs.filter((l) => l.activityType === 'search').length;
-    const totalReflections = logs.filter((l) => l.activityType === 'reflection').length;
-
-    // 4. Compute real 7-day trend
+    // Daily trends map (counts only)
     const trendsMap = new Map<string, { aiQueries: number; searches: number; reflections: number }>();
-    const now = new Date();
+    const today = new Date();
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
+      const d = new Date(today);
       d.setDate(d.getDate() - i);
       const key = d.toISOString().split('T')[0];
       trendsMap.set(key, { aiQueries: 0, searches: 0, reflections: 0 });
     }
-
-    logs.forEach((log) => {
-      const dateKey = new Date(log.timestamp).toISOString().split('T')[0];
-      if (trendsMap.has(dateKey)) {
-        const item = trendsMap.get(dateKey)!;
-        if (log.activityType === 'ai_query' || log.activityType === 'media_gen') item.aiQueries += 1;
-        else if (log.activityType === 'search') item.searches += 1;
-        else if (log.activityType === 'reflection') item.reflections += 1;
-      }
-    });
 
     const activityTrends = Array.from(trendsMap.entries()).map(([date, counts]) => ({
       date: date.slice(5),
@@ -2575,178 +2420,710 @@ app.get('/api/admin/analytics', async (req: Request, res: Response) => {
     }));
 
     return res.json({
-      totalUsers,
-      activeUsers,
-      totalAiQueries,
-      totalSearches,
-      totalReflections,
-      recentActivityCount: logs.length,
-      activityTrends,
-      loggingStartDate: logs.length > 0 ? new Date(Math.min(...logs.map(l => l.timestamp))).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      success: true,
+      analytics: {
+        totalUsers: Math.max(totalUsers, 1),
+        activeUsers: Math.max(activeUsers, 1),
+        dailyActiveUsers: Math.max(dailyActiveUsers, 1),
+        suspendedUsers,
+        bannedUsers,
+        totalReports,
+        pendingReports,
+        resolvedReports,
+        underageReports,
+        totalReflectionsCount,
+        totalChatMessagesCount,
+        totalWisdomQueriesCount,
+        totalAiQueries,
+        totalSearches: totalWisdomQueriesCount,
+        totalReflections: totalReflectionsCount,
+        recentActivityCount: totalAiQueries,
+        activityTrends,
+      },
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'Analytics fetch failed.' });
   }
 });
 
-// User Report Submission Endpoint (Report inappropriate behavior / under-18 / harassment)
-app.post('/api/reports', async (req: Request, res: Response) => {
-  try {
-    const authUser = await authenticateUserRequest(req);
-    const body = (req.body && typeof req.body === 'object') ? req.body : {};
-    const reportId = body.id || `rep_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const reportData = {
-      id: reportId,
-      reporterId: authUser?.uid || body.reporterId || 'anonymous',
-      reporterEmail: authUser?.email || body.reporterEmail || '',
-      reportedUserId: body.reportedUserId || '',
-      reportedUserName: body.reportedUserName || 'Somotoz User',
-      reportedSomoId: body.reportedSomoId || '',
-      reason: body.reason || 'other',
-      details: (body.details || '').slice(0, 2000),
-      timestamp: Date.now(),
-      status: 'pending',
-    };
+// Admin Users List (Account metadata, status, report counts - NO CHAT VIEWER)
+app.get('/api/admin/users', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req, false);
+  if (!check.authorized || !check.user) {
+    return res.status(check.statusCode || 403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
 
+  try {
+    const searchTerm = (req.query.search as string || '').toLowerCase().trim();
+    const usersMap = new Map<string, any>();
+
+    // 1. Fetch real Firebase Authentication users
     try {
-      await adminDb.collection('somo_reports').doc(reportId).set(reportData);
-    } catch (dbErr) {
-      console.warn('[Reports] Firestore write notice:', dbErr);
+      const listResult = await adminAuth.listUsers(200);
+      listResult.users.forEach((u) => {
+        const isAdmin = u.customClaims?.admin === true && u.emailVerified === true;
+        usersMap.set(u.uid, {
+          uid: u.uid,
+          displayName: u.displayName || (u.email ? u.email.split('@')[0] : 'Somotoz User'),
+          username: u.displayName ? u.displayName.toLowerCase().replace(/\s+/g, '_') : undefined,
+          email: u.email || '',
+          photoURL: u.photoURL,
+          createdAt: u.metadata.creationTime ? new Date(u.metadata.creationTime).getTime() : Date.now(),
+          lastLoginAt: u.metadata.lastSignInTime ? new Date(u.metadata.lastSignInTime).getTime() : Date.now(),
+          status: u.disabled ? 'suspended' : 'active',
+          role: isAdmin ? 'admin' : 'user',
+          reportCount: 0,
+          isUnderageReported: false,
+          isSuspicious: false,
+          totalActivities: 0,
+          totalEntries: 0,
+        });
+      });
+    } catch (listErr: any) {
+      console.warn('[Admin Users] listUsers fallback:', listErr?.message || listErr);
     }
 
-    await persistActivityLog({
-      userId: authUser?.uid || 'anonymous',
-      userEmail: authUser?.email || 'anonymous@somotoz.ai',
-      userName: authUser?.name,
-      activityType: 'admin_action',
-      query: `User filed report against ${reportData.reportedUserId || reportData.reportedSomoId} (Reason: ${reportData.reason})`,
-      feature: 'SomoChat Moderation',
-      status: 'success',
-    });
+    // 2. Fetch User Status from Firestore (`user_status`)
+    try {
+      const statusSnap = await adminDb.collection('user_status').get();
+      statusSnap.forEach((doc) => {
+        const uid = doc.id;
+        const d = doc.data();
+        if (usersMap.has(uid)) {
+          const u = usersMap.get(uid);
+          u.status = d.status || (d.isDisabled ? 'suspended' : 'active');
+          u.disabledReason = d.reason;
+        }
+      });
+    } catch {
+      // Ignored
+    }
 
-    return res.json({ success: true, reportId });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message || 'Could not submit report.' });
+    // 3. Count reports per user to populate `reportCount` & `isUnderageReported`
+    try {
+      const reportsSnap = await adminDb.collection('reports').get();
+      reportsSnap.forEach((doc) => {
+        const d = doc.data();
+        const reportedUid = d.reportedUserId;
+        if (reportedUid && usersMap.has(reportedUid)) {
+          const u = usersMap.get(reportedUid);
+          u.reportCount = (u.reportCount || 0) + 1;
+          if (d.reason === 'underage') u.isUnderageReported = true;
+          if (u.reportCount >= 2) u.isSuspicious = true;
+        }
+      });
+    } catch {
+      // Fallback somo_reports
+      try {
+        const somoReportsSnap = await adminDb.collection('somo_reports').get();
+        somoReportsSnap.forEach((doc) => {
+          const d = doc.data();
+          const reportedUid = d.reportedUserId;
+          if (reportedUid && usersMap.has(reportedUid)) {
+            const u = usersMap.get(reportedUid);
+            u.reportCount = (u.reportCount || 0) + 1;
+            if (d.reason === 'underage') u.isUnderageReported = true;
+            if (u.reportCount >= 2) u.isSuspicious = true;
+          }
+        });
+      } catch {
+        // Ignored
+      }
+    }
+
+    let allUsers = Array.from(usersMap.values());
+
+    // Search filter across username, UID, or email
+    if (searchTerm) {
+      allUsers = allUsers.filter(
+        (u) =>
+          u.uid.toLowerCase().includes(searchTerm) ||
+          u.email.toLowerCase().includes(searchTerm) ||
+          u.displayName.toLowerCase().includes(searchTerm) ||
+          (u.username && u.username.toLowerCase().includes(searchTerm))
+      );
+    }
+
+    return res.json({ success: true, users: allUsers });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Users list fetch failed.' });
   }
 });
 
-// Admin Reports Listing Endpoint
-app.get('/api/admin/reports', async (req: Request, res: Response) => {
-  const check = await verifyAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+// Admin User Moderation Action: Suspend, Unsuspend, Ban, Delete Account
+// MANDATORY: Re-authenticate within last 5 minutes AND provide explanatory note
+app.post('/api/admin/users/:userId/action', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req, true);
+  if (!check.authorized || !check.user) {
+    return res.status(check.statusCode || 401).json({
+      error: check.reauthRequired ? 'REAUTH_REQUIRED' : (check.error || 'Unauthorized'),
+      message: check.error || 'Recent re-authentication required (within last 5 minutes).',
+    });
+  }
+
+  const { userId } = req.params;
+  const { action, note } = req.body || {};
+
+  const validActions = ['suspend', 'unsuspend', 'ban', 'delete'];
+  if (!validActions.includes(action)) {
+    return res.status(400).json({ error: 'INVALID_ACTION', message: `Action must be one of: ${validActions.join(', ')}` });
+  }
+
+  if (!note || typeof note !== 'string' || note.trim().length < 5) {
+    return res.status(400).json({
+      error: 'INVALID_NOTE',
+      message: 'A descriptive explanatory note (minimum 5 characters) is mandatory for all user moderation actions.',
+    });
   }
 
   try {
-    const snapshot = await adminDb.collection('somo_reports').orderBy('timestamp', 'desc').limit(100).get();
-    const reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    return res.json({ success: true, reports });
+    let targetUserName = '';
+
+    if (action === 'suspend') {
+      try {
+        await adminAuth.updateUser(userId, { disabled: true });
+        await adminAuth.revokeRefreshTokens(userId);
+      } catch (authErr: any) {
+        console.warn('[Admin] adminAuth.updateUser notice:', authErr?.message || authErr);
+      }
+      await adminDb.collection('user_status').doc(userId).set({
+        status: 'suspended',
+        isDisabled: true,
+        reason: note.trim(),
+        updatedBy: check.user.email,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    } else if (action === 'unsuspend') {
+      try {
+        await adminAuth.updateUser(userId, { disabled: false });
+      } catch (authErr: any) {
+        console.warn('[Admin] adminAuth.updateUser notice:', authErr?.message || authErr);
+      }
+      await adminDb.collection('user_status').doc(userId).set({
+        status: 'active',
+        isDisabled: false,
+        reason: note.trim(),
+        updatedBy: check.user.email,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    } else if (action === 'ban') {
+      try {
+        await adminAuth.updateUser(userId, { disabled: true });
+        await adminAuth.revokeRefreshTokens(userId);
+      } catch (authErr: any) {
+        console.warn('[Admin] adminAuth.updateUser notice:', authErr?.message || authErr);
+      }
+      await adminDb.collection('user_status').doc(userId).set({
+        status: 'banned',
+        isDisabled: true,
+        reason: note.trim(),
+        updatedBy: check.user.email,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    } else if (action === 'delete') {
+      try {
+        await adminAuth.revokeRefreshTokens(userId);
+        await adminAuth.updateUser(userId, { disabled: true });
+      } catch {
+        // Ignored
+      }
+      // Schedule account deletion with retention window tracking
+      await adminDb.collection('user_status').doc(userId).set({
+        status: 'scheduled_for_deletion',
+        deletionScheduledAt: Date.now(),
+        reason: note.trim(),
+        updatedBy: check.user.email,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      // Clean application profile
+      try {
+        await adminDb.collection('users').doc(userId).collection('profile').doc('main').delete();
+      } catch {
+        // Ignored
+      }
+    }
+
+    // Immutable record in admin_action_logs
+    await recordAdminActionLog({
+      adminUid: check.user.uid,
+      adminEmail: check.user.email,
+      action: `${action}_user`,
+      targetId: userId,
+      targetType: 'user',
+      targetUserName,
+      note: note.trim(),
+      req,
+      metadata: { targetStatus: action },
+    });
+
+    return res.json({ success: true, action, userId });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Moderation action failed.' });
+  }
+});
+
+// Admin Reports List (Displays ONLY attached messages - up to 20 messages attached by reporter)
+app.get('/api/admin/reports', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req, false);
+  if (!check.authorized || !check.user) {
+    return res.status(check.statusCode || 403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
+  try {
+    const reportsMap = new Map<string, any>();
+
+    // 1. Primary collection: `reports`
+    try {
+      const snap = await adminDb.collection('reports').orderBy('timestamp', 'desc').limit(150).get();
+      snap.docs.forEach((doc) => {
+        const d = doc.data();
+        reportsMap.set(doc.id, {
+          id: doc.id,
+          reporterId: d.reporterId || '',
+          reporterEmail: d.reporterEmail,
+          reportedUserId: d.reportedUserId || '',
+          reportedUserName: d.reportedUserName,
+          reportedSomoId: d.reportedSomoId,
+          reason: d.reason || 'other',
+          details: d.details || '',
+          priority: d.reason === 'underage' ? 'critical' : (d.priority || 'normal'),
+          // Only the messages the reporter attached
+          attachedMessages: Array.isArray(d.attachedMessages) ? d.attachedMessages.slice(0, 20) : [],
+          timestamp: d.timestamp || Date.now(),
+          status: d.status || 'pending',
+          moderatorNote: d.moderatorNote,
+          actionedAt: d.actionedAt,
+          actionedBy: d.actionedBy,
+        });
+      });
+    } catch {
+      // Ignored
+    }
+
+    // 2. Legacy fallback collection: `somo_reports`
+    if (reportsMap.size === 0) {
+      try {
+        const fallbackSnap = await adminDb.collection('somo_reports').orderBy('timestamp', 'desc').limit(150).get();
+        fallbackSnap.docs.forEach((doc) => {
+          const d = doc.data();
+          reportsMap.set(doc.id, {
+            id: doc.id,
+            reporterId: d.reporterId || '',
+            reporterEmail: d.reporterEmail,
+            reportedUserId: d.reportedUserId || '',
+            reportedUserName: d.reportedUserName,
+            reportedSomoId: d.reportedSomoId,
+            reason: d.reason || 'other',
+            details: d.details || '',
+            priority: d.reason === 'underage' ? 'critical' : 'normal',
+            attachedMessages: Array.isArray(d.attachedMessages) ? d.attachedMessages.slice(0, 20) : [],
+            timestamp: d.timestamp || Date.now(),
+            status: d.status || 'pending',
+            moderatorNote: d.moderatorNote,
+            actionedAt: d.actionedAt,
+            actionedBy: d.actionedBy,
+          });
+        });
+      } catch {
+        // Ignored
+      }
+    }
+
+    return res.json({ success: true, reports: Array.from(reportsMap.values()) });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Failed to fetch reports.' });
   }
 });
 
-// Admin Update Report Status
-app.post('/api/admin/reports/:reportId/status', async (req: Request, res: Response) => {
-  const check = await verifyAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+// Admin Report Action: Dismiss, Warn, Suspend, Ban
+// MANDATORY: Re-authenticate within last 5 minutes AND provide explanatory note
+app.post('/api/admin/reports/:reportId/action', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req, true);
+  if (!check.authorized || !check.user) {
+    return res.status(check.statusCode || 401).json({
+      error: check.reauthRequired ? 'REAUTH_REQUIRED' : (check.error || 'Unauthorized'),
+      message: check.error || 'Recent re-authentication required (within last 5 minutes).',
+    });
+  }
+
+  const { reportId } = req.params;
+  const { action, note } = req.body || {};
+
+  const validActions = ['dismiss', 'warn', 'suspend', 'ban'];
+  if (!validActions.includes(action)) {
+    return res.status(400).json({ error: 'INVALID_ACTION', message: `Action must be one of: ${validActions.join(', ')}` });
+  }
+
+  if (!note || typeof note !== 'string' || note.trim().length < 5) {
+    return res.status(400).json({
+      error: 'INVALID_NOTE',
+      message: 'A descriptive explanatory note (minimum 5 characters) is mandatory when resolving reports.',
+    });
   }
 
   try {
-    const { reportId } = req.params;
-    const { status } = req.body || {};
-    await adminDb.collection('somo_reports').doc(reportId).update({
-      status: status || 'reviewed',
-      reviewedAt: Date.now(),
-      reviewedBy: check.user?.email || 'admin',
+    let reportDoc = await adminDb.collection('reports').doc(reportId).get();
+    let isSomoCol = false;
+    if (!reportDoc.exists) {
+      reportDoc = await adminDb.collection('somo_reports').doc(reportId).get();
+      isSomoCol = true;
+    }
+
+    const reportData = reportDoc.data() || {};
+    const reportedUserId = reportData.reportedUserId;
+
+    // Update Report Status
+    const updatePayload = {
+      status: action === 'dismiss' ? 'dismissed' : action === 'warn' ? 'warned' : action === 'suspend' ? 'suspended' : 'banned',
+      moderatorNote: note.trim(),
+      actionedAt: Date.now(),
+      actionedBy: check.user.email,
+    };
+
+    if (isSomoCol) {
+      await adminDb.collection('somo_reports').doc(reportId).set(updatePayload, { merge: true });
+    } else {
+      await adminDb.collection('reports').doc(reportId).set(updatePayload, { merge: true });
+    }
+
+    // Execute user suspension or ban if applicable
+    if ((action === 'suspend' || action === 'ban') && reportedUserId) {
+      try {
+        await adminAuth.updateUser(reportedUserId, { disabled: true });
+        await adminAuth.revokeRefreshTokens(reportedUserId);
+      } catch (authErr: any) {
+        console.warn('[Admin Reports] User suspension notice:', authErr?.message || authErr);
+      }
+      await adminDb.collection('user_status').doc(reportedUserId).set({
+        status: action === 'suspend' ? 'suspended' : 'banned',
+        isDisabled: true,
+        reason: `Enforced via report resolution (${reportId}): ${note.trim()}`,
+        updatedBy: check.user.email,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+
+    // Record in admin_action_logs
+    await recordAdminActionLog({
+      adminUid: check.user.uid,
+      adminEmail: check.user.email,
+      action: `${action}_report`,
+      targetId: reportId,
+      targetType: 'report',
+      targetUserName: reportData.reportedUserName,
+      note: note.trim(),
+      req,
+      metadata: { reportedUserId, reportReason: reportData.reason },
     });
-    return res.json({ success: true, reportId, status });
+
+    return res.json({ success: true, reportId, action, status: updatePayload.status });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message || 'Failed to update report status.' });
+    return res.status(500).json({ error: err.message || 'Report action failed.' });
   }
 });
 
-// Legal Request Export Endpoint (Compliance-focused, strictly logged, server-side verified)
-app.post('/api/admin/legal-export', async (req: Request, res: Response) => {
-  const check = await verifyAdminRequest(req);
-  if (!check.authorized) {
-    return res.status(403).json({ error: check.error || 'Forbidden: Admin authorization required' });
-  }
-
-  const { targetUserId, caseReference, authorityReason } = req.body || {};
-  if (!targetUserId || !caseReference) {
-    return res.status(400).json({ error: 'targetUserId and valid caseReference are required for legal exports.' });
+// Admin Action Log Queue: Who did what, when, and why
+app.get('/api/admin/action-logs', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req, false);
+  if (!check.authorized || !check.user) {
+    return res.status(check.statusCode || 403).json({ error: check.error || 'Forbidden: Admin authorization required' });
   }
 
   try {
-    // 1. Fetch user account metadata from Firebase Admin SDK
-    let authRecord: any = null;
+    const snap = await adminDb.collection('admin_action_logs')
+      .orderBy('timestamp', 'desc')
+      .limit(200)
+      .get();
+
+    const logs: ServerAdminActionLog[] = snap.docs.map((doc) => {
+      const d = doc.data();
+      return {
+        id: doc.id,
+        adminUid: d.adminUid || '',
+        adminEmail: d.adminEmail || '',
+        action: d.action || '',
+        targetId: d.targetId || '',
+        targetType: d.targetType || 'user',
+        targetUserName: d.targetUserName,
+        note: d.note || '',
+        timestamp: d.timestamp || Date.now(),
+        ipAddress: d.ipAddress,
+        metadata: d.metadata,
+      };
+    });
+
+    return res.json({ success: true, logs });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to fetch action logs.' });
+  }
+});
+
+// Suspicious Accounts & Underage Reports Queue
+app.get('/api/admin/flagged-queue', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req, false);
+  if (!check.authorized || !check.user) {
+    return res.status(check.statusCode || 403).json({ error: check.error || 'Forbidden: Admin authorization required' });
+  }
+
+  try {
+    // 1. Underage reports (Critical priority)
+    const underageReports: any[] = [];
     try {
-      authRecord = await adminAuth.getUser(targetUserId);
+      const repSnap = await adminDb.collection('reports')
+        .where('reason', '==', 'underage')
+        .orderBy('timestamp', 'desc')
+        .limit(50)
+        .get();
+      repSnap.forEach((doc) => {
+        underageReports.push({ id: doc.id, ...doc.data() });
+      });
     } catch {
-      // Ignored if user not found directly by UID
+      // Ignored
     }
 
-    // 2. Fetch profile document
-    let profileData: any = null;
+    // 2. Suspicious accounts (reports >= 2 or rapid actions)
+    const suspiciousUsers: any[] = [];
     try {
-      const pDoc = await adminDb.collection('users').doc(targetUserId).collection('profile').doc('main').get();
-      if (pDoc.exists) {
-        profileData = pDoc.data();
+      const allReports = await adminDb.collection('reports').get();
+      const reportCountByUid = new Map<string, number>();
+      allReports.forEach((doc) => {
+        const uid = doc.data().reportedUserId;
+        if (uid) {
+          reportCountByUid.set(uid, (reportCountByUid.get(uid) || 0) + 1);
+        }
+      });
+
+      for (const [uid, count] of reportCountByUid.entries()) {
+        if (count >= 2) {
+          let uRecord: any = null;
+          try {
+            uRecord = await adminAuth.getUser(uid);
+          } catch {
+            // Ignored
+          }
+          suspiciousUsers.push({
+            uid,
+            displayName: uRecord?.displayName || 'User',
+            email: uRecord?.email || '',
+            reportCount: count,
+            status: uRecord?.disabled ? 'suspended' : 'active',
+            reasons: [`Accumulated ${count} user reports`],
+          });
+        }
       }
     } catch {
       // Ignored
     }
 
-    // 3. Count total logs and activities for audit summary
-    let activityCount = 0;
+    return res.json({ success: true, underageReports, suspiciousUsers });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to fetch flagged queue.' });
+  }
+});
+
+// Legal Request Export Endpoint (Server-Side Only)
+// Target userId, legal order reference number, requesting authority, order date
+// Writes to immutable `legal_exports` collection, returns downloadable compliance JSON
+// MANDATORY: Re-authenticate within last 5 minutes
+app.post('/api/admin/legal-export', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req, true);
+  if (!check.authorized || !check.user) {
+    return res.status(check.statusCode || 401).json({
+      error: check.reauthRequired ? 'REAUTH_REQUIRED' : (check.error || 'Unauthorized'),
+      message: check.error || 'Recent re-authentication required (within last 5 minutes).',
+    });
+  }
+
+  const { targetUserId, caseReference, requestingAuthority, orderDate, note } = req.body || {};
+
+  if (!targetUserId || !caseReference || !requestingAuthority || !orderDate) {
+    return res.status(400).json({
+      error: 'MISSING_FIELDS',
+      message: 'targetUserId, caseReference, requestingAuthority, and orderDate are all mandatory for legal exports.',
+    });
+  }
+
+  try {
+    const retentionDays = parseInt(process.env.DATA_RETENTION_DAYS || '90', 10);
+    const retentionCutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+
+    // 1. Account Details
+    let authRecord: any = null;
     try {
-      const logsSnap = await adminDb.collection('admin_activity_logs').where('userId', '==', targetUserId).get();
-      activityCount = logsSnap.size;
+      authRecord = await adminAuth.getUser(targetUserId);
+    } catch {
+      // Ignored if user not found directly
+    }
+
+    let profileDoc: any = null;
+    try {
+      const pDoc = await adminDb.collection('users').doc(targetUserId).collection('profile').doc('main').get();
+      if (pDoc.exists) profileDoc = pDoc.data();
     } catch {
       // Ignored
     }
 
+    // 2. Login & IP Logs (from activity logs)
+    let loginAndIpLogs: any[] = [];
+    try {
+      const logsSnap = await adminDb.collection('admin_activity_logs')
+        .where('userId', '==', targetUserId)
+        .limit(200)
+        .get();
+      loginAndIpLogs = logsSnap.docs.map((doc) => {
+        const d = doc.data();
+        return {
+          timestamp: d.timestamp,
+          activityType: d.activityType,
+          ipAddress: d.metadata?.ip || 'anonymized_network_proxy',
+          userAgent: d.metadata?.userAgent || 'somotoz_client',
+          status: d.status,
+        };
+      });
+    } catch {
+      // Ignored
+    }
+
+    // 3. Chat Requests (Sent & Received)
+    let chatRequests: any[] = [];
+    try {
+      const outgoingSnap = await adminDb.collection('chatRequests').where('fromUid', '==', targetUserId).get();
+      outgoingSnap.forEach((doc) => chatRequests.push({ id: doc.id, direction: 'outgoing', ...doc.data() }));
+
+      const incomingSnap = await adminDb.collection('chatRequests').where('toUid', '==', targetUserId).get();
+      incomingSnap.forEach((doc) => chatRequests.push({ id: doc.id, direction: 'incoming', ...doc.data() }));
+    } catch {
+      // Ignored
+    }
+
+    // 4. Messages of that user (including soft-deleted ones still inside 90 days retention window)
+    let messages: any[] = [];
+    try {
+      const convSnap = await adminDb.collection('conversations')
+        .where('participants', 'array-contains', targetUserId)
+        .get();
+
+      for (const convDoc of convSnap.docs) {
+        const msgsSnap = await convDoc.ref.collection('messages').get();
+        msgsSnap.forEach((msgDoc) => {
+          const m = msgDoc.data();
+          // Include if active OR if soft-deleted inside retention window (deletedAt >= retentionCutoff)
+          // Strictly exclude if deleted earlier than retention cutoff
+          if (!m.deletedAt || m.deletedAt >= retentionCutoff) {
+            messages.push({
+              id: msgDoc.id,
+              conversationId: convDoc.id,
+              senderUid: m.senderUid,
+              type: m.type,
+              text: m.text,
+              mediaUrl: m.mediaUrl,
+              createdAt: m.createdAt,
+              deletedAt: m.deletedAt || null,
+              isSoftDeleted: Boolean(m.deletedAt),
+            });
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('[Legal Export] Message collection notice:', e);
+    }
+
+    const exportId = `LEGAL_EXP_${Date.now()}_${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
     const exportData = {
-      exportId: `LEGAL_EXP_${Date.now()}_${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      exportId,
       caseReference,
-      authorityReason: authorityReason || 'Official Legal Process Request',
+      requestingAuthority,
+      orderDate,
       exportedAt: new Date().toISOString(),
-      authorizedAdmin: check.user?.email,
+      authorizedAdminUid: check.user.uid,
+      authorizedAdminEmail: check.user.email,
+      retentionWindowDays: retentionDays,
+      dataScope: {
+        accountDetails: true,
+        loginAndIpLogs: true,
+        chatRequests: true,
+        conversationsWithinRetention: true,
+      },
       targetUser: {
         uid: targetUserId,
-        email: authRecord?.email || profileData?.email || 'unknown',
-        displayName: authRecord?.displayName || profileData?.displayName || '',
+        email: authRecord?.email || profileDoc?.email || 'unknown',
+        displayName: authRecord?.displayName || profileDoc?.displayName || '',
         creationTime: authRecord?.metadata?.creationTime || null,
         lastSignInTime: authRecord?.metadata?.lastSignInTime || null,
         disabled: authRecord?.disabled || false,
-        totalLoggedEvents: activityCount,
       },
-      complianceNotice: 'Strictly for legal compliance verification. Private end-to-end communication contents are not retrievable without receiver/sender authorization.',
+      auditRecords: {
+        loginAndIpLogsCount: loginAndIpLogs.length,
+        chatRequestsCount: chatRequests.length,
+        messagesCount: messages.length,
+      },
+      records: {
+        loginAndIpLogs,
+        chatRequests,
+        messages,
+      },
+      chainOfCustodyNotice: 'Generated strictly for official legal compliance. Not editable or browsable in dashboard UI.',
     };
 
-    // 4. Immutable Audit Record in admin_activity_logs
-    await persistActivityLog({
-      userId: check.user?.uid || 'admin',
-      userEmail: check.user?.email || 'admin',
-      userName: check.user?.name || 'Administrator',
-      activityType: 'admin_action',
-      query: `LEGAL_EXPORT: Case ${caseReference} for user ${targetUserId}`,
-      feature: 'Legal Compliance Audit',
-      status: 'success',
-      metadata: {
-        caseReference,
-        authorityReason,
-        targetUserId,
-        exportId: exportData.exportId,
-      },
+    // 5. Immutable record in `legal_exports` collection
+    await adminDb.collection('legal_exports').doc(exportId).set({
+      id: exportId,
+      adminId: check.user.uid,
+      adminEmail: check.user.email,
+      targetUserId,
+      caseReference,
+      requestingAuthority,
+      orderDate,
+      dataScope: 'Account details, login and IP logs, chat requests, and messages within retention window',
+      timestamp: Date.now(),
+      ipAddress: (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '',
+    });
+
+    // 6. Action log in `admin_action_logs`
+    await recordAdminActionLog({
+      adminUid: check.user.uid,
+      adminEmail: check.user.email,
+      action: 'legal_export',
+      targetId: targetUserId,
+      targetType: 'user',
+      note: note ? note.trim() : `Executed legal compliance export for Case ${caseReference} (${requestingAuthority})`,
+      req,
+      metadata: { caseReference, requestingAuthority, orderDate, exportId },
     });
 
     return res.json({ success: true, exportData });
   } catch (err: any) {
     console.error('[API /api/admin/legal-export Error]:', err);
     return res.status(500).json({ error: err.message || 'Legal export generation failed.' });
+  }
+});
+
+// Admin Manual Retention Cleanup Trigger
+// MANDATORY: Re-authenticate within last 5 minutes
+app.post('/api/admin/retention-cleanup', async (req: Request, res: Response) => {
+  const check = await verifyAdminRequest(req, true);
+  if (!check.authorized || !check.user) {
+    return res.status(check.statusCode || 401).json({
+      error: check.reauthRequired ? 'REAUTH_REQUIRED' : (check.error || 'Unauthorized'),
+      message: check.error || 'Recent re-authentication required (within last 5 minutes).',
+    });
+  }
+
+  const { note } = req.body || {};
+  if (!note || typeof note !== 'string' || note.trim().length < 5) {
+    return res.status(400).json({
+      error: 'INVALID_NOTE',
+      message: 'A descriptive explanatory note (minimum 5 characters) is required to trigger retention cleanup.',
+    });
+  }
+
+  try {
+    const result = await runRetentionCleanup(check.user.email);
+    return res.json({ success: true, ...result });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Retention cleanup failed.' });
   }
 });
 

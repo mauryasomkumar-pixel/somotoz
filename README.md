@@ -722,18 +722,30 @@ Every user interaction has a concrete walkthrough test to verify stability:
 3. Select a reason, type optional context, and click **Submit Report**.
 4. **Expected Result**: A success toast confirms submission (*"Thank you for letting us know. Our team will review this report."*), and the report is persisted to Firestore collection `somo_reports` and logged.
 
-### Test Case 4: Admin Dashboard & Privacy Guarantee (Zero Message Browsing)
+### Test Case 4: Admin Dashboard & Privacy Guarantee (Moderation & Legal Compliance Only)
 1. Navigate to `/admin` or click the **ADMIN** badge in the top navigation.
-2. Sign in with the administrator account. If not authenticated, the **Access Denied** gate appears.
+2. Sign in with an account having the custom claim `admin: true` and a verified email address. If unauthenticated, the **Access Denied** gate appears (401/403).
 3. In the Admin Dashboard:
-   - Click **ANALYTICS & OVERVIEW**: Displays real telemetry counts, prompt totals, and activity trends.
-   - Click **USER MANAGEMENT**: Lists real Firebase Authentication users (`UID`, `Email`, `Joined Date`, `Last Login`, `Status`).
-   - Click **AI QUERIES & SEARCH AUDIT**: Displays real queries logged inside Somotoz.
-   - Click **REPORTS & MODERATION**: Displays user conduct reports with action buttons (*Review*, *Dismiss*). Notice that nowhere in the dashboard can an admin view private chats or photos.
-4. Click **LEGAL EXPORT** in the header action bar:
-   - Enter a target user UID and formal case reference (e.g. `CASE-2026-7788`).
-   - Click **Generate Compliance Export**.
-   - An immutable audit log entry is written to `admin_activity_logs`, and a structured JSON compliance export (containing account-level metadata only) is displayed for download.
+   - **Overview Tab**: Displays telemetry counts (Total Accounts, DAU, Active Users, Pending Reports, Underage Reports, Suspended/Banned) and AI Usage Counts ONLY (Reflections count, Chat messages count, Wisdom searches count). Raw user prompts and journals are strictly omitted.
+   - **Users Tab**: Search accounts by username, email, or UID. Filter by status (`active`, `suspended`, `banned`, `scheduled_for_deletion`). View report counts and risk flags (`Underage Report`, `Suspicious`). Zero chat viewing interface is present.
+   - **Reports Tab**: List filed incident reports. When inspecting a report, the administrator sees **only the messages the reporter attached** (up to 20 messages) rather than full chat history. Action buttons: *Dismiss*, *Warn*, *Suspend User*, *Ban User*.
+   - **Underage & Suspicious Queue Tab**: Dedicated high-urgency triage queue for underage reports (marked CRITICAL) and high-report suspicious accounts for rapid account freezing.
+   - **Admin Action Log Tab**: Immutable audit trail showing who performed which moderation action, timestamp, target user or report, and the required explanatory note (*why*).
+4. **5-Minute Re-Authentication Gate**:
+   - Attempting any sensitive action (suspend, unsuspend, ban, delete account, resolve report, legal export, or retention cleanup) enforces that the administrator's authentication session was established within the last 5 minutes (300 seconds).
+   - If older than 5 minutes, an interactive **Recent Authentication Required** modal appears to re-verify credentials via Google before executing the action.
+5. **Mandatory Explanatory Notes**:
+   - Every moderation action on a user or report requires an explanatory note (minimum 5 characters). Submitting an empty note is strictly blocked and rejected by both client and backend API.
+6. **Legal Request Export**:
+   - Navigate to **Legal Request Export**.
+   - Input: Target User UID, Legal Order Reference Number (e.g. `SUBPOENA-US-2026-9042`), Requesting Authority, Order Date, and Compliance Note.
+   - Click **Generate & Download Compliance Export JSON**.
+   - The server aggregates account metadata, login/IP logs, chat requests, and user messages within the 90-day retention window.
+   - An immutable record is persisted in `legal_exports` and `admin_action_logs`. Nothing is displayed in the dashboard; the audited JSON compliance package is downloaded directly to the administrator's device.
+7. **Data Retention & Auto-Purge (90-Day Standard)**:
+   - Navigate to **Data Retention**.
+   - Shows status of the 12-hour background retention scheduler.
+   - Enter a note and click **Run Retention Cleanup Pass Now** to immediately purge soft-deleted messages, expired disappearing messages, and scheduled account deletions older than 90 days.
 
 ### Test Case 5: Tri-Mode Themes & Reduced Motion
 1. In the top navigation or Profile screen, click the theme selector (Day, Night, Eye Comfort).
@@ -851,6 +863,28 @@ Every user interaction has a concrete walkthrough test to verify stability:
    - In Settings or the theme switcher, select a Mood Theme (e.g. *Peaceful*, *Focused*, *Inspired*, *Calm*, *Reflective*, *Energetic*) or toggle *Theme of the Day*.
    - Verify that only accent colors and gradients (`--accent-color`, `--border-active`, etc.) adapt to the mood or day of the week.
    - Verify that the underlying base mode (Day, Night, or Eye Comfort) is never altered, and all card backgrounds, text, and inputs remain 100% readable with full contrast.
+
+---
+
+### Test Case 15: Legal Compliance — Privacy Policy, Terms of Use, Data Export & 90-Day Retention
+1. **Unauthenticated Access to Legal Pages**:
+   - Open `http://localhost:3000/privacy` or click **Privacy Policy** in the landing page footer.
+   - **Expected Result**: The complete Privacy Policy opens with transparent disclosures (18+ age mandate, server-stored messages without E2EE, Gemini AI multimodal processing, 90-day retention and purge, zero-chat admin boundaries, and legal subpoena standards).
+   - Click the back button to return to the landing page.
+   - Open `http://localhost:3000/terms` or click **Terms of Use** in the landing page footer.
+   - **Expected Result**: The complete Terms of Use page renders with explicit prohibited conduct rules, zero-tolerance child harm policy, no bot/impersonation rules, and account suspension policies.
+2. **Signup Agreement Links**:
+   - In the landing page auth card, verify the disclosure: *"By continuing, you agree to our Terms of Use and Privacy Policy. (18+ only)"*.
+   - In the 4-step onboarding modal, verify the agreement notice is clearly displayed.
+3. **Settings — User Data Export ("Download My Data")**:
+   - Navigate to **Profile** (Settings).
+   - In the **Privacy, Legal & Data Rights** card, click **Download My Data**.
+   - **Expected Result**: The system queries the user's private profile, reflections, journal entries, and chat requests, constructs a structured machine-readable JSON archive, and automatically triggers a file download named `somotoz-data-export-<username>-<timestamp>.json`. A confirmation message confirms total exported items.
+4. **Settings — Statutory Grievance Officer**:
+   - In Settings and on both legal pages, verify the designated contact details: **Som Maurya**, `grievance@somotoz.ai`, 24–48 hour response SLA.
+5. **Settings — Account Deletion with 90-Day Retention Notice**:
+   - Click **Delete Account** in the danger zone.
+   - **Expected Result**: A confirmation modal clearly explains that the username is released immediately, the profile is removed from SomoChat, and data is soft-deleted and permanently purged after 90 days in compliance with statutory retention standards.
 
 ---
 

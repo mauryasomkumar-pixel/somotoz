@@ -57,3 +57,62 @@ export async function compressProfileImage(file: File | Blob, maxSizeBytes: numb
     reader.readAsDataURL(file);
   });
 }
+
+/**
+ * Client-side image compressor for Chat photo messages.
+ * Scales to max 1280px and compresses under 400 KB for fast mobile transport.
+ */
+export async function compressChatImage(
+  file: File | Blob,
+  maxDim: number = 1280,
+  maxSizeBytes: number = 380 * 1024
+): Promise<{ dataUrl: string; sizeBytes: number }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas context not available'));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        let quality = 0.82;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        let base64Length = dataUrl.length - (dataUrl.indexOf(',') + 1);
+        let byteSize = Math.round((base64Length * 3) / 4);
+
+        while (byteSize > maxSizeBytes && quality > 0.3) {
+          quality -= 0.12;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+          base64Length = dataUrl.length - (dataUrl.indexOf(',') + 1);
+          byteSize = Math.round((base64Length * 3) / 4);
+        }
+
+        resolve({ dataUrl, sizeBytes: byteSize });
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+

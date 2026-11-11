@@ -89,6 +89,8 @@ export interface UserProfile {
   status?: 'active' | 'scheduled_for_deletion' | 'disabled';
   isAdmin?: boolean;
   role?: 'admin' | 'member';
+  notificationsEnabled?: boolean;
+  pushSubscription?: Record<string, any>;
   createdAt?: number;
   updatedAt?: number;
 }
@@ -116,7 +118,7 @@ export interface UserActivityLog {
   metadata?: Record<string, any>;
 }
 
-export type ViewMode = 'dashboard' | 'chat' | 'somochat' | 'write' | 'view' | 'edit' | 'wisdom' | 'soundscapes' | 'admin' | 'discover' | 'profile';
+export type ViewMode = 'dashboard' | 'chat' | 'somochat' | 'write' | 'view' | 'edit' | 'wisdom' | 'soundscapes' | 'admin' | 'discover' | 'profile' | 'privacy' | 'terms';
 
 export type ActivityType = 'ai_query' | 'search' | 'reflection' | 'media_gen' | 'auth' | 'admin_action';
 
@@ -135,16 +137,34 @@ export interface AdminActivityLog {
   metadata?: Record<string, any>;
 }
 
+export interface AdminActionLog {
+  id: string;
+  adminUid: string;
+  adminEmail: string;
+  action: 'suspend' | 'unsuspend' | 'ban' | 'delete_account' | 'dismiss_report' | 'warn_user' | 'suspend_user' | 'ban_user' | 'legal_export' | 'retention_cleanup' | string;
+  targetId: string;
+  targetType: 'user' | 'report' | 'system';
+  targetUserName?: string;
+  note: string; // Mandatory explanation of why the action was taken
+  timestamp: number;
+  ipAddress?: string;
+  metadata?: Record<string, any>;
+}
+
 export interface ManagedUser {
   uid: string;
   displayName: string;
+  username?: string;
   email: string;
   photoURL?: string | null;
   createdAt: number;
   lastLoginAt: number;
   lastActiveAt?: number;
-  status: 'active' | 'disabled';
+  status: 'active' | 'suspended' | 'banned' | 'scheduled_for_deletion' | 'disabled';
   disabledReason?: string;
+  reportCount?: number;
+  isUnderageReported?: boolean;
+  isSuspicious?: boolean;
   totalActivities: number;
   totalAiQueries?: number;
   totalSearches?: number;
@@ -156,6 +176,16 @@ export interface ManagedUser {
 export interface AdminAnalytics {
   totalUsers: number;
   activeUsers: number;
+  dailyActiveUsers: number;
+  suspendedUsers: number;
+  bannedUsers: number;
+  pendingReports: number;
+  resolvedReports: number;
+  underageReports: number;
+  // AI Usage - Counts ONLY
+  totalReflectionsCount: number;
+  totalChatMessagesCount: number;
+  totalWisdomQueriesCount: number;
   totalAiQueries: number;
   totalSearches: number;
   totalReflections: number;
@@ -301,6 +331,15 @@ export interface SomoChannel {
   lastTimestamp?: number;
 }
 
+export interface AttachedReportMessage {
+  id: string;
+  senderUid: string;
+  type: string;
+  text: string;
+  createdAt: number;
+  mediaUrl?: string;
+}
+
 export interface SomoReport {
   id: string;
   reporterId: string;
@@ -308,10 +347,15 @@ export interface SomoReport {
   reportedUserId: string;
   reportedUserName?: string;
   reportedSomoId?: string;
-  reason: 'harassment' | 'spam' | 'inappropriate_content' | 'underage' | 'other';
+  reason: 'spam' | 'harassment' | 'fake_bot' | 'nudity' | 'underage' | 'inappropriate_content' | 'other';
   details?: string;
+  priority?: 'critical' | 'high' | 'normal';
+  attachedMessages?: AttachedReportMessage[];
   timestamp: number;
-  status: 'pending' | 'reviewed' | 'action_taken' | 'dismissed';
+  status: 'pending' | 'dismissed' | 'warned' | 'suspended' | 'banned';
+  moderatorNote?: string;
+  actionedAt?: number;
+  actionedBy?: string;
 }
 
 export interface LegalExportLog {
@@ -321,5 +365,7 @@ export interface LegalExportLog {
   targetUserId: string;
   caseReference: string;
   authorityReason: string;
+  orderDate?: string;
+  dataScope: string;
   timestamp: number;
 }

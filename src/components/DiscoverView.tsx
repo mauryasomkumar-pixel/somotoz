@@ -60,8 +60,8 @@ export const DiscoverView: React.FC = () => {
           </p>
         </div>
 
-        {/* Clean Segmented Tab Control */}
-        <div className="flex items-center p-1 bg-[var(--bg-elevated)] border border-[var(--border-color)] rounded-xl self-start sm:self-auto">
+        {/* Clean Segmented Tab Control (Scrollable on 320px) */}
+        <div className="flex items-center p-1 bg-[var(--bg-elevated)] border border-[var(--border-color)] rounded-xl self-start sm:self-auto max-w-full overflow-x-auto scrollbar-none">
           <button
             type="button"
             onClick={() => setActiveTab('knowledge')}

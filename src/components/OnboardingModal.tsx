@@ -532,8 +532,17 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           </div>
         )}
 
+        {/* Legal Terms & 18+ Agreement Note */}
+        <div className="pt-4 text-center">
+          <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+            By proceeding, you confirm you are 18+ and agree to the Somotoz{' '}
+            <span className="font-semibold text-[var(--text-primary)]">Terms of Use</span> and{' '}
+            <span className="font-semibold text-[var(--text-primary)]">Privacy Policy</span>.
+          </p>
+        </div>
+
         {/* Footer Navigation Buttons */}
-        <div className="flex items-center justify-between gap-3 pt-6 mt-6 border-t border-[var(--border-color)]">
+        <div className="flex items-center justify-between gap-3 pt-4 border-t border-[var(--border-color)]">
           {step > 1 && !isUnderage ? (
             <button
               type="button"

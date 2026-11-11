@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { onAuthStateChanged, onIdTokenChanged, User } from 'firebase/auth';
 import {
   collection,
@@ -28,10 +28,23 @@ import { FirstTimeTour } from './components/FirstTimeTour';
 import { OnboardingModal } from './components/OnboardingModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { ProfileModal } from './components/ProfileModal';
-import { AdminDashboard } from './components/admin/AdminDashboard';
 import { ToastContainer, ToastMessage } from './components/Toast';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ReconnectingBanner } from './components/pwa/ReconnectingBanner';
+import { ScreenLoadingFallback } from './components/common/LoadingSkeletons';
 import { Loader2, Terminal, BookOpen, ShieldAlert, LogOut } from 'lucide-react';
 import { checkIsAdmin, checkUserIsDisabled, recordAdminActivity } from './lib/adminService';
+
+// Lazy-loaded heavy modules for optimized bundle splitting and startup latency
+const AdminDashboard = lazy(() =>
+  import('./components/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
+);
+const PrivacyPolicy = lazy(() =>
+  import('./components/legal/PrivacyPolicy').then((m) => ({ default: m.PrivacyPolicy }))
+);
+const TermsOfUse = lazy(() =>
+  import('./components/legal/TermsOfUse').then((m) => ({ default: m.TermsOfUse }))
+);
 
 export default function App() {
   // Auth state
@@ -94,6 +107,10 @@ export default function App() {
       const hash = window.location.hash;
       if (path === '/admin' || hash === '#/admin' || hash === '#admin') {
         setViewMode('admin');
+      } else if (path === '/privacy' || hash === '#/privacy' || hash === '#privacy') {
+        setViewMode('privacy');
+      } else if (path === '/terms' || hash === '#/terms' || hash === '#terms') {
+        setViewMode('terms');
       }
     };
 
@@ -409,8 +426,16 @@ export default function App() {
       if (window.location.pathname !== '/admin') {
         window.history.pushState(null, '', '/admin');
       }
+    } else if (view === 'privacy') {
+      if (window.location.pathname !== '/privacy') {
+        window.history.pushState(null, '', '/privacy');
+      }
+    } else if (view === 'terms') {
+      if (window.location.pathname !== '/terms') {
+        window.history.pushState(null, '', '/terms');
+      }
     } else {
-      if (window.location.pathname === '/admin') {
+      if (window.location.pathname === '/admin' || window.location.pathname === '/privacy' || window.location.pathname === '/terms') {
         window.history.pushState(null, '', '/');
       }
     }
@@ -638,18 +663,51 @@ export default function App() {
     );
   }
 
-  // Render Landing Page if unauthenticated
+  // Render Landing Page or Legal pages if unauthenticated
   if (!currentUser) {
+    if (viewMode === 'privacy') {
+      return (
+        <ErrorBoundary>
+          <div className="min-h-screen bg-[var(--bg-primary)] p-4 sm:p-6 overflow-y-auto">
+            <ReconnectingBanner />
+            <div className="max-w-4xl mx-auto py-6">
+              <Suspense fallback={<ScreenLoadingFallback label="Loading Privacy Policy..." />}>
+                <PrivacyPolicy onNavigate={handleNavigate} onBack={() => handleNavigate('dashboard')} />
+              </Suspense>
+            </div>
+            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+          </div>
+        </ErrorBoundary>
+      );
+    }
+    if (viewMode === 'terms') {
+      return (
+        <ErrorBoundary>
+          <div className="min-h-screen bg-[var(--bg-primary)] p-4 sm:p-6 overflow-y-auto">
+            <ReconnectingBanner />
+            <div className="max-w-4xl mx-auto py-6">
+              <Suspense fallback={<ScreenLoadingFallback label="Loading Terms of Use..." />}>
+                <TermsOfUse onNavigate={handleNavigate} onBack={() => handleNavigate('dashboard')} />
+              </Suspense>
+            </div>
+            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+          </div>
+        </ErrorBoundary>
+      );
+    }
+
     return (
-      <>
+      <ErrorBoundary>
+        <ReconnectingBanner />
         <LandingPage
           onSignIn={handleGoogleSignIn}
           onManualAuth={handleManualAuth}
           isAuthenticating={isAuthenticating}
           authError={authError}
+          onNavigateLegal={handleNavigate}
         />
         <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-      </>
+      </ErrorBoundary>
     );
   }
 
@@ -689,10 +747,12 @@ export default function App() {
 
   // Render Authenticated Dashboard & Engineering Workspace
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col h-screen overflow-hidden font-sans selection:bg-[#00FF41] selection:text-black transition-colors duration-300">
-      
-      {/* Top Navbar */}
-      <Navbar
+    <ErrorBoundary>
+      <ReconnectingBanner />
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col h-screen overflow-hidden font-sans selection:bg-[#00FF41] selection:text-black transition-colors duration-300">
+        
+        {/* Top Navbar */}
+        <Navbar
         user={currentUser}
         entryCount={entries.length}
         currentView={viewMode}
@@ -888,11 +948,31 @@ export default function App() {
           {/* 8. MASTER ADMIN DASHBOARD VIEW */}
           {viewMode === 'admin' && (
             <div className="max-w-7xl mx-auto">
-              <AdminDashboard
-                currentUser={currentUser}
-                onNavigate={handleNavigate}
-                onShowToast={addToast}
-              />
+              <Suspense fallback={<ScreenLoadingFallback label="Loading Admin Console..." />}>
+                <AdminDashboard
+                  currentUser={currentUser}
+                  onNavigate={handleNavigate}
+                  onShowToast={addToast}
+                />
+              </Suspense>
+            </div>
+          )}
+
+          {/* 9. LEGAL: PRIVACY POLICY */}
+          {viewMode === 'privacy' && (
+            <div className="max-w-4xl mx-auto py-2">
+              <Suspense fallback={<ScreenLoadingFallback label="Loading Privacy Policy..." />}>
+                <PrivacyPolicy onNavigate={handleNavigate} onBack={() => handleNavigate('profile')} />
+              </Suspense>
+            </div>
+          )}
+
+          {/* 10. LEGAL: TERMS OF USE */}
+          {viewMode === 'terms' && (
+            <div className="max-w-4xl mx-auto py-2">
+              <Suspense fallback={<ScreenLoadingFallback label="Loading Terms of Use..." />}>
+                <TermsOfUse onNavigate={handleNavigate} onBack={() => handleNavigate('profile')} />
+              </Suspense>
             </div>
           )}
         </main>
@@ -936,6 +1016,7 @@ export default function App() {
 
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

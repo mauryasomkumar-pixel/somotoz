@@ -39,7 +39,7 @@ import {
   ShieldCheck,
   Activity
 } from 'lucide-react';
-import { UserProfile } from '../types';
+import { UserProfile, ViewMode } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeSwitcher } from './ThemeSwitcher';
 
@@ -48,6 +48,7 @@ interface LandingPageProps {
   onManualAuth?: (user: UserProfile) => void;
   isAuthenticating: boolean;
   authError?: string | null;
+  onNavigateLegal?: (view: ViewMode) => void;
 }
 
 // Country Code Data for Phone Input
@@ -220,6 +221,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onManualAuth,
   isAuthenticating,
   authError,
+  onNavigateLegal,
 }) => {
   // Global Theme Context for Night, Day, and Eye Comfort (Mix) Modes
   const { theme, isAutoMode, autoThemeReason } = useTheme();
@@ -1300,6 +1302,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         Continue with Meta
                       </span>
                     </button>
+
+                    <p className={`text-[11px] text-center font-mono leading-relaxed px-2 ${isLight ? 'text-[#64748B]' : isMix ? 'text-[#786E64]' : 'text-[#737373]'}`}>
+                      By continuing, you agree to our{' '}
+                      <button
+                        type="button"
+                        onClick={() => onNavigateLegal?.('terms')}
+                        className={`underline font-semibold cursor-pointer ${isLight ? 'text-[#0284C7]' : isMix ? 'text-[#D97706]' : 'text-[#00F0FF]'}`}
+                      >
+                        Terms of Use
+                      </button>{' '}
+                      and{' '}
+                      <button
+                        type="button"
+                        onClick={() => onNavigateLegal?.('privacy')}
+                        className={`underline font-semibold cursor-pointer ${isLight ? 'text-[#0284C7]' : isMix ? 'text-[#D97706]' : 'text-[#00F0FF]'}`}
+                      >
+                        Privacy Policy
+                      </button>
+                      . (18+ only)
+                    </p>
                   </div>
 
                   {/* Divider */}
@@ -1670,6 +1692,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                           {authMode === 'login' ? 'SIGN IN' : 'CREATE ACCOUNT'}
                         </span>
                       </motion.button>
+
+                      <p className={`text-[11px] text-center font-mono leading-relaxed pt-2 ${isLight ? 'text-[#64748B]' : isMix ? 'text-[#786E64]' : 'text-[#737373]'}`}>
+                        By continuing, you agree to our{' '}
+                        <button
+                          type="button"
+                          onClick={() => onNavigateLegal?.('terms')}
+                          className={`underline font-semibold cursor-pointer ${isLight ? 'text-[#0284C7]' : isMix ? 'text-[#D97706]' : 'text-[#00F0FF]'}`}
+                        >
+                          Terms of Use
+                        </button>{' '}
+                        and{' '}
+                        <button
+                          type="button"
+                          onClick={() => onNavigateLegal?.('privacy')}
+                          className={`underline font-semibold cursor-pointer ${isLight ? 'text-[#0284C7]' : isMix ? 'text-[#D97706]' : 'text-[#00F0FF]'}`}
+                        >
+                          Privacy Policy
+                        </button>
+                        . (18+ only)
+                      </p>
                     </div>
                   </form>
                 </div>
@@ -2033,10 +2075,24 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         }`}
       >
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 flex-wrap justify-center sm:justify-start gap-y-1">
             <span>SOMOTOZ AI SUITE</span>
             <span>•</span>
-            <span>GEMINI MULTIMODAL</span>
+            <button
+              type="button"
+              onClick={() => onNavigateLegal?.('privacy')}
+              className={`hover:underline cursor-pointer font-semibold ${isLight ? 'text-[#0284C7]' : isMix ? 'text-[#D97706]' : 'text-[#00F0FF]'}`}
+            >
+              Privacy Policy
+            </button>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => onNavigateLegal?.('terms')}
+              className={`hover:underline cursor-pointer font-semibold ${isLight ? 'text-[#0284C7]' : isMix ? 'text-[#D97706]' : 'text-[#00F0FF]'}`}
+            >
+              Terms of Use
+            </button>
             <span>•</span>
             <span>FIRESTORE CLOUD</span>
           </div>

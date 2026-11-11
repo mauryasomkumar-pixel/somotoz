@@ -18,7 +18,13 @@ import {
   AtSign,
   Clock,
   CheckCircle2,
-  Edit3
+  Edit3,
+  Download,
+  FileText,
+  Building,
+  Shield,
+  ExternalLink,
+  Bell,
 } from 'lucide-react';
 import { UserProfile, ViewMode } from '../types';
 import { useTheme } from '../context/ThemeContext';
@@ -31,6 +37,14 @@ import {
   scheduleAccountDeletion
 } from '../lib/profileService';
 import { compressProfileImage } from '../utils/imageCompressor';
+import { downloadMyUserData } from '../lib/userDataExport';
+import { PWAInstallButton } from './pwa/PWAInstallButton';
+import {
+  isPushSupported,
+  getNotificationPermission,
+  requestPushPermission,
+  disablePushNotifications
+} from '../lib/pushNotifications';
 
 interface ProfileViewProps {
   user: UserProfile | null;
@@ -85,6 +99,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
+  // User Data Export State
+  const [isDownloadingData, setIsDownloadingData] = useState(false);
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+
   // Accessible reading mode
   const [accessibleMode, setAccessibleMode] = useState<boolean>(() => {
     try {
@@ -100,6 +118,34 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     try {
       localStorage.setItem('somotoz_accessible_mode', String(next));
     } catch {}
+  };
+
+  // Push Notifications (FCM / Web Push)
+  const [pushEnabled, setPushEnabled] = useState<boolean>(() => {
+    return user?.notificationsEnabled ?? (getNotificationPermission() === 'granted');
+  });
+  const [isUpdatingPush, setIsUpdatingPush] = useState(false);
+
+  const togglePushNotifications = async () => {
+    setIsUpdatingPush(true);
+    try {
+      if (pushEnabled) {
+        await disablePushNotifications(user?.uid);
+        setPushEnabled(false);
+      } else {
+        const res = await requestPushPermission(user?.uid);
+        if (res.success) {
+          setPushEnabled(true);
+        } else {
+          setPushEnabled(false);
+          alert(res.error || 'Notification permission was not granted by your browser.');
+        }
+      }
+    } catch (e: any) {
+      alert(e.message || 'Error updating push notifications.');
+    } finally {
+      setIsUpdatingPush(false);
+    }
   };
 
   // Live availability check for username edit
@@ -216,6 +262,27 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     } finally {
       setIsDeletingAccount(false);
       setShowDeleteModal(false);
+    }
+  };
+
+  const handleDownloadData = async () => {
+    if (!user?.uid) return;
+    setIsDownloadingData(true);
+    setDownloadNotice(null);
+    try {
+      const dataPackage = await downloadMyUserData(user.uid, user.username);
+      const totalCount =
+        (dataPackage.journalEntries?.length || 0) +
+        (dataPackage.reflectionsAndActivities?.length || 0) +
+        (dataPackage.chatRequests?.outgoing?.length || 0) +
+        (dataPackage.chatRequests?.incoming?.length || 0) +
+        (dataPackage.profile ? 1 : 0);
+      setDownloadNotice(`Data archive generated successfully (${totalCount} records exported).`);
+    } catch (err: any) {
+      setDownloadNotice(err.message || 'Error downloading user data.');
+    } finally {
+      setIsDownloadingData(false);
+      setTimeout(() => setDownloadNotice(null), 6000);
     }
   };
 
@@ -441,7 +508,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <ThemeSwitcher compact={false} showLabels={false} />
 
 
-        <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] mt-3">
+        <div className="flex items-center justify-between p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] mt-3">
           <div>
             <h4 className="text-xs font-bold text-[var(--text-primary)]">Accessible Reading Mode</h4>
             <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
@@ -451,7 +518,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <button
             type="button"
             onClick={toggleAccessibleMode}
-            className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+            aria-label="Toggle accessible reading mode"
+            className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 min-h-[44px] flex items-center ${
               accessibleMode ? 'bg-[var(--accent-color)]' : 'bg-[var(--border-color)]'
             }`}
           >
@@ -461,6 +529,41 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               }`}
             />
           </button>
+        </div>
+
+        {/* Push Notifications (FCM / Web Push) */}
+        <div className="flex items-center justify-between p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] mt-3">
+          <div className="flex items-start gap-2.5">
+            <div className="p-1.5 rounded-lg bg-[var(--accent-color)]/10 text-[var(--accent-color)] shrink-0 mt-0.5">
+              <Bell className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-[var(--text-primary)]">Push Notifications (FCM)</h4>
+              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                Real-time alerts for incoming chat messages, connection requests, and calls.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={isUpdatingPush}
+            onClick={togglePushNotifications}
+            aria-label={pushEnabled ? "Disable push notifications" : "Enable push notifications"}
+            className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 min-h-[44px] flex items-center ${
+              pushEnabled ? 'bg-[var(--accent-color)]' : 'bg-[var(--border-color)]'
+            } disabled:opacity-50`}
+          >
+            <div
+              className={`w-4 h-4 rounded-full bg-white transition-transform absolute top-1 ${
+                pushEnabled ? 'right-1' : 'left-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* In-App PWA Install Card */}
+        <div className="pt-2">
+          <PWAInstallButton variant="settings" />
         </div>
       </div>
 
@@ -497,7 +600,111 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         )}
       </div>
 
-      {/* 5. DANGER ZONE: ACCOUNT DELETION & LOGOUT */}
+      {/* 5. PRIVACY, LEGAL & DATA CONTROLS */}
+      <div className="p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-[var(--accent-color)]" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+              Privacy, Legal &amp; Data Rights
+            </h2>
+          </div>
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--accent-color)]/10 text-[var(--accent-color)] font-semibold border border-[var(--accent-color)]/20">
+            18+ Platform
+          </span>
+        </div>
+
+        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+          You are in control of your personal data. Read our transparent legal policies, download a full machine-readable archive of your account records, or get in touch with our designated Grievance Officer.
+        </p>
+
+        {downloadNotice && (
+          <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs flex items-center gap-2 animate-fade-in">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-blue-400" />
+            <span>{downloadNotice}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          {/* Privacy Policy Link */}
+          <button
+            type="button"
+            onClick={() => onNavigate('privacy')}
+            className="p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] hover:border-[var(--accent-color)] text-left transition-all cursor-pointer group flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between text-xs font-bold text-[var(--text-primary)] mb-1">
+              <span className="flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-[var(--accent-color)]" />
+                Privacy Policy
+              </span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)]">
+              Server storage, Gemini AI flows, 90-day retention &amp; zero-chat admin boundaries.
+            </p>
+          </button>
+
+          {/* Terms of Use Link */}
+          <button
+            type="button"
+            onClick={() => onNavigate('terms')}
+            className="p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] hover:border-[var(--accent-color)] text-left transition-all cursor-pointer group flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between text-xs font-bold text-[var(--text-primary)] mb-1">
+              <span className="flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-[var(--accent-color)]" />
+                Terms of Use
+              </span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)]">
+              18+ age mandate, prohibited conduct, anti-harassment &amp; suspension rules.
+            </p>
+          </button>
+
+          {/* Download My Data Button */}
+          <button
+            type="button"
+            disabled={isDownloadingData}
+            onClick={handleDownloadData}
+            className="p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] hover:border-[var(--accent-color)] text-left transition-all cursor-pointer group flex flex-col justify-between disabled:opacity-50"
+          >
+            <div className="flex items-center justify-between text-xs font-bold text-[var(--text-primary)] mb-1">
+              <span className="flex items-center gap-1.5">
+                {isDownloadingData ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-[var(--accent-color)]" />
+                ) : (
+                  <Download className="w-4 h-4 text-[var(--accent-color)]" />
+                )}
+                Download My Data
+              </span>
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)]">
+              {isDownloadingData
+                ? 'Exporting JSON archive...'
+                : 'Export profile, reflections, journals &amp; chat metadata in JSON format.'}
+            </p>
+          </button>
+        </div>
+
+        {/* Grievance Officer Info Box */}
+        <div className="p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5 font-bold text-[var(--text-primary)]">
+              <Building className="w-3.5 h-3.5 text-[var(--accent-color)]" />
+              <span>Statutory Grievance Officer</span>
+            </div>
+            <p className="text-[11px] text-[var(--text-secondary)]">
+              Som Maurya &bull; Email: <a href="mailto:grievance@somotoz.ai" className="text-[var(--accent-color)] hover:underline font-mono">grievance@somotoz.ai</a> &bull; Response SLA: 24–48 hours
+            </p>
+          </div>
+          <span className="text-[10px] font-mono text-[var(--text-muted)] bg-[var(--bg-card)] px-2.5 py-1 rounded-md border border-[var(--border-color)]">
+            IIT Madras Data Science
+          </span>
+        </div>
+      </div>
+
+      {/* 6. DANGER ZONE: ACCOUNT DELETION & LOGOUT */}
       <div className="p-6 rounded-2xl bg-rose-500/5 border border-rose-500/20 shadow-sm space-y-4">
         <h2 className="text-xs font-bold uppercase tracking-wider text-rose-500">
           Account Actions
@@ -532,13 +739,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <Trash2 className="w-6 h-6" />
             </div>
 
-            <div className="text-center space-y-1">
+            <div className="text-center space-y-2">
               <h3 className="text-base font-bold text-[var(--text-primary)]">
                 Schedule Account Deletion?
               </h3>
               <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                This will release your username <strong className="text-[var(--text-primary)]">@{user?.username}</strong>, remove your profile from SomoChat, and schedule your reflections for permanent deletion.
+                This will release your username <strong className="text-[var(--text-primary)]">@{user?.username}</strong> and immediately remove your profile from SomoChat.
               </p>
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-left text-[11px] leading-relaxed space-y-1">
+                <p className="font-semibold text-rose-300">90-Day Retention Notice:</p>
+                <p>
+                  In accordance with regulatory compliance and legal disclosure standards, your account records and messages will be soft-deleted immediately and permanently purged from server backups after 90 days.
+                </p>
+              </div>
             </div>
 
             <div className="flex space-x-2 pt-2">
