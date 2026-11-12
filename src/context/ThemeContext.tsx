@@ -178,9 +178,9 @@ export function getTodayTheme(): ThemeOfTheDayOption {
 
 /**
  * Calculates base mode based on user's local device time:
- * - Day: 06:00 - 16:59 (hour >= 6 && hour < 17) -> 'white'
- * - Eye Comfort: 17:00 - 19:59 (hour >= 17 && hour < 20) -> 'mix'
- * - Night: 20:00 - 05:59 (hour >= 20 || hour < 6) -> 'black'
+ * - Day: 05:00 - 11:59 (hour >= 5 && hour < 12) -> 'white'
+ * - Eye Comfort: 12:00 - 17:59 (hour >= 12 && hour < 18) -> 'mix'
+ * - Night: 18:00 - 04:59 (hour >= 18 || hour < 5) -> 'black'
  */
 export function getAutoBaseModeByTime(date: Date = new Date()): {
   theme: AppTheme;
@@ -192,26 +192,26 @@ export function getAutoBaseModeByTime(date: Date = new Date()): {
   const minutes = date.getMinutes();
   const timeFormatted = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
-  if (hour >= 6 && hour < 17) {
+  if (hour >= 5 && hour < 12) {
     return {
       theme: 'white',
       mode: 'day',
       label: 'Auto (Day)',
-      reason: `Daylight Active (${timeFormatted} • 06:00-16:59)`,
+      reason: `Daylight (${timeFormatted} • 05:00-11:59)`,
     };
-  } else if (hour >= 17 && hour < 20) {
+  } else if (hour >= 12 && hour < 18) {
     return {
       theme: 'mix',
       mode: 'eye-comfort',
       label: 'Auto (Eye Comfort)',
-      reason: `Evening Twilight (${timeFormatted} • 17:00-19:59)`,
+      reason: `Warm Amber Comfort (${timeFormatted} • 12:00-17:59)`,
     };
   } else {
     return {
       theme: 'black',
       mode: 'night',
       label: 'Auto (Night)',
-      reason: `Night Glow Active (${timeFormatted} • 20:00-05:59)`,
+      reason: `Night Glow (${timeFormatted} • 18:00-04:59)`,
     };
   }
 }
@@ -259,6 +259,7 @@ interface ThemeContextType {
 
   // Motion & Animation System
   animationLevel: 'full' | 'light' | 'off';
+  setAnimationLevel: (level: 'full' | 'light' | 'off') => void;
   isLowEndDevice: boolean;
   isTabVisible: boolean;
 }
@@ -305,7 +306,21 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const themeOfTheDay = useMemo(() => getTodayTheme(), []);
 
   // Motion & Animation states
-  const [animationLevel] = useState<'full' | 'light' | 'off'>('full');
+  const [animationLevel, setAnimationLevelState] = useState<'full' | 'light' | 'off'>(() => {
+    try {
+      const saved = localStorage.getItem('somotoz_animations_level') as any;
+      if (saved === 'full' || saved === 'light' || saved === 'off') return saved;
+    } catch {}
+    return 'full';
+  });
+
+  const setAnimationLevel = useCallback((lvl: 'full' | 'light' | 'off') => {
+    setAnimationLevelState(lvl);
+    try {
+      localStorage.setItem('somotoz_animations_level', lvl);
+    } catch {}
+  }, []);
+
   const [isLowEndDevice] = useState<boolean>(() => {
     if (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) {
       return (navigator as any).hardwareConcurrency <= 4;
@@ -513,6 +528,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setIsThemeOfTheDayActive,
         themeOfTheDay,
         animationLevel,
+        setAnimationLevel,
         isLowEndDevice,
         isTabVisible,
       }}

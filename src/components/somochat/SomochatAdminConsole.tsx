@@ -53,11 +53,7 @@ export const SomochatAdminConsole: React.FC<SomochatAdminConsoleProps> = ({
   onBroadcastAnnouncement,
   onShowToast,
 }) => {
-  const isMasterAdmin =
-    currentUser.role === 'admin' ||
-    currentUser.somoId === 'SOMO-SOM-001' ||
-    currentUser.email?.toLowerCase() === 'mauryasomkumar@gmail.com' ||
-    currentUser.name.toLowerCase().includes('som maurya');
+  const isMasterAdmin = currentUser.role === 'admin';
 
   const isSubAdmin = currentUser.role === 'sub_admin';
 
@@ -311,7 +307,7 @@ export const SomochatAdminConsole: React.FC<SomochatAdminConsoleProps> = ({
 
               <div className="space-y-2">
                 {allAccounts.map((account) => {
-                  const isThisMaster = account.somoId === 'SOMO-SOM-001' || account.role === 'admin';
+                  const isThisMaster = account.role === 'admin';
                   const isAccountSubAdmin = account.role === 'sub_admin';
 
                   return (
@@ -518,7 +514,7 @@ export const SomochatAdminConsole: React.FC<SomochatAdminConsoleProps> = ({
 
               <div className="space-y-2">
                 {allAccounts.map((acc) => {
-                  const isThisMaster = acc.somoId === 'SOMO-SOM-001';
+                  const isThisMaster = acc.role === 'admin';
 
                   return (
                     <div

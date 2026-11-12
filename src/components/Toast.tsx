@@ -16,48 +16,53 @@ interface ToastProps {
 
 export const ToastContainer: React.FC<ToastProps> = ({ toasts, onDismiss }) => {
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none max-w-sm w-full px-4 font-mono">
+    <aside
+      aria-label="Notifications"
+      aria-live="polite"
+      className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-50 flex flex-col items-center space-y-2 pointer-events-none w-[92vw] max-w-md"
+    >
       <AnimatePresence>
         {toasts.map((toast) => (
           <motion.div
             key={toast.id}
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            initial={{ opacity: 0, y: 16, scale: 0.94 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className={`pointer-events-auto p-4 border flex items-start space-x-3 shadow-[4px_4px_0px_0px_#141414] bg-black ${
+            exit={{ opacity: 0, y: 10, scale: 0.94 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            role="status"
+            className={`pointer-events-auto w-full px-4 py-3 rounded-2xl flex items-center space-x-3 backdrop-blur-xl border transition-all ${
               toast.type === 'error'
-                ? 'border-rose-700 text-rose-200'
+                ? 'bg-rose-950/90 border-rose-500/30 text-rose-100 shadow-lg shadow-rose-950/40'
                 : toast.type === 'success'
-                ? 'border-[#00FF41] text-[#EDEDED]'
-                : 'border-[#262626] text-[#EDEDED]'
+                ? 'bg-emerald-950/90 border-emerald-500/30 text-emerald-100 shadow-lg shadow-emerald-950/40'
+                : 'bg-zinc-900/90 border-zinc-700/40 text-zinc-100 shadow-lg shadow-zinc-950/40'
             }`}
           >
-            <div className="shrink-0 mt-0.5">
+            <div className="shrink-0">
               {toast.type === 'error' ? (
-                <AlertCircle className="w-4 h-4 text-rose-400" />
+                <AlertCircle className="w-5 h-5 text-rose-400" />
               ) : toast.type === 'success' ? (
-                <CheckCircle2 className="w-4 h-4 text-[#00FF41]" />
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
               ) : (
-                <Info className="w-4 h-4 text-[#00FF41]" />
+                <Info className="w-5 h-5 text-indigo-400" />
               )}
             </div>
-            <div className="flex-1 min-w-0 font-sans">
-              <h4 className="text-xs font-bold font-mono text-[#EDEDED]">{toast.title}</h4>
+            <div className="flex-1 min-w-0 text-left">
+              <h4 className="text-xs font-semibold text-white tracking-tight">{toast.title}</h4>
               {toast.message && (
-                <p className="text-xs mt-0.5 text-[#A1A1AA] leading-relaxed break-words">{toast.message}</p>
+                <p className="text-[11px] mt-0.5 opacity-80 leading-snug break-words">{toast.message}</p>
               )}
             </div>
             <button
               onClick={() => onDismiss(toast.id)}
-              className="shrink-0 text-[#737373] hover:text-[#EDEDED] p-1 transition-colors cursor-pointer"
+              className="shrink-0 text-zinc-400 hover:text-white p-1 rounded-full transition-colors cursor-pointer"
               aria-label="Close notification"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           </motion.div>
         ))}
       </AnimatePresence>
-    </div>
+    </aside>
   );
 };

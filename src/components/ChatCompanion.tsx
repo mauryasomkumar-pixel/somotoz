@@ -210,13 +210,23 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
     }
   }, [initialMode]);
 
+  const [isWelcomeCollapsed, setIsWelcomeCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('somotoz_welcome_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [showScrollBottom, setShowScrollBottom] = useState<boolean>(false);
+
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: 'welcome',
       role: 'model',
       content: initialReflection
-        ? `⚡ **Somotoz Master AI Core Initialized**.\n\nLoaded note context: **"${initialReflection.title}"**.\n\nI am ready to execute all multimodal tasks end-to-end with strict adherence to your instructions.`
-        : `⚡ **Welcome to Somotoz AI Suite**.\n\nI am your Master AI Core and autonomous intelligence engine. I execute all user requests end-to-end with zero manual intervention required:\n\n• **📸 Real-World Photography & Imagination**: Hyper-realistic 1K cinematic visual synthesis with true-to-life lighting and textures.\n• **📖 Accessible Reading Mode**: Clean bullet points, short paragraphs, and simple language for effortless dyslexia-friendly reading.\n• **🏷️ Brand Watermark**: Minimalist "Somotoz" watermark embedded across all generated media outputs.\n• **⚡ Multimodal Execution**: Seamless Smart Chat reasoning, 60FPS Video motion sequences, and 432Hz harmonic Music synthesis.\n\nEnter any prompt or command below to begin!`,
+        ? `Loaded note: **"${initialReflection.title}"**. Ready to help you reflect, generate, or brainstorm.`
+        : `**Welcome to Somotoz Ask AI**\n\nAsk questions, explore ideas, or create images, videos, and music right from the composer below.`,
       timestamp: Date.now(),
       mode: 'text',
     },
@@ -487,9 +497,21 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 60;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    const isAtBottom = distanceFromBottom < 80;
     isAutoScrollEnabled.current = isAtBottom;
+    setShowScrollBottom(distanceFromBottom > 160);
   };
+
+  const scrollToBottom = useCallback(() => {
+    if (!scrollContainerRef.current) return;
+    isAutoScrollEnabled.current = true;
+    scrollContainerRef.current.scrollTo({
+      top: scrollContainerRef.current.scrollHeight,
+      behavior: 'smooth',
+    });
+    setShowScrollBottom(false);
+  }, []);
 
   useEffect(() => {
     performSmoothScroll();
@@ -838,6 +860,49 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
         className="gemini-chat-stream p-3 sm:p-5 md:p-6 space-y-4 font-sans relative text-[var(--text-primary)] scroll-smooth"
       >
         {messages.map((msg, index) => {
+          if (msg.id === 'welcome') {
+            return (
+              <div
+                key="welcome"
+                className="p-3.5 sm:p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs transition-all"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-[var(--accent-color)]/15 text-[var(--accent-color)] flex items-center justify-center font-bold">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs sm:text-sm font-semibold text-[var(--text-primary)]">
+                      Ask AI
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsWelcomeCollapsed((prev) => {
+                        const next = !prev;
+                        try {
+                          localStorage.setItem('somotoz_welcome_collapsed', String(next));
+                        } catch {}
+                        return next;
+                      });
+                    }}
+                    className="p-1 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer transition-colors"
+                    title={isWelcomeCollapsed ? 'Expand intro' : 'Collapse intro'}
+                    aria-label={isWelcomeCollapsed ? 'Expand intro' : 'Collapse intro'}
+                  >
+                    {isWelcomeCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {!isWelcomeCollapsed && (
+                  <p className="text-xs text-[var(--text-secondary)] mt-2 leading-relaxed">
+                    {msg.content}
+                  </p>
+                )}
+              </div>
+            );
+          }
+
           let priorPrompt = '';
           if (msg.role === 'model' && index > 0 && messages[index - 1].role === 'user') {
             priorPrompt = messages[index - 1].content;
@@ -932,11 +997,26 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
         )}
 
         {errorMsg && (
-          <div className="p-3 bg-rose-950/40 border border-rose-800 text-rose-300 text-xs font-mono clip-badge-poly">
+          <div className="p-3 bg-rose-950/40 border border-rose-800 text-rose-300 text-xs font-mono rounded-xl">
             {errorMsg}
           </div>
         )}
       </div>
+
+      {/* Jump to latest message floating indicator button */}
+      {showScrollBottom && (
+        <div className="absolute bottom-24 right-4 sm:right-8 z-30 pointer-events-auto">
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-color)] hover:border-[var(--accent-color)] text-[var(--text-primary)] shadow-lg backdrop-blur-md text-xs font-medium cursor-pointer transition-all hover:scale-105 active:scale-95"
+            aria-label="Jump to latest message"
+          >
+            <ArrowDown className="w-3.5 h-3.5 text-[var(--accent-color)]" />
+            <span>Latest</span>
+          </button>
+        </div>
+      )}
 
       {/* Gemini-Style Sticky Bottom Input Dock with Rounded Pill Styling */}
       <div className="gemini-chat-input-dock">

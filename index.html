@@ -22,7 +22,7 @@
           var manual = sessionStorage.getItem('somotoz_manual_base_mode');
           var theme = 'black';
           var hour = new Date().getHours();
-          var autoTheme = (hour >= 6 && hour < 17) ? 'white' : (hour >= 17 && hour < 20) ? 'mix' : 'black';
+          var autoTheme = (hour >= 5 && hour < 12) ? 'white' : (hour >= 12 && hour < 18) ? 'mix' : 'black';
 
           if (manual === 'day' || manual === 'white') {
             theme = 'white';

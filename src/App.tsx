@@ -34,6 +34,13 @@ import { ReconnectingBanner } from './components/pwa/ReconnectingBanner';
 import { ScreenLoadingFallback } from './components/common/LoadingSkeletons';
 import { Loader2, Terminal, BookOpen, ShieldAlert, LogOut } from 'lucide-react';
 import { checkIsAdmin, checkUserIsDisabled, recordAdminActivity } from './lib/adminService';
+import {
+  saveOfflineJournalEntry,
+  getCachedJournalEntries,
+  cacheServerJournalEntries,
+  initOfflineSyncManager,
+  getPendingQueueItems,
+} from './lib/offlineJournalSync';
 
 // Lazy-loaded heavy modules for optimized bundle splitting and startup latency
 const AdminDashboard = lazy(() =>
@@ -93,7 +100,7 @@ export default function App() {
     setToasts((prev) => [...prev, { id, type, title, message }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4500);
+    }, 3000);
   }, []);
 
   const dismissToast = useCallback((id: string) => {

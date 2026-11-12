@@ -262,7 +262,7 @@ export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onNavigate, onBack
             <p><strong>Designated Grievance Officer:</strong> Som Maurya</p>
             <p><strong>Organization:</strong> Somotoz Technologies / Trust & Safety Division</p>
             <p><strong>Email:</strong> <a href="mailto:grievance@somotoz.ai" className="text-emerald-500 hover:underline">grievance@somotoz.ai</a></p>
-            <p><strong>Administrator Contact:</strong> <a href="mailto:mauryasomkumar@gmail.com" className="text-emerald-500 hover:underline">mauryasomkumar@gmail.com</a></p>
+            <p><strong>Administrator Contact:</strong> <a href="mailto:privacy@somotoz.ai" className="text-emerald-500 hover:underline">privacy@somotoz.ai</a></p>
             <p><strong>Response Timeline:</strong> We acknowledge complaints within 24 to 48 hours and resolve reported grievances within 15 business days.</p>
           </div>
         </section>

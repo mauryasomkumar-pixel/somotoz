@@ -65,6 +65,8 @@ export interface JournalEntry {
   artworkPrompt?: string | null;
   chatThread?: ChatMessage[];
   transcribedAudio?: boolean;
+  isOfflinePending?: boolean;
+  syncStatus?: 'synced' | 'pending' | 'syncing';
 }
 
 export interface UserProfile {

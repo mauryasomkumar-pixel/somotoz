@@ -43,7 +43,11 @@ import {
   LogOut,
   AlertTriangle,
   AtSign,
-  Building
+  Building,
+  Phone,
+  PhoneOff,
+  Video,
+  VideoOff
 } from 'lucide-react';
 import {
   UserProfile,
@@ -54,7 +58,8 @@ import {
   SomoUserStatus,
   SomoRegisteredAccount,
   SomoChatRequest,
-  SomoConnectionStatus
+  SomoConnectionStatus,
+  PublicUserProfile
 } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -71,6 +76,10 @@ import { SomochatAuthGateway } from './somochat/SomochatAuthGateway';
 import { SomochatRequestsModal } from './somochat/SomochatRequestsModal';
 import { SomochatAdminConsole } from './somochat/SomochatAdminConsole';
 import { SomochatPrivacyModal } from './somochat/SomochatPrivacyModal';
+import { CallScreen } from './CallScreen';
+import { WebRTCCall } from '../lib/webrtcService';
+import { db } from '../lib/firebase';
+import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { submitUserReportAsync } from '../lib/adminService';
 import { compressChatImage } from '../utils/imageCompressor';
 import { enqueueMessage, flushMessageQueue } from '../lib/offlineQueue';
@@ -182,13 +191,11 @@ export const Somochat: React.FC<SomochatProps> = ({
     }
   }, [currentAuthUser]);
 
-  // Is Master Admin (Som Maurya)
+  // Is Administrator (verified via role or custom claim, never hardcoded email)
   const isMasterAdmin = useMemo(() => {
     if (!currentAuthUser) return false;
-    const email = currentAuthUser.email?.toLowerCase() || '';
-    const name = currentAuthUser.name.toLowerCase();
-    return email === 'mauryasomkumar@gmail.com' || name.includes('som') || currentAuthUser.somoId === 'SOMO-SOM-001';
-  }, [currentAuthUser]);
+    return currentAuthUser.role === 'admin' || (currentUser && (currentUser.isAdmin || currentUser.role === 'admin'));
+  }, [currentAuthUser, currentUser]);
 
   // Is Sub-Admin
   const isSubAdmin = currentAuthUser?.role === 'sub_admin';
@@ -258,10 +265,56 @@ export const Somochat: React.FC<SomochatProps> = ({
     return 'none';
   };
 
-  // Directory derived from registered accounts
+  // Real users from publicProfiles collection (Strictly zero bots, zero demo profiles)
+  const [realPublicUsers, setRealPublicUsers] = useState<PublicUserProfile[]>([]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    try {
+      const unsub = onSnapshot(collection(db, 'publicProfiles'), (snap) => {
+        const users: PublicUserProfile[] = [];
+        snap.forEach((d) => {
+          const data = d.data();
+          if (d.id !== currentUser.uid && data.uid !== currentUser.uid && data.isAdult !== false) {
+            users.push({
+              uid: d.id,
+              username: data.username || 'user',
+              photoURL: data.photoURL || null,
+              bio: data.bio || '',
+              mood: data.mood || 'peaceful',
+              accentColor: data.accentColor,
+              isAdult: data.isAdult !== false,
+              updatedAt: data.updatedAt || Date.now(),
+            });
+          }
+        });
+        setRealPublicUsers(users);
+      });
+      return () => unsub();
+    } catch (err) {
+      console.warn('Real publicProfiles subscription notice:', err);
+    }
+  }, [currentUser]);
+
+  // Directory derived strictly from real public profiles (username, photo, bio only; no real name/email)
   const directory: SomoUser[] = useMemo(() => {
-    return registeredAccounts.map(({ passwordHash, privacySettings, subAdminPermissions, ...user }) => user);
-  }, [registeredAccounts]);
+    return realPublicUsers.map((u) => {
+      const userSomoId = `SOMO-${(u.username || u.uid).toUpperCase().slice(0, 14)}`;
+      return {
+        id: u.uid,
+        somoId: userSomoId,
+        name: u.username ? `@${u.username}` : 'User',
+        username: u.username,
+        avatar: u.photoURL || `https://api.dicebear.com/7.x/identicon/svg?seed=${u.uid}`,
+        role: 'member',
+        status: 'online',
+        statusText: u.bio || 'Connecting on Somotoz',
+        publicKey: `pk_${u.uid.slice(0, 8)}`,
+        bio: u.bio || '',
+        joinedAt: u.updatedAt || Date.now(),
+      };
+    });
+  }, [realPublicUsers]);
 
   // User Report Modal State (Rule 4: Users can block and report anyone)
   const [reportingPeer, setReportingPeer] = useState<SomoUser | null>(null);
@@ -369,6 +422,27 @@ export const Somochat: React.FC<SomochatProps> = ({
   const [mobilePane, setMobilePane] = useState<'list' | 'chat'>('list');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // 3 Primary Tabs: "Public room" | "Chats" | "Find people"
+  const [sidebarTab, setSidebarTab] = useState<'public' | 'chats' | 'people'>('public');
+
+  // Rate Limiting & Spam Filter Refs for Public Room (1 msg / 3s, link filtering)
+  const lastPublicMsgTimeRef = useRef<number>(0);
+  const lastSentTextRef = useRef<string>('');
+
+  // Active WebRTC Voice/Video Call
+  const [activeCall, setActiveCall] = useState<WebRTCCall | null>(null);
+
+  // 7 Chat Themes + Theme of the Day
+  const [activeChatTheme, setActiveChatTheme] = useState<string>(() => {
+    try {
+      return localStorage.getItem('somotoz_active_chat_theme') || 'aurora';
+    } catch {
+      return 'aurora';
+    }
+  });
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+
   // Story Creator Form
   const [storyMediaType, setStoryMediaType] = useState<'text' | 'image'>('text');
   const [storyTextContent, setStoryTextContent] = useState('');
@@ -445,6 +519,24 @@ export const Somochat: React.FC<SomochatProps> = ({
         onShowToast('error', 'Connection Required', 'You must be connected with this peer to send direct messages.');
         return;
       }
+    } else {
+      // Public room rate limits and anti-spam
+      const now = Date.now();
+      if (now - lastPublicMsgTimeRef.current < 3000) {
+        onShowToast('info', 'Slow mode active', 'Please wait 3 seconds between messages in the Public room.');
+        return;
+      }
+      const hasLink = /(https?:\/\/|www\.|\.[a-z]{2,6}\b)/i.test(inputMessage);
+      if (hasLink) {
+        onShowToast('error', 'Links Not Allowed', 'Links and advertising are blocked in the Public room.');
+        return;
+      }
+      if (lastSentTextRef.current === inputMessage.trim()) {
+        onShowToast('info', 'Duplicate message', 'Please avoid sending repeated identical messages.');
+        return;
+      }
+      lastPublicMsgTimeRef.current = now;
+      lastSentTextRef.current = inputMessage.trim();
     }
 
     const rawContent = inputMessage.trim();
@@ -927,63 +1019,173 @@ export const Somochat: React.FC<SomochatProps> = ({
               ))}
             </div>
 
-            {/* Channels & Direct Conversations List */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              <div className="px-2 py-1 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                Public Matrix
-              </div>
-
-              {/* Global Matrix Channel */}
+            {/* 3 Channels Navigation Tabs: "Public room", "Chats", "Find people" */}
+            <div className="p-2 border-b border-[var(--border-color)] grid grid-cols-3 gap-1 bg-black/10 shrink-0">
               <button
                 type="button"
                 onClick={() => {
+                  setSidebarTab('public');
                   setActiveChannelId('GLOBAL_SPACE');
                   setMobilePane('chat');
                 }}
-                className={`w-full p-2.5 rounded-2xl flex items-center space-x-3 transition-all cursor-pointer text-left ${
-                  activeChannelId === 'GLOBAL_SPACE'
-                    ? 'bg-gradient-to-r from-[#00F0FF]/15 to-[#A855F7]/15 border border-[#00F0FF]/40 shadow-sm'
-                    : 'hover:bg-[var(--bg-input)] border border-transparent'
+                className={`py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center ${
+                  sidebarTab === 'public'
+                    ? 'bg-[var(--accent-color)] text-black font-bold shadow-xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
                 }`}
               >
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#00F0FF] to-[#A855F7] p-[2px] shrink-0">
-                  <div className="w-full h-full bg-black rounded-[14px] flex items-center justify-center text-[#00F0FF]">
-                    <Radio className="w-5 h-5" />
-                  </div>
-                </div>
-                <div className="flex-1 truncate">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-                      <span># global-matrix</span>
-                      <span className="text-[8px] px-1 py-0.2 rounded bg-[#00FF41]/20 text-[#00FF41] font-bold">
-                        PUBLIC
-                      </span>
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
-                    Open network chatter & master broadcasts
-                  </p>
-                </div>
+                Public room
               </button>
+              <button
+                type="button"
+                onClick={() => setSidebarTab('chats')}
+                className={`py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center relative ${
+                  sidebarTab === 'chats'
+                    ? 'bg-[var(--accent-color)] text-black font-bold shadow-xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+                }`}
+              >
+                <span>Chats</span>
+                {connectedPeers.length > 0 && (
+                  <span className={`ml-1 text-[10px] px-1.5 py-0.2 rounded-full ${sidebarTab === 'chats' ? 'bg-black text-white' : 'bg-[var(--accent-color)]/20 text-[var(--accent-color)] font-bold'}`}>
+                    {connectedPeers.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSidebarTab('people')}
+                className={`py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center ${
+                  sidebarTab === 'people'
+                    ? 'bg-[var(--accent-color)] text-black font-bold shadow-xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]'
+                }`}
+              >
+                Find people
+              </button>
+            </div>
 
-              <div className="px-2 pt-3 pb-1 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center justify-between">
-                <span>Direct Human Chats</span>
-                <span className="text-[#00F0FF]">{connectedPeers.length} Connected</span>
-              </div>
-
-              {/* Direct Peer Conversations */}
-              {connectedPeers.length === 0 ? (
-                <div className="p-4 text-center text-[var(--text-muted)] text-[11px] space-y-2">
-                  <p>No direct peer chats yet.</p>
+            {/* Channels & Direct Conversations List */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {sidebarTab === 'public' && (
+                <div className="space-y-2 pt-1">
                   <button
                     type="button"
-                    onClick={() => setShowDirectoryModal(true)}
-                    className="px-3 py-1.5 rounded-xl bg-[var(--bg-input)] hover:border-[#00F0FF] border border-[var(--border-color)] text-xs text-[#00F0FF] font-bold cursor-pointer"
+                    onClick={() => {
+                      setActiveChannelId('GLOBAL_SPACE');
+                      setMobilePane('chat');
+                    }}
+                    className={`w-full p-3 rounded-2xl flex items-center space-x-3 transition-all cursor-pointer text-left ${
+                      activeChannelId === 'GLOBAL_SPACE'
+                        ? 'bg-gradient-to-r from-[#00F0FF]/15 to-[#A855F7]/15 border border-[#00F0FF]/40 shadow-sm'
+                        : 'hover:bg-[var(--bg-input)] border border-transparent'
+                    }`}
                   >
-                    + Search & Connect
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#00F0FF] to-[#A855F7] p-[2px] shrink-0">
+                      <div className="w-full h-full bg-black rounded-[14px] flex items-center justify-center text-[#00F0FF]">
+                        <Radio className="w-5 h-5" />
+                      </div>
+                    </div>
+                    <div className="flex-1 truncate">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                          <span>Public room</span>
+                          <span className="text-[8px] px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-bold">
+                            18+ ONLY
+                          </span>
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">
+                        Open friendly chat • 1 msg / 3s rate limit
+                      </p>
+                    </div>
                   </button>
                 </div>
-              ) : (
+              )}
+
+              {sidebarTab === 'chats' && (
+                <div className="space-y-1">
+                  {connectedPeers.length === 0 ? (
+                    <div className="p-6 text-center text-[var(--text-muted)] text-xs space-y-3">
+                      <p>No direct conversations yet.</p>
+                      <button
+                        type="button"
+                        onClick={() => setSidebarTab('people')}
+                        className="px-4 py-2 rounded-xl bg-[var(--accent-color)] text-black font-semibold text-xs cursor-pointer"
+                      >
+                        Find people to chat
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {sidebarTab === 'people' && (
+                <div className="space-y-2 pt-1">
+                  {directory.filter((u) => u.id !== currentAuthUser.id && getConnectionStatus(u.somoId) !== 'accepted').length === 0 ? (
+                    <div className="p-6 text-center text-[var(--text-muted)] text-xs space-y-2">
+                      <p className="font-medium text-[var(--text-secondary)]">No one here yet, invite a friend</p>
+                      <p className="text-[11px] opacity-75">When new adults join Somotoz, they will appear here.</p>
+                    </div>
+                  ) : (
+                    directory
+                      .filter((u) => u.id !== currentAuthUser.id && getConnectionStatus(u.somoId) !== 'accepted')
+                      .map((peer) => {
+                        const status = getConnectionStatus(peer.somoId);
+                        return (
+                          <div
+                            key={peer.somoId}
+                            className="p-3 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)] flex items-center justify-between gap-2"
+                          >
+                            <div className="flex items-center space-x-2.5 truncate">
+                              <img
+                                src={peer.avatar}
+                                alt={peer.name}
+                                className="w-9 h-9 rounded-full object-cover border border-[#00F0FF]/30 shrink-0"
+                              />
+                              <div className="truncate">
+                                <div className="text-xs font-bold text-[var(--text-primary)] truncate">
+                                  {peer.name}
+                                </div>
+                                <div className="text-[10px] text-[var(--text-muted)] truncate">
+                                  {peer.statusText || 'Somotoz Member'}
+                                </div>
+                              </div>
+                            </div>
+
+                            {status === 'pending_outgoing' ? (
+                              <span className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                Pending
+                              </span>
+                            ) : status === 'pending_incoming' ? (
+                              <button
+                                type="button"
+                                onClick={() => setShowRequestsModal(true)}
+                                className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 cursor-pointer"
+                              >
+                                Accept
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRequestTargetUser(peer);
+                                  setRequestCustomNote('');
+                                }}
+                                className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-[var(--accent-color)] text-black cursor-pointer hover:opacity-90"
+                              >
+                                Connect
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+              )}
+
+              {/* Connected Chats rendering under Chats tab */}
+              {sidebarTab === 'chats' && (
                 connectedPeers.map((peer) => {
                   const isSelected = activeChannelId === peer.somoId;
                   const lastPeerMsg = messages
@@ -1082,13 +1284,13 @@ export const Somochat: React.FC<SomochatProps> = ({
                     </div>
                     <div>
                       <div className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-                        <span>global-matrix</span>
-                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#00FF41]/20 text-[#00FF41]">
-                          Active Mesh
+                        <span>Public room</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-bold">
+                          18+ Adults
                         </span>
                       </div>
                       <p className="text-[9px] text-[var(--text-muted)]">
-                        Zero-Knowledge Broadcast Relay
+                        Open community chatter • 1 msg / 3s limit
                       </p>
                     </div>
                   </div>
@@ -1102,21 +1304,96 @@ export const Somochat: React.FC<SomochatProps> = ({
                     <div className="truncate">
                       <div className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
                         <span>{activePeer.name}</span>
-                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#00F0FF]/15 text-[#00F0FF] font-mono">
-                          {activePeer.somoId}
-                        </span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" title="Online" />
                       </div>
                       <p className="text-[9px] text-[var(--text-muted)] truncate">
-                        {activePeer.statusText}
+                        {activePeer.statusText || 'Connected peer'}
                       </p>
                     </div>
                   </div>
                 ) : null}
               </div>
 
-              {/* Peer Actions Menu (Block and Report) */}
-              {activePeer && (
+              {/* Public Room Rules Button or Peer In-Call & Safety Controls */}
+              {activeChannelId === 'GLOBAL_SPACE' ? (
                 <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowRulesModal(true)}
+                    className="px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer bg-[var(--bg-input)] hover:bg-[var(--border-color)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    <Info className="w-3.5 h-3.5 text-[#00F0FF]" />
+                    <span>Rules</span>
+                  </button>
+                </div>
+              ) : activePeer && (
+                <div className="flex items-center space-x-1.5 sm:space-x-2">
+                  {/* Voice & Video Call Buttons (Accepted connections only, not blocked) */}
+                  {activeChannelConnectionStatus === 'accepted' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const convId = [currentAuthUser.id, activePeer.id].sort().join('_');
+                          setActiveCall({
+                            id: `call_${Date.now()}`,
+                            conversationId: convId,
+                            callerUid: currentAuthUser.id,
+                            callerName: currentAuthUser.name,
+                            callerPhoto: currentAuthUser.avatar,
+                            callerMood: currentAuthUser.mood || 'peaceful',
+                            calleeUid: activePeer.id,
+                            calleeName: activePeer.name,
+                            calleePhoto: activePeer.avatar,
+                            calleeMood: activePeer.statusText,
+                            type: 'voice',
+                            status: 'calling',
+                            createdAt: Date.now(),
+                          });
+                        }}
+                        className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30 transition-colors cursor-pointer"
+                        title="Voice Call"
+                        aria-label="Start Voice Call"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const convId = [currentAuthUser.id, activePeer.id].sort().join('_');
+                          setActiveCall({
+                            id: `call_${Date.now()}`,
+                            conversationId: convId,
+                            callerUid: currentAuthUser.id,
+                            callerName: currentAuthUser.name,
+                            callerPhoto: currentAuthUser.avatar,
+                            callerMood: currentAuthUser.mood || 'peaceful',
+                            calleeUid: activePeer.id,
+                            calleeName: activePeer.name,
+                            calleePhoto: activePeer.avatar,
+                            calleeMood: activePeer.statusText,
+                            type: 'video',
+                            status: 'calling',
+                            createdAt: Date.now(),
+                          });
+                        }}
+                        className="p-2 rounded-xl bg-sky-500/15 text-sky-400 hover:bg-sky-500/25 border border-sky-500/30 transition-colors cursor-pointer"
+                        title="Video Call"
+                        aria-label="Start Video Call"
+                      >
+                        <Video className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowThemePicker(!showThemePicker)}
+                        className="p-2 rounded-xl bg-purple-500/15 text-purple-400 hover:bg-purple-500/25 border border-purple-500/30 transition-colors cursor-pointer"
+                        title="Chat Theme"
+                        aria-label="Chat Theme"
+                      >
+                        <Palette className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -2015,6 +2292,115 @@ export const Somochat: React.FC<SomochatProps> = ({
           </div>
         )}
       </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* ACTIVE WEBRTC VOICE / VIDEO CALL SCREEN                                  */}
+      {/* ========================================================================= */}
+      {activeCall && currentUser && (
+        <CallScreen
+          currentUser={currentUser}
+          activeCall={activeCall}
+          themeId={activeChatTheme}
+          onClose={() => setActiveCall(null)}
+          onShowToast={onShowToast}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 7 CHAT THEMES + THEME OF THE DAY MODAL                                     */}
+      {/* ========================================================================= */}
+      {showThemePicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                <Palette className="w-4 h-4 text-purple-400" />
+                <span>Choose Chat Theme</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowThemePicker(false)}
+                className="p-1 rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'aurora', name: 'Aurora', color: 'bg-gradient-to-r from-emerald-500 to-cyan-500' },
+                { id: 'sunset', name: 'Sunset', color: 'bg-gradient-to-r from-amber-500 to-rose-500' },
+                { id: 'ocean', name: 'Ocean', color: 'bg-gradient-to-r from-blue-600 to-cyan-400' },
+                { id: 'forest', name: 'Forest', color: 'bg-gradient-to-r from-emerald-700 to-teal-500' },
+                { id: 'neon', name: 'Neon', color: 'bg-gradient-to-r from-fuchsia-600 to-cyan-400' },
+                { id: 'candy', name: 'Candy', color: 'bg-gradient-to-r from-pink-400 to-purple-400' },
+                { id: 'mocha', name: 'Mocha', color: 'bg-gradient-to-r from-amber-800 to-yellow-600' },
+                { id: 'theme_of_day', name: 'Theme of Day', color: 'bg-gradient-to-r from-indigo-500 to-violet-500' },
+              ].map((th) => (
+                <button
+                  key={th.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveChatTheme(th.id);
+                    try {
+                      localStorage.setItem('somotoz_active_chat_theme', th.id);
+                    } catch {}
+                    setShowThemePicker(false);
+                    onShowToast('success', 'Theme Applied', `${th.name} theme activated for this conversation.`);
+                  }}
+                  className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                    activeChatTheme === th.id
+                      ? 'border-[var(--accent-color)] bg-[var(--bg-elevated)] shadow-sm'
+                      : 'border-[var(--border-color)] bg-[var(--bg-input)] hover:border-[var(--accent-color)]/40'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-full ${th.color} shrink-0`} />
+                  <span className="text-xs font-semibold text-[var(--text-primary)] truncate">{th.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* PUBLIC ROOM RULES MODAL                                                   */}
+      {/* ========================================================================= */}
+      {showRulesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-[var(--bg-card)] border border-[var(--border-color)] rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                <Shield className="w-4 h-4 text-emerald-400" />
+                <span>Public Room Rules</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowRulesModal(false)}
+                className="p-1 rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <ul className="text-xs text-[var(--text-secondary)] space-y-2.5 list-disc list-inside leading-relaxed">
+              <li><strong>Adults only (18+):</strong> Date of birth verification required.</li>
+              <li><strong>Respectful community:</strong> Zero tolerance for hate speech or harassment.</li>
+              <li><strong>No link spam:</strong> External URLs, websites, and links are blocked.</li>
+              <li><strong>Slow mode:</strong> 1 message per 3 seconds rate limit to prevent flooding.</li>
+              <li><strong>Report abuse:</strong> Tap Report on any inappropriate messages.</li>
+            </ul>
+
+            <button
+              type="button"
+              onClick={() => setShowRulesModal(false)}
+              className="w-full py-2.5 rounded-2xl bg-[var(--accent-color)] text-black font-semibold text-xs hover:opacity-90 cursor-pointer"
+            >
+              I Understand & Agree
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

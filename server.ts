@@ -8,14 +8,60 @@ import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
+import helmet from 'helmet';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+
 dotenv.config();
 
 const PORT = 3000;
-const app = express();
+export const app = express();
+
+// Security Headers with Helmet (relaxing contentSecurityPolicy for inline scripts and assets)
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+// CORS configuration (customizable from CORS_ORIGIN environment variable)
+const allowedOrigins = (process.env.CORS_ORIGIN || '*')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: allowedOrigins.includes('*') ? true : allowedOrigins,
+    credentials: true,
+  })
+);
 
 // 1. TOP-LEVEL REQUEST DESERIALIZATION & MIDDLEWARE
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// General Rate Limiter for standard API routes (100 requests per minute)
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait a minute before trying again.' },
+});
+
+// Strict Rate Limiter for AI generation routes (40 requests per minute)
+const aiRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait a minute before trying again.' },
+});
+
+app.use('/api/', apiLimiter);
+app.use(['/api/reflect', '/api/chat', '/api/chat/stream', '/api/transcribe', '/api/search-wisdom', '/api/generate-art', '/api/mood/detect', '/api/quotes/generate'], aiRateLimiter);
 
 // Lazy initializer for Gemini SDK client
 let genAIClient: GoogleGenAI | null = null;
@@ -1702,7 +1748,7 @@ async function persistActivityLog(data: {
 
 // 2. API ROUTES
 app.get('/api/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', suite: 'Somotoz AI', time: new Date().toISOString() });
+  res.json({ ok: true, status: 'ok', suite: 'Somotoz AI', time: new Date().toISOString() });
 });
 
 // AI Reflection Generation Endpoint
@@ -2067,6 +2113,240 @@ CRITICAL: Output ONLY valid SVG without markdown backticks or commentary.`;
   } catch (error: any) {
     console.error('[API /api/generate-art Error]:', error);
     return res.status(500).json({ error: error.message || 'Artwork generation failed.' });
+  }
+});
+
+// Cache for daily generated quotes per user + mood + language + day
+const dailyQuoteCache = new Map<string, { quote: any; cachedAt: number }>();
+
+// 1. One-line Mood Detection (Raw user text is discarded server-side, never stored)
+app.post('/api/mood/detect', async (req: Request, res: Response) => {
+  try {
+    const body = (req.body && typeof req.body === 'object') ? req.body : {};
+    const text = typeof body.text === 'string' ? body.text.trim().slice(0, 300) : '';
+
+    if (!text) {
+      return res.status(400).json({ error: 'Text cannot be empty.' });
+    }
+
+    const authUser = await authenticateUserRequest(req);
+    if (authUser?.disabled) {
+      return res.status(403).json({ error: 'User access has been disabled.' });
+    }
+
+    const ai = getGeminiClient();
+    const prompt = `Classify this user's one-line reflection into EXACTLY ONE of these moods: "happy", "chill", "romantic", "heartbroken", "mood_off", "motivated", "focus".
+Text: "${text}"
+Output ONLY the mood key in lowercase without any explanation or markdown.`;
+
+    let classifiedMood = 'chill';
+    for (const modelName of ['gemini-3.1-flash-lite', 'gemini-3.7-flash', 'gemini-flash-latest']) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: { temperature: 0.1 },
+        });
+        const result = (response.text || '').trim().toLowerCase().replace(/[^a-z_]/g, '');
+        const validMoods = ['happy', 'chill', 'romantic', 'heartbroken', 'mood_off', 'motivated', 'focus'];
+        if (validMoods.includes(result)) {
+          classifiedMood = result;
+          break;
+        }
+      } catch (err: any) {
+        console.warn(`[Mood Detect] Model ${modelName} notice:`, err?.message || err);
+      }
+    }
+
+    return res.json({ success: true, mood: classifiedMood });
+  } catch (error: any) {
+    console.error('[API /api/mood/detect Error]:', error);
+    return res.status(500).json({ error: 'Mood detection failed.' });
+  }
+});
+
+// 40-Item Offline Fallback Quotes Bank (Original by Somotoz)
+interface OfflineQuoteItem {
+  text: string;
+  inspiringLine: string;
+  moodTag: string;
+  language: 'hinglish' | 'english';
+  category: string;
+}
+
+const OFFLINE_QUOTES_BANK: OfflineQuoteItem[] = [
+  // Happy (Hinglish)
+  { text: "Khushiyon ka koi mausam nahi hota janab,\nJab dil muskura de, wahi bahaar hai.", inspiringLine: "Muskurahat ko aadat bana lo.", moodTag: "happy", language: "hinglish", category: "happiness" },
+  { text: "Chhoti si zindagi hai, har pal mein rang bharo,\nJo mil gaya usme khush raho, aage ka na darr karo.", inspiringLine: "Aaj ka din tumhara hai.", moodTag: "happy", language: "hinglish", category: "happiness" },
+  { text: "Subah ki chai aur doston ki hansi,\nBas itni si baat pe zindagi khil uthi.", inspiringLine: "Khushiyan hamesha aasan cheezon mein milti hain.", moodTag: "happy", language: "hinglish", category: "happiness" },
+  // Happy (English)
+  { text: "A genuine smile is the shortest distance\nBetween your soul and true delight.", inspiringLine: "Celebrate every small spark of joy.", moodTag: "happy", language: "english", category: "happiness" },
+  { text: "Light doesn't enter where doors are locked;\nOpen your heart and watch joy return.", inspiringLine: "Today is a fresh canvas.", moodTag: "happy", language: "english", category: "happiness" },
+  { text: "Laughter is quiet courage making itself heard\nAgainst the noise of the rushing world.", inspiringLine: "Let joy be your steady compass.", moodTag: "happy", language: "english", category: "happiness" },
+
+  // Chill (Hinglish)
+  { text: "Dhoop ki halki si thandak aur coffee ka cup,\nBheed se door, bas khud mein theherne ka sukoon.", inspiringLine: "Sukoon bheed mein nahi, thehraav mein hai.", moodTag: "chill", language: "hinglish", category: "calm" },
+  { text: "Raftaar ki duniya mein do pal tham ke dekho,\nZindagi bhaagne ka nahi, mehsoos karne ka naam hai.", inspiringLine: "Saans lo, sab theek ho jayega.", moodTag: "chill", language: "hinglish", category: "calm" },
+  { text: "Hawaon ka rukh jidhar bhi ho apna rasta alag hai,\nKhamoshi se behte paani jaisa hamara dhang hai.", inspiringLine: "Apni gati se aage bado.", moodTag: "chill", language: "hinglish", category: "calm" },
+  // Chill (English)
+  { text: "In the quiet corners between busy hours,\nWe find the strength that was always ours.", inspiringLine: "Rest is not lost time; it is regained clarity.", moodTag: "chill", language: "english", category: "calm" },
+  { text: "Like quiet water reflecting clear sky,\nCalm minds see further without asking why.", inspiringLine: "Flow gently with the current.", moodTag: "chill", language: "english", category: "calm" },
+  { text: "Breathe in the calm of this unfolding hour;\nStillness holds its own quiet power.", inspiringLine: "Pause and let your thoughts settle.", moodTag: "chill", language: "english", category: "calm" },
+
+  // Romantic (Hinglish)
+  { text: "Teri ek muskaan pe meri saari baatein tham jaati hain,\nKhamosh aankhein bhi kitna kuch keh jaati hain.", inspiringLine: "Mohabbat lafzon se nahi, ehsaas se hoti hai.", moodTag: "romantic", language: "hinglish", category: "love" },
+  { text: "Shaam dhalte hi teri yaad ki chhanv aati hai,\nHar dua mein bas teri hansi nazar aati hai.", inspiringLine: "Dil ki baat dil tak pahunch hi jaati hai.", moodTag: "romantic", language: "hinglish", category: "love" },
+  { text: "Faasle kitne bhi hon darmiyaan hamare,\nEk khayal tera aate hi dil kareeb ho jata hai.", inspiringLine: "Sache rishte dooriyon se kamzor nahi hote.", moodTag: "romantic", language: "hinglish", category: "love" },
+  // Romantic (English)
+  { text: "In a world of endless hurried words,\nYour gentle presence is the only sound I heard.", inspiringLine: "True connection lives in quiet understanding.", moodTag: "romantic", language: "english", category: "love" },
+  { text: "Two quiet souls beneath the evening light,\nFinding peace before the coming night.", inspiringLine: "Love speaks through gentle kindness.", moodTag: "romantic", language: "english", category: "love" },
+  { text: "Distance is only geometry in space;\nYour warmth remains in every quiet place.", inspiringLine: "Cherish what matters deeply.", moodTag: "romantic", language: "english", category: "love" },
+
+  // Heartbroken (Hinglish)
+  { text: "Toota hua tara bhi roshni de jaata hai,\nZakhm chahe gehra ho, insaan nikharta chala jaata hai.", inspiringLine: "Waqt har zakhm ka marham ban jaata hai.", moodTag: "heartbroken", language: "hinglish", category: "healing" },
+  { text: "Khone ka gham unhi ko hota hai jo dil se jude hon,\nPar naye savere unke aate hain jo fir se khade hon.", inspiringLine: "Apne hausle par yakeen rakhein.", moodTag: "heartbroken", language: "hinglish", category: "healing" },
+  { text: "Aansuon ko behne do, ye dil ki safaai hai,\nHar tooti hui cheez ne nayi subah paayi hai.", inspiringLine: "Gham guzar jayega, tum thehre rahoge.", moodTag: "heartbroken", language: "hinglish", category: "healing" },
+  // Heartbroken (English)
+  { text: "The break is where the golden light slips through;\nYou will rebuild more beautifully than before.", inspiringLine: "Healing is a gentle, quiet art.", moodTag: "heartbroken", language: "english", category: "healing" },
+  { text: "Rain must fall before the garden blooms;\nTomorrow sweeps away today's heavy glooms.", inspiringLine: "Be patient with your own tender heart.", moodTag: "heartbroken", language: "english", category: "healing" },
+  { text: "Every ending holds a seed unborn;\nNight surrenders quietly to dawn.", inspiringLine: "You are stronger than the ache you feel.", moodTag: "heartbroken", language: "english", category: "healing" },
+
+  // Mood Off (Hinglish)
+  { text: "Kayi baar chup rehna hi sabse behtar jawab hota hai,\nHar sawal ka hisaab lafzon mein nahi hota.", inspiringLine: "Khud ko thoda waqt do.", moodTag: "mood_off", language: "hinglish", category: "patience" },
+  { text: "Badal chahe kitne bhi ghane hon aasmaan pe,\nSooraj ki kiran nikalne ki raah dhoondh hi leti hai.", inspiringLine: "Yeh waqt bhi guzar jayega.", moodTag: "mood_off", language: "hinglish", category: "patience" },
+  { text: "Thakan agar zehan ki ho toh thehar jaana chahiye,\nHar jung ladna zaroori nahi hota.", inspiringLine: "Aaram bhi ek zaroori safar hai.", moodTag: "mood_off", language: "hinglish", category: "patience" },
+  // Mood Off (English)
+  { text: "Not every day is built for leaps and bounds;\nSometimes peace is simply quiet ground.", inspiringLine: "Give yourself permission to pause.", moodTag: "mood_off", language: "english", category: "patience" },
+  { text: "Gray skies don't mean the sun forgot its way;\nIt simply rests until another day.", inspiringLine: "Tomorrow brings a clean slate.", moodTag: "mood_off", language: "english", category: "patience" },
+  { text: "When words feel heavy and thoughts unwind,\nRest gently and let silence soothe the mind.", inspiringLine: "Be kind to your quiet hours.", moodTag: "mood_off", language: "english", category: "patience" },
+
+  // Motivated (Hinglish)
+  { text: "Manzilein unhi ko milti hain jinke sapno mein jaan hoti hai,\nPankh se kuch nahi hota, hauslon se udaan hoti hai.", inspiringLine: "Aag apne andar jalaaye rakho.", moodTag: "motivated", language: "hinglish", category: "motivation" },
+  { text: "Gir kar uthna hi toh asli pehchaan hai,\nJo har mushkil se lad jaye, wahi insaan hai.", inspiringLine: "Rukna nahi, jhukna nahi.", moodTag: "motivated", language: "hinglish", category: "motivation" },
+  { text: "Mushkilon se keh do ki hausle bade hain,\nRaaste kitne bhi kathin hon, hum khade hain.", inspiringLine: "Tumhara waqt zaroor aayega.", moodTag: "motivated", language: "hinglish", category: "motivation" },
+  // Motivated (English)
+  { text: "The river carves through rock not by brute force,\nBut by refusing ever to cease its course.", inspiringLine: "Consistency beats intensity every single day.", moodTag: "motivated", language: "english", category: "motivation" },
+  { text: "Stand firm when mountains rise before your sight;\nThe highest peaks are conquered step by step in light.", inspiringLine: "Keep climbing without looking back.", moodTag: "motivated", language: "english", category: "motivation" },
+  { text: "Steel is forged in deep and blazing heat;\nEvery setback prepares your grand feat.", inspiringLine: "Turn your obstacle into your staircase.", moodTag: "motivated", language: "english", category: "motivation" },
+
+  // Focus (Hinglish)
+  { text: "Shor se door apna aashiyana bana,\nKamyabi khud ba khud cheekh uthegi.", inspiringLine: "Mehnat khamoshi se karo.", moodTag: "focus", language: "hinglish", category: "focus" },
+  { text: "Nazar nishane pe ho toh teer nahi bhatakta,\nIraada pakka ho toh dil nahi jhijhakta.", inspiringLine: "Dhyan bas ek cheez par rakhein.", moodTag: "focus", language: "hinglish", category: "focus" },
+  // Focus (English)
+  { text: "Silence the noise and listen to the thread;\nGreat things are woven where few dare to tread.", inspiringLine: "Deep focus shapes true mastery.", moodTag: "focus", language: "english", category: "focus" },
+  { text: "One stone placed firmly every single dawn\nBuilds castles before the year has gone.", inspiringLine: "Single-minded dedication creates miracles.", moodTag: "focus", language: "english", category: "focus" },
+];
+
+// 2. Original Modern Shayari & Inspirational Quote Generation
+// Generates ORIGINAL modern Urdu-shayari style lines labeled "Original by Somotoz".
+// Zero reproduction of copyrighted lyrics or modern living artists.
+app.all('/api/quotes/generate', async (req: Request, res: Response) => {
+  try {
+    const body = (req.body && typeof req.body === 'object') ? req.body : {};
+    const query = req.query || {};
+    const mood = typeof body.mood === 'string' ? body.mood.trim() : typeof query.mood === 'string' ? (query.mood as string).trim() : 'chill';
+    const language = (body.lang || body.language || query.lang || query.language) === 'english' ? 'english' : 'hinglish';
+    const forceRefresh = !!(body.forceRefresh || body.refresh || query.refresh);
+
+    const authUser = await authenticateUserRequest(req);
+    if (authUser?.disabled) {
+      return res.status(403).json({ error: 'User access has been disabled.' });
+    }
+
+    const todayDateKey = new Date().toISOString().split('T')[0];
+    const cacheKey = `${authUser?.uid || 'guest'}_${mood}_${language}_${todayDateKey}`;
+
+    // Return cached quote if requested within same day unless forceRefresh requested
+    if (!forceRefresh && dailyQuoteCache.has(cacheKey)) {
+      const entry = dailyQuoteCache.get(cacheKey)!;
+      if (Date.now() - entry.cachedAt < 24 * 60 * 60 * 1000) {
+        return res.json(entry.quote);
+      }
+    }
+
+    const ai = getGeminiClient();
+    const systemInstruction = `You are a modern Urdu-Hinglish poetic writer for Somotoz.
+CRITICAL DIRECTIVES:
+1. Write 100% ORIGINAL contemporary couplets (shayari / quote) in Roman Hinglish and English.
+2. DO NOT reproduce, quote, or paraphrase any copyrighted songs, Bollywood lyrics, or contemporary living poets.
+3. Keep the tone conversational, Gen-Z poetic, authentic, and emotionally resonant.
+4. Output strict JSON with format:
+{
+  "text": "original couplet or quote line (2-3 lines)",
+  "inspiringLine": "one short punchy takeaway line"
+}`;
+
+    const prompt = `Generate a fresh original quote for someone feeling "${mood}". Language requested: ${language}.
+Mood context:
+- happy: joyful, bright, celebratory
+- chill: calm, coffee, peace, peaceful breeze
+- romantic: sweet, longing, tender, soft heart
+- heartbroken: healing, moving on, inner resilience
+- mood_off: quiet patience, tomorrow is a new canvas
+- motivated: ambition, determination, fierce focus
+- focus: clarity, deep work, silence, flow state`;
+
+    let generatedQuote: any = null;
+    for (const modelName of ['gemini-3.1-flash-lite', 'gemini-3.7-flash', 'gemini-flash-latest']) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            systemInstruction,
+            temperature: 0.7,
+            responseMimeType: 'application/json',
+          },
+        });
+        const parsed = JSON.parse(response.text || '{}');
+        if (parsed.text) {
+          generatedQuote = {
+            quote: parsed.text,
+            inspiringLine: parsed.inspiringLine || 'Keep your inner fire alive.',
+            source: 'Original by Somotoz',
+            mood,
+            lang: language,
+            authorTag: 'Original by Somotoz',
+          };
+          break;
+        }
+      } catch (err: any) {
+        console.warn(`[Quote Gen] Model ${modelName} notice:`, err?.message || err);
+      }
+    }
+
+    // Fallback to offline quotes bank if generation fails or is offline
+    if (!generatedQuote) {
+      const fallbackList = OFFLINE_QUOTES_BANK.filter(
+        (q) => q.language === language && (q.moodTag === mood || q.category === 'motivation')
+      );
+      const fallbackItem = fallbackList.length > 0
+        ? fallbackList[Math.floor(Math.random() * fallbackList.length)]
+        : OFFLINE_QUOTES_BANK[Math.floor(Math.random() * OFFLINE_QUOTES_BANK.length)];
+
+      generatedQuote = {
+        quote: fallbackItem.text,
+        inspiringLine: fallbackItem.inspiringLine || 'Har nayi subah ek naya raasta dikhati hai.',
+        source: 'Original by Somotoz',
+        mood,
+        lang: language,
+        authorTag: 'Original by Somotoz',
+      };
+    }
+
+    dailyQuoteCache.set(cacheKey, { quote: generatedQuote, cachedAt: Date.now() });
+    return res.json(generatedQuote);
+  } catch (error: any) {
+    console.error('[API /api/quotes/generate Error]:', error);
+    const fallbackItem = OFFLINE_QUOTES_BANK[0];
+    return res.json({
+      quote: fallbackItem.text,
+      inspiringLine: fallbackItem.inspiringLine,
+      source: 'Original by Somotoz',
+      mood: 'chill',
+      lang: 'hinglish',
+      authorTag: 'Original by Somotoz',
+    });
   }
 });
 
@@ -3131,7 +3411,10 @@ app.post('/api/admin/retention-cleanup', async (req: Request, res: Response) => 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -3148,5 +3431,10 @@ async function startServer() {
   });
 }
 
-startServer();
+// Only launch standalone HTTP server if running directly (e.g. Node/tsx in dev or Cloud Run)
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
 

@@ -19,6 +19,7 @@ import {
   Ban
 } from 'lucide-react';
 import { SomoRegisteredAccount, SomoUserStatus, SomoPrivacySettings } from '../../types';
+import { useTheme } from '../../context/ThemeContext';
 
 interface SomochatPrivacyModalProps {
   isOpen: boolean;
@@ -48,6 +49,7 @@ export const SomochatPrivacyModal: React.FC<SomochatPrivacyModalProps> = ({
   onOpenRequestsModal,
   onShowToast,
 }) => {
+  const { animationLevel, setAnimationLevel } = useTheme();
   const [activeTab, setActiveTab] = useState<'profile' | 'privacy'>('profile');
 
   // Profile Form States
@@ -324,6 +326,34 @@ export const SomochatPrivacyModal: React.FC<SomochatPrivacyModalProps> = ({
                       className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         storyAudience === item.val
                           ? 'bg-[#00FF41] text-black border-[#00FF41] font-black'
+                          : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)]'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Animations: Full / Light / Off */}
+              <div>
+                <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-[#00F0FF]" />
+                  <span>Animations & Motion Effects</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { val: 'full', label: 'Full' },
+                    { val: 'light', label: 'Light' },
+                    { val: 'off', label: 'Off' },
+                  ].map((item) => (
+                    <button
+                      key={item.val}
+                      type="button"
+                      onClick={() => setAnimationLevel(item.val as any)}
+                      className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        animationLevel === item.val
+                          ? 'bg-[#00F0FF] text-black border-[#00F0FF] shadow-xs font-black'
                           : 'bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)]'
                       }`}
                     >

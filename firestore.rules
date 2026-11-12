@@ -56,6 +56,11 @@ service cloud.firestore {
       match /daily_usage/{dayId} {
         allow read, write: if isOwner(userId);
       }
+
+      // Subcollection: Favourite Quotes & Shayari
+      match /favourites/{favId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // =========================================================================
@@ -160,13 +165,24 @@ service cloud.firestore {
 
       allow update: if isSignedIn() && (
         (resource.data.toUid == request.auth.uid && request.resource.data.status in ['accepted', 'declined']) ||
-        (resource.data.fromUid == request.auth.uid && request.resource.data.status == 'declined')
+        (resource.data.fromUid == request.auth.uid && request.resource.data.status in ['cancelled', 'declined'])
       );
 
       allow delete: if isSignedIn() && (
         resource.data.fromUid == request.auth.uid ||
         resource.data.toUid == request.auth.uid
       );
+    }
+
+    // =========================================================================
+    // 6.5. 24-HOUR STORIES (stories/{storyId})
+    // =========================================================================
+    match /stories/{storyId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && (request.resource.data.authorUid == request.auth.uid || request.resource.data.authorSomoId == request.auth.uid);
+      allow update, delete: if isSignedIn()
+        && (resource.data.authorUid == request.auth.uid || resource.data.authorSomoId == request.auth.uid);
     }
 
     // =========================================================================

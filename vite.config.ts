@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import { defineConfig } from 'vite';
 import dyadComponentTagger from '@dyad-sh/react-vite-component-tagger';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -50,6 +50,8 @@ export default defineConfig(() => {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           navigateFallback: '/offline.html',
           navigateFallbackDenylist: [/^\/api/],
+          maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+          importScripts: ['/sw-custom.js'],
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -79,6 +81,35 @@ export default defineConfig(() => {
                 },
               },
             },
+            {
+              urlPattern: /\/api\/reflect/,
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'api-reflection-cache',
+                networkTimeoutSeconds: 4,
+                expiration: {
+                  maxEntries: 40,
+                  maxAgeSeconds: 60 * 60 * 24 * 7,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /\/api\/(quotes|wisdom)/,
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'api-wisdom-cache',
+                expiration: {
+                  maxEntries: 30,
+                  maxAgeSeconds: 60 * 60 * 24 * 3,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
           ],
         },
         devOptions: {
@@ -87,17 +118,31 @@ export default defineConfig(() => {
         },
       }),
     ],
+    build: {
+      chunkSizeWarningLimit: 2000,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('firebase')) return 'vendor-firebase';
+              if (id.includes('lucide-react')) return 'vendor-lucide';
+              if (id.includes('motion')) return 'vendor-motion';
+              if (id.includes('jspdf')) return 'vendor-jspdf';
+              if (id.includes('react') || id.includes('react-dom')) return 'vendor-react';
+            }
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
-      hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      // HMR is disabled in AI Studio to prevent WebSocket errors
+      hmr: false,
+      watch: null,
     },
   };
 });

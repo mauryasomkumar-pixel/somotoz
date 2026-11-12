@@ -197,15 +197,9 @@ export const SomochatAuthGateway: React.FC<SomochatAuthGatewayProps> = ({
       return;
     }
 
-    // Check if registering Som Maurya
-    const isSomMaster =
-      regEmail.trim().toLowerCase() === 'mauryasomkumar@gmail.com' ||
-      cleanUser === 'sommaurya' ||
-      regFullName.trim().toLowerCase().includes('som maurya');
-
-    const generatedSomoId = isSomMaster ? 'SOMO-SOM-001' : generateUniqueSomoId('USR', cleanUser.slice(0, 4));
-    const assignedRole: SomoUserRole = isSomMaster ? 'admin' : 'member';
-    const assignedBadge = isSomMaster ? 'MASTER ADMIN' : 'VERIFIED HUMAN';
+    const generatedSomoId = generateUniqueSomoId('USR', cleanUser.slice(0, 4));
+    const assignedRole: SomoUserRole = 'member';
+    const assignedBadge = 'VERIFIED ADULT';
 
     const newAccount: SomoRegisteredAccount = {
       id: `somo_usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -224,7 +218,7 @@ export const SomochatAuthGateway: React.FC<SomochatAuthGatewayProps> = ({
       isVerified: true,
       joinedAt: Date.now(),
       customBadge: assignedBadge,
-      colorTheme: isSomMaster ? '#00F0FF' : '#A855F7',
+      colorTheme: '#00F0FF',
       passwordHash: hashSomoPassword(regPassword),
       privacySettings: DEFAULT_PRIVACY_SETTINGS,
       dateOfBirth: regDob,

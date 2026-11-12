@@ -42,8 +42,12 @@ export interface ThemeConfig {
 export const CHAT_THEMES: Record<string, ThemeConfig> = {
   aurora: { id: 'aurora', name: 'Aurora', previewBg: 'from-emerald-500 to-cyan-500' },
   sunset: { id: 'sunset', name: 'Sunset', previewBg: 'from-amber-500 to-rose-500' },
-  midnight: { id: 'midnight', name: 'Midnight', previewBg: 'from-indigo-500 to-purple-600' },
-  cyberpunk: { id: 'cyberpunk', name: 'Cyberpunk', previewBg: 'from-fuchsia-500 to-cyan-400' },
+  ocean: { id: 'ocean', name: 'Ocean', previewBg: 'from-blue-600 to-cyan-400' },
+  forest: { id: 'forest', name: 'Forest', previewBg: 'from-emerald-700 to-teal-500' },
+  neon: { id: 'neon', name: 'Neon', previewBg: 'from-fuchsia-600 to-cyan-400' },
+  candy: { id: 'candy', name: 'Candy', previewBg: 'from-pink-400 to-purple-400' },
+  mocha: { id: 'mocha', name: 'Mocha', previewBg: 'from-amber-800 to-yellow-600' },
+  theme_of_day: { id: 'theme_of_day', name: 'Theme of the Day', previewBg: 'from-indigo-500 to-violet-500' },
 };
 
 interface CallScreenProps {

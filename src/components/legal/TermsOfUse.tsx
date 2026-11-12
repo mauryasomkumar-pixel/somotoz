@@ -218,7 +218,7 @@ export const TermsOfUse: React.FC<TermsOfUseProps> = ({ onNavigate, onBack }) =>
             <p><strong>Grievance Officer:</strong> Som Maurya</p>
             <p><strong>Trust & Safety Organization:</strong> Somotoz Legal & Compliance Operations</p>
             <p><strong>Email:</strong> <a href="mailto:grievance@somotoz.ai" className="text-emerald-500 hover:underline">grievance@somotoz.ai</a></p>
-            <p><strong>Administrative Contact:</strong> <a href="mailto:mauryasomkumar@gmail.com" className="text-emerald-500 hover:underline">mauryasomkumar@gmail.com</a></p>
+            <p><strong>Administrative Contact:</strong> <a href="mailto:support@somotoz.ai" className="text-emerald-500 hover:underline">support@somotoz.ai</a></p>
             <p><strong>Notice Turnaround:</strong> Inquiries are acknowledged within 24-48 hours. Formal disputes are addressed in accordance with platform mediation procedures.</p>
           </div>
         </section>
