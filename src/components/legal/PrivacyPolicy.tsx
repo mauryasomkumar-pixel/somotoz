@@ -188,6 +188,9 @@ export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onNavigate, onBack
             <li>
               <strong>Account Deletion:</strong> When you request account deletion in Settings, your account is placed into a 30-day grace/schedule period, followed by permanent purging from all database collections within 90 days.
             </li>
+            <li>
+              <strong>Offline Journal Drafts:</strong> When your device loses connectivity, journal drafts and cached entries may be temporarily stored in your browser's local IndexedDB storage so you do not lose your writing. These local drafts sync to your account once connectivity returns and are cleared from the device when you sign out.
+            </li>
           </ul>
         </section>
 

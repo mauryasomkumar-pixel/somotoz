@@ -157,7 +157,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
 
         {/* Small label next to switch: e.g. "Auto (Day)", "Auto (Night)" */}
         <span
-          className="text-[10px] font-mono font-bold text-[var(--accent-color)] px-1.5 py-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-color)] whitespace-nowrap shadow-xs select-none"
+          className="hidden sm:inline-block text-[10px] font-mono font-bold text-[var(--accent-color)] px-1.5 py-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-color)] whitespace-nowrap shadow-xs select-none"
           title={`Active Theme: ${autoModeLabel}`}
         >
           {autoModeLabel}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Shield,
@@ -76,13 +76,17 @@ import { SomochatAuthGateway } from './somochat/SomochatAuthGateway';
 import { SomochatRequestsModal } from './somochat/SomochatRequestsModal';
 import { SomochatAdminConsole } from './somochat/SomochatAdminConsole';
 import { SomochatPrivacyModal } from './somochat/SomochatPrivacyModal';
-import { CallScreen } from './CallScreen';
-import { WebRTCCall } from '../lib/webrtcService';
+import { WebRTCCall, hasTurnConfig } from '../lib/webrtcService';
 import { db } from '../lib/firebase';
 import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { submitUserReportAsync } from '../lib/adminService';
 import { compressChatImage } from '../utils/imageCompressor';
 import { enqueueMessage, flushMessageQueue } from '../lib/offlineQueue';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+
+const CallScreen = lazy(() =>
+  import('./CallScreen').then((m) => ({ default: m.CallScreen }))
+);
 
 interface SomochatProps {
   currentUser: UserProfile | null;
@@ -96,6 +100,7 @@ export const Somochat: React.FC<SomochatProps> = ({
   onLogActivity,
 }) => {
   const { theme } = useTheme();
+  const { isOnline } = useOnlineStatus();
 
   // ============================================================================
   // 1. REGISTERED ACCOUNTS REPOSITORY
@@ -543,7 +548,7 @@ export const Somochat: React.FC<SomochatProps> = ({
     const messageId = `somo_msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const encryptedPayload = encryptSomoPayload(rawContent || `[${mediaAttachment?.type.toUpperCase()}]`);
 
-    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    const isOffline = !isOnline;
 
     const newMsg: SomoMessage = {
       id: messageId,
@@ -1334,6 +1339,9 @@ export const Somochat: React.FC<SomochatProps> = ({
                       <button
                         type="button"
                         onClick={() => {
+                          if (!hasTurnConfig()) {
+                            onShowToast('info', 'Network Notice', 'Calls may not connect on some networks');
+                          }
                           const convId = [currentAuthUser.id, activePeer.id].sort().join('_');
                           setActiveCall({
                             id: `call_${Date.now()}`,
@@ -1360,6 +1368,9 @@ export const Somochat: React.FC<SomochatProps> = ({
                       <button
                         type="button"
                         onClick={() => {
+                          if (!hasTurnConfig()) {
+                            onShowToast('info', 'Network Notice', 'Calls may not connect on some networks');
+                          }
                           const convId = [currentAuthUser.id, activePeer.id].sort().join('_');
                           setActiveCall({
                             id: `call_${Date.now()}`,
@@ -2297,13 +2308,21 @@ export const Somochat: React.FC<SomochatProps> = ({
       {/* ACTIVE WEBRTC VOICE / VIDEO CALL SCREEN                                  */}
       {/* ========================================================================= */}
       {activeCall && currentUser && (
-        <CallScreen
-          currentUser={currentUser}
-          activeCall={activeCall}
-          themeId={activeChatTheme}
-          onClose={() => setActiveCall(null)}
-          onShowToast={onShowToast}
-        />
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center text-white text-sm font-sans">
+              Connecting call interface...
+            </div>
+          }
+        >
+          <CallScreen
+            currentUser={currentUser}
+            activeCall={activeCall}
+            themeId={activeChatTheme}
+            onClose={() => setActiveCall(null)}
+            onShowToast={onShowToast}
+          />
+        </Suspense>
       )}
 
       {/* ========================================================================= */}

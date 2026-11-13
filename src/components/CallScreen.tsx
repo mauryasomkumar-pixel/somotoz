@@ -23,6 +23,7 @@ import {
   WebRTCCall,
   CallType,
   getIceServers,
+  hasTurnConfig,
   toneManager,
   answerCallSession,
   declineCallSession,
@@ -568,6 +569,14 @@ export const CallScreen: React.FC<CallScreenProps> = ({
           </button>
         </div>
       </div>
+
+      {/* TURN Missing Notice */}
+      {!hasTurnConfig() && (
+        <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs flex items-center gap-2 z-30">
+          <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+          <span>Calls may not connect on some networks</span>
+        </div>
+      )}
 
       {/* Permission Denied Alert Banner */}
       {permissionError && (

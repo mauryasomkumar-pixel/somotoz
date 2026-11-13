@@ -47,12 +47,45 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
+          cacheId: 'somotoz-v2',
+          skipWaiting: true,
+          clientsClaim: true,
+          cleanupOutdatedCaches: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-          navigateFallback: '/offline.html',
-          navigateFallbackDenylist: [/^\/api/],
-          maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
-          importScripts: ['/sw-custom.js'],
+          globIgnores: ['**/sw-custom.js', '**/firebase-messaging-sw.js'],
+          navigateFallback: null,
+          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
           runtimeCaching: [
+            // 1. Always bypass cache for backend API routes & Firebase auth handlers
+            {
+              urlPattern: ({ url }) => url.pathname.startsWith('/api/') || url.pathname.startsWith('/__/'),
+              handler: 'NetworkOnly',
+            },
+            // 2. Always bypass cache for Firebase Auth, Firestore, Storage & Realtime DB
+            {
+              urlPattern: /^https:\/\/(firestore\.googleapis\.com|identitytoolkit\.googleapis\.com|securetoken\.googleapis\.com|firebasestorage\.googleapis\.com|firebase\.googleapis\.com|fcmregistrations\.googleapis\.com|.*\.firebaseio\.com|.*\.firebaseapp\.com)\/.*/i,
+              handler: 'NetworkOnly',
+            },
+            // 3. Navigation requests: try live network first, fallback to cached page or offline.html ONLY on failure
+            {
+              urlPattern: ({ request }) => request.mode === 'navigate',
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'somotoz-pages-v2',
+                networkTimeoutSeconds: 4,
+                expiration: {
+                  maxEntries: 20,
+                  maxAgeSeconds: 60 * 60 * 24,
+                },
+                cacheableResponse: {
+                  statuses: [200],
+                },
+                precacheFallback: {
+                  fallbackURL: '/offline.html',
+                },
+              },
+            },
+            // 4. Google Fonts static assets
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'CacheFirst',
@@ -81,53 +114,24 @@ export default defineConfig(() => {
                 },
               },
             },
-            {
-              urlPattern: /\/api\/reflect/,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'api-reflection-cache',
-                networkTimeoutSeconds: 4,
-                expiration: {
-                  maxEntries: 40,
-                  maxAgeSeconds: 60 * 60 * 24 * 7,
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
-            {
-              urlPattern: /\/api\/(quotes|wisdom)/,
-              handler: 'StaleWhileRevalidate',
-              options: {
-                cacheName: 'api-wisdom-cache',
-                expiration: {
-                  maxEntries: 30,
-                  maxAgeSeconds: 60 * 60 * 24 * 3,
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
           ],
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
     ],
     build: {
-      chunkSizeWarningLimit: 2000,
+      chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
               if (id.includes('firebase')) return 'vendor-firebase';
               if (id.includes('lucide-react')) return 'vendor-lucide';
-              if (id.includes('motion')) return 'vendor-motion';
-              if (id.includes('jspdf')) return 'vendor-jspdf';
+              if (id.includes('motion') || id.includes('framer-motion')) return 'vendor-motion';
+              if (id.includes('jspdf') || id.includes('html2canvas')) return 'vendor-pdf';
+              if (id.includes('react-markdown') || id.includes('remark-')) return 'vendor-markdown';
               if (id.includes('react') || id.includes('react-dom')) return 'vendor-react';
             }
           },

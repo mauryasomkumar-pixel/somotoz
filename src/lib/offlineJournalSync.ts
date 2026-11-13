@@ -1,6 +1,7 @@
 import { JournalEntry, AIReflectionResponse } from '../types';
 import { db, auth, cleanForFirestore } from './firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import { verifyConnectivityNow } from '../hooks/useOnlineStatus';
 
 const DB_NAME = 'somotoz_offline_journal_db';
 const DB_VERSION = 1;
@@ -313,7 +314,8 @@ export async function syncOfflineJournalQueue(
     onProgress?: (synced: number, total: number) => void;
   }
 ): Promise<{ syncedCount: number; failedCount: number; errors: string[] }> {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+  const isReachable = await verifyConnectivityNow().catch(() => false);
+  if (!isReachable) {
     return { syncedCount: 0, failedCount: 0, errors: ['Device is still offline'] };
   }
 
@@ -474,6 +476,30 @@ async function incrementQueueRetry(dbInstance: IDBDatabase, queueItem: OfflineQu
   });
 }
 
+export async function clearOfflineJournalData(): Promise<void> {
+  if (typeof window === 'undefined' || !window.indexedDB) return;
+  try {
+    const dbInstance = await openOfflineDB();
+    await Promise.all([
+      new Promise<void>((resolve) => {
+        const tx = dbInstance.transaction(STORE_ENTRIES, 'readwrite');
+        tx.objectStore(STORE_ENTRIES).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      }),
+      new Promise<void>((resolve) => {
+        const tx = dbInstance.transaction(STORE_QUEUE, 'readwrite');
+        tx.objectStore(STORE_QUEUE).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      }),
+    ]);
+    dbInstance.close();
+  } catch (err) {
+    console.warn('[OfflineSync] Failed clearing local IndexedDB journal data:', err);
+  }
+}
+
 /**
  * Hook to initialize auto-sync listeners when internet returns or service worker fires
  */
@@ -487,7 +513,8 @@ export function initOfflineSyncManager(
   if (typeof window === 'undefined') return () => {};
 
   const handleSyncTrigger = async () => {
-    if (navigator.onLine) {
+    const online = await verifyConnectivityNow().catch(() => false);
+    if (online) {
       try {
         const result = await syncOfflineJournalQueue(userId, {
           onEntrySynced: callbacks?.onEntrySynced,
@@ -515,13 +542,11 @@ export function initOfflineSyncManager(
     navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
   }
 
-  // 3. Check immediately on mount if online
-  if (navigator.onLine) {
-    // Delay slightly to allow auth session to settle
-    setTimeout(handleSyncTrigger, 1500);
-  }
+  // 3. Check shortly after mount
+  const initialTimer = setTimeout(handleSyncTrigger, 1500);
 
   return () => {
+    clearTimeout(initialTimer);
     window.removeEventListener('online', handleSyncTrigger);
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);

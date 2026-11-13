@@ -1,3 +1,5 @@
+import { verifyConnectivityNow } from '../hooks/useOnlineStatus';
+
 export interface QueuedMessage {
   id: string;
   conversationId: string;
@@ -61,7 +63,8 @@ export function removeQueuedMessage(id: string): void {
 export async function flushMessageQueue(
   sendMessageFn: (msg: QueuedMessage) => Promise<boolean>
 ): Promise<number> {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+  const isReachable = await verifyConnectivityNow().catch(() => false);
+  if (!isReachable) {
     return 0;
   }
 

@@ -4,6 +4,7 @@ import { Sparkles, Send, Lightbulb, Heart, Feather, Compass, Mic, Square, Loader
 import { DynamicWelcomeBanner } from './DynamicWelcomeBanner';
 import { useTheme } from '../context/ThemeContext';
 import { auth } from '../lib/firebase';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 interface ReflectionEditorProps {
   initialContent?: string;
@@ -52,6 +53,7 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
   userName,
 }) => {
   const { theme } = useTheme();
+  const { isOnline } = useOnlineStatus();
   const isLight = theme === 'white';
   const isMix = theme === 'mix';
 
@@ -525,7 +527,9 @@ export const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
               </button>
             ) : (
               <div className={`text-[11px] font-mono ${textMutedClass}`}>
-                Saved securely to your private cloud storage
+                {!isOnline
+                  ? 'Saved on this device, will sync when you are online'
+                  : 'Saved securely to your private cloud storage'}
               </div>
             )}
 

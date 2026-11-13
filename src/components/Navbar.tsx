@@ -9,6 +9,7 @@ import {
 import { UserProfile, ViewMode } from '../types';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { checkIsAdmin } from '../lib/adminService';
+import { OfflineModeIndicator } from './pwa/OfflineModeIndicator';
 
 interface NavbarProps {
   user: UserProfile;
@@ -58,33 +59,36 @@ export const Navbar: React.FC<NavbarProps> = memo(({
   const viewTitle = getViewLabel(currentView);
 
   return (
-    <header className="sticky top-0 z-30 bg-[var(--bg-card)]/90 backdrop-blur-md border-b border-[var(--border-color)] px-4 sm:px-6 py-3 transition-colors font-sans">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-30 bg-[var(--bg-card)]/90 backdrop-blur-md border-b border-[var(--border-color)] px-3 sm:px-6 py-2.5 sm:py-3 transition-colors font-sans">
+      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         
         {/* Left: Brand Logo & Section Title Breadcrumb */}
-        <div className="flex items-center space-x-2.5 sm:space-x-3 select-none">
+        <div className="flex items-center space-x-2 sm:space-x-3 select-none min-w-0">
           <button
             type="button"
             onClick={() => onSelectView('dashboard')}
-            className="flex items-center space-x-2 cursor-pointer group"
+            className="flex items-center space-x-2 cursor-pointer group shrink-0"
           >
             <div className="w-8 h-8 rounded-xl bg-[var(--accent-color)] text-black flex items-center justify-center font-bold text-sm shadow-sm group-hover:opacity-90 transition-opacity">
               S
             </div>
-            <span className="font-bold text-base sm:text-lg tracking-tight text-[var(--text-primary)]">
+            <span className="font-bold text-base sm:text-lg tracking-tight text-[var(--text-primary)] whitespace-nowrap">
               Somotoz
             </span>
           </button>
 
-          <ChevronRight className="w-4 h-4 text-[var(--text-muted)] hidden sm:block" />
+          <ChevronRight className="w-4 h-4 text-[var(--text-muted)] hidden sm:block shrink-0" />
 
-          <span className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)] hidden sm:inline-block">
+          <span className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)] hidden sm:inline-block truncate">
             {viewTitle}
           </span>
         </div>
 
-        {/* Right: Theme Options, Admin Badge, and Profile Shortcut */}
-        <div className="flex items-center space-x-2 sm:space-x-3">
+        {/* Right: Persistent Offline Mode Indicator, Theme Options, Admin Badge, and Profile Shortcut */}
+        <div className="flex items-center flex-wrap gap-1.5 sm:gap-3 shrink-0">
+          {/* Persistent Offline Mode Indicator (Navigator API) */}
+          <OfflineModeIndicator />
+
           {/* Quick Theme Switcher */}
           <ThemeSwitcher compact={true} />
 
@@ -93,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = memo(({
             <button
               type="button"
               onClick={() => onSelectView('admin')}
-              className={`px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 currentView === 'admin'
                   ? 'bg-amber-500 text-black shadow-xs'
                   : 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25 border border-amber-500/30'
@@ -109,7 +113,7 @@ export const Navbar: React.FC<NavbarProps> = memo(({
           <button
             type="button"
             onClick={onOpenProfile || (() => onSelectView('profile'))}
-            className="flex items-center space-x-2 p-1.5 rounded-xl hover:bg-[var(--bg-elevated)] text-[var(--text-primary)] transition-colors cursor-pointer"
+            className="flex items-center space-x-2 p-1.5 rounded-xl hover:bg-[var(--bg-elevated)] text-[var(--text-primary)] transition-colors cursor-pointer shrink-0"
             title="Open Profile"
             aria-label="User Profile"
           >

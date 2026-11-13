@@ -1,7 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { Compass, Sparkles, BookOpen, Headphones, Quote, RefreshCw } from 'lucide-react';
-import { WisdomExplorer } from './WisdomExplorer';
-import { SoundscapePlayer } from './SoundscapePlayer';
+import { ScreenLoadingFallback } from './common/LoadingSkeletons';
+
+const WisdomExplorer = lazy(() =>
+  import('./WisdomExplorer').then((m) => ({ default: m.WisdomExplorer }))
+);
+const SoundscapePlayer = lazy(() =>
+  import('./SoundscapePlayer').then((m) => ({ default: m.SoundscapePlayer }))
+);
 
 const INSPIRING_QUOTES = [
   {
@@ -104,14 +110,18 @@ export const DiscoverView: React.FC = () => {
       {/* 1. Knowledge Hub Tab */}
       {activeTab === 'knowledge' && (
         <div className="animate-fade-in">
-          <WisdomExplorer />
+          <Suspense fallback={<ScreenLoadingFallback label="Loading Knowledge Hub..." />}>
+            <WisdomExplorer />
+          </Suspense>
         </div>
       )}
 
       {/* 2. Soundscapes Tab */}
       {activeTab === 'soundscapes' && (
         <div className="animate-fade-in">
-          <SoundscapePlayer />
+          <Suspense fallback={<ScreenLoadingFallback label="Loading Soundscapes..." />}>
+            <SoundscapePlayer />
+          </Suspense>
         </div>
       )}
 

@@ -90,6 +90,7 @@
       transition: opacity 0.2s;
     }
     .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.6; cursor: wait; }
     .tips {
       margin-top: 1.5rem;
       padding-top: 1.25rem;
@@ -126,30 +127,24 @@
 
     <h1>You're currently offline</h1>
     <p>
-      Somotoz is waiting for an active internet connection. Any messages you send will be queued safely and sent automatically when you reconnect.
+      Somotoz is waiting for an active internet connection. Any journal notes or messages you create will be saved safely and synced when you reconnect.
     </p>
 
-    <button class="btn" onclick="retryConnection()">
+    <button class="btn" id="retryBtn" onclick="retryConnection()">
       Retry Connection
     </button>
 
     <div class="tips">
       <strong>Offline Features:</strong><br />
-      • Your cached journal entries and app views remain accessible.<br />
-      • We will automatically restore live sync the moment internet returns.
+      • Cached journal entries and recent views stay accessible.<br />
+      • If this screen appeared by mistake, <a href="/?reset-sw=1" style="color: #00F0FF;">reset app cache</a>.
     </div>
   </div>
 
   <script>
-    function retryConnection() {
-      if (navigator.onLine) {
-        window.location.href = '/';
-      } else {
-        window.location.reload();
-      }
-    }
+    var checking = false;
 
-    window.addEventListener('online', function() {
+    function setOnlineUI() {
       var pill = document.getElementById('statusPill');
       var dot = document.getElementById('statusDot');
       var text = document.getElementById('statusText');
@@ -158,11 +153,61 @@
         pill.style.borderColor = 'rgba(16, 185, 129, 0.3)';
         pill.style.color = '#34D399';
         dot.style.background = '#34D399';
-        text.innerText = 'Back Online! Reconnecting...';
+        text.innerText = 'Back Online! Opening Somotoz...';
       }
-      setTimeout(function() {
-        window.location.href = '/';
-      }, 1000);
+    }
+
+    function setStillOfflineUI() {
+      var text = document.getElementById('statusText');
+      if (text) {
+        text.innerText = 'Still offline — check your connection';
+      }
+    }
+
+    async function checkRealHealth() {
+      if (checking) return;
+      checking = true;
+      var btn = document.getElementById('retryBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Checking connection...';
+      }
+
+      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timer = controller ? setTimeout(function() { controller.abort(); }, 4000) : null;
+
+      try {
+        var res = await fetch('/api/health', {
+          method: 'GET',
+          cache: 'no-store',
+          signal: controller ? controller.signal : undefined
+        });
+        if (res && res.ok) {
+          setOnlineUI();
+          setTimeout(function() {
+            window.location.replace('/');
+          }, 400);
+          return;
+        }
+        setStillOfflineUI();
+      } catch (err) {
+        setStillOfflineUI();
+      } finally {
+        if (timer) clearTimeout(timer);
+        checking = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = 'Retry Connection';
+        }
+      }
+    }
+
+    function retryConnection() {
+      checkRealHealth();
+    }
+
+    window.addEventListener('online', function() {
+      checkRealHealth();
     });
   </script>
 </body>

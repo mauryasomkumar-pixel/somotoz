@@ -1,5 +1,6 @@
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
+import { isRestrictedSwEnvironment } from './pwaService';
 
 export function isPushSupported(): boolean {
   return typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator;
@@ -24,10 +25,12 @@ export async function requestPushPermission(uid?: string): Promise<{
     const currentUid = uid || auth.currentUser?.uid;
 
     if (permission === 'granted') {
-      // Register service worker if not already registered
-      if ('serviceWorker' in navigator) {
+      // Register FCM service worker on dedicated scope in production only (never overwrite root /sw.js)
+      if ('serviceWorker' in navigator && !isRestrictedSwEnvironment()) {
         try {
-          await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+          await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+            scope: '/firebase-cloud-messaging-push-scope',
+          });
         } catch (swErr) {
           console.warn('[Push] Service worker registration notice:', swErr);
         }

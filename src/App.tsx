@@ -18,11 +18,9 @@ import { LandingPage } from './components/LandingPage';
 import { NavigationRail } from './components/NavigationRail';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
-import { ReflectionEditor } from './components/ReflectionEditor';
 import { ReflectionDetail } from './components/ReflectionDetail';
 import { ChatCompanion } from './components/ChatCompanion';
 import { Somochat } from './components/Somochat';
-import { DiscoverView } from './components/DiscoverView';
 import { ProfileView } from './components/ProfileView';
 import { FirstTimeTour } from './components/FirstTimeTour';
 import { OnboardingModal } from './components/OnboardingModal';
@@ -30,8 +28,8 @@ import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { ProfileModal } from './components/ProfileModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
-import { ReconnectingBanner } from './components/pwa/ReconnectingBanner';
-import { ScreenLoadingFallback } from './components/common/LoadingSkeletons';
+import { OfflineModeIndicator } from './components/pwa/OfflineModeIndicator';
+import { ScreenLoadingFallback, JournalListSkeleton } from './components/common/LoadingSkeletons';
 import { Loader2, Terminal, BookOpen, ShieldAlert, LogOut } from 'lucide-react';
 import { checkIsAdmin, checkUserIsDisabled, recordAdminActivity } from './lib/adminService';
 import {
@@ -40,7 +38,10 @@ import {
   cacheServerJournalEntries,
   initOfflineSyncManager,
   getPendingQueueItems,
+  clearOfflineJournalData,
 } from './lib/offlineJournalSync';
+import { consumeCacheResetNotice } from './lib/pwaService';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
 
 // Lazy-loaded heavy modules for optimized bundle splitting and startup latency
 const AdminDashboard = lazy(() =>
@@ -51,6 +52,12 @@ const PrivacyPolicy = lazy(() =>
 );
 const TermsOfUse = lazy(() =>
   import('./components/legal/TermsOfUse').then((m) => ({ default: m.TermsOfUse }))
+);
+const ReflectionEditor = lazy(() =>
+  import('./components/ReflectionEditor').then((m) => ({ default: m.ReflectionEditor }))
+);
+const DiscoverView = lazy(() =>
+  import('./components/DiscoverView').then((m) => ({ default: m.DiscoverView }))
 );
 
 export default function App() {
@@ -93,6 +100,7 @@ export default function App() {
     isDeleting: false,
   });
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const { isOnline } = useOnlineStatus();
 
   // Toast Helper
   const addToast = useCallback((type: 'success' | 'error' | 'info', title: string, message?: string) => {
@@ -106,6 +114,13 @@ export default function App() {
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
+
+  // Show confirmation toast if user just triggered ?reset-sw=1 or "Fix app cache"
+  useEffect(() => {
+    if (consumeCacheResetNotice()) {
+      addToast('success', 'App cache reset', 'Old offline cache was cleared and refreshed.');
+    }
+  }, [addToast]);
 
   // 1. Auth Listener & URL Synchronizer
   useEffect(() => {
@@ -228,7 +243,7 @@ export default function App() {
     };
   }, []);
 
-  // 2. Real-time Firestore Subscriptions for User's Entries
+  // 2. Real-time Firestore Subscriptions for User's Entries + Offline Sync Manager
   useEffect(() => {
     if (!currentUser?.uid) {
       setEntries([]);
@@ -236,13 +251,40 @@ export default function App() {
       return;
     }
 
+    let isMounted = true;
     setIsLoadingEntries(true);
+
+    // Hydrate immediately from local IndexedDB cache so entries are available offline
+    getCachedJournalEntries(currentUser.uid).then((cached) => {
+      if (isMounted && cached.length > 0) {
+        setEntries((prev) => (prev.length === 0 ? cached : prev));
+      }
+    });
+
+    // Start background sync for any queued offline journal drafts
+    const stopSyncManager = initOfflineSyncManager(currentUser.uid, {
+      onEntrySynced: (syncedEntry) => {
+        if (!isMounted) return;
+        setEntries((prev) => {
+          const exists = prev.some((e) => e.id === syncedEntry.id);
+          if (exists) {
+            return prev.map((e) => (e.id === syncedEntry.id ? syncedEntry : e));
+          }
+          return [syncedEntry, ...prev];
+        });
+      },
+      onSyncComplete: (count) => {
+        if (!isMounted) return;
+        addToast('success', 'Offline Notes Synced', `${count} offline journal ${count === 1 ? 'note' : 'notes'} synced to your account.`);
+      },
+    });
+
     const userEntriesRef = collection(db, 'users', currentUser.uid, 'entries');
     const q = query(userEntriesRef, orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(
       q,
-      (snapshot) => {
+      async (snapshot) => {
         const loadedEntries: JournalEntry[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
@@ -260,17 +302,41 @@ export default function App() {
             isFavorite: !!data.isFavorite,
           });
         });
-        setEntries(loadedEntries);
-        setIsLoadingEntries(false);
+
+        await cacheServerJournalEntries(currentUser.uid, loadedEntries);
+
+        const pendingItems = await getPendingQueueItems(currentUser.uid);
+        const pendingEntries = pendingItems.map((item) => item.entry);
+        const pendingIds = new Set(pendingEntries.map((e) => e.id));
+        const merged = [
+          ...pendingEntries,
+          ...loadedEntries.filter((e) => !pendingIds.has(e.id)),
+        ].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+        if (isMounted) {
+          setEntries(merged);
+          setIsLoadingEntries(false);
+        }
       },
-      (error) => {
+      async (error) => {
         console.error('Firestore entries listener error:', error);
-        addToast('error', 'Sync Failed', 'Could not sync entries with Firestore. Please check your connection.');
-        setIsLoadingEntries(false);
+        const cached = await getCachedJournalEntries(currentUser.uid);
+        if (isMounted) {
+          if (cached.length > 0) {
+            setEntries(cached);
+          } else {
+            addToast('info', 'Offline Cache Active', 'Showing cached notes until connection returns.');
+          }
+          setIsLoadingEntries(false);
+        }
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      stopSyncManager();
+      unsubscribe();
+    };
   }, [currentUser?.uid, addToast]);
 
   // 3. Real-time Firestore Subscriptions for User's Activity Logs
@@ -412,9 +478,10 @@ export default function App() {
     }
   };
 
-  // Handle Logout
+  // Handle Logout (wipe local offline journal drafts & queue on sign out)
   const handleLogout = async () => {
     try {
+      await clearOfflineJournalData();
       await logoutUser();
       addToast('info', 'Signed Out', 'You have been safely signed out.');
     } catch (err: any) {
@@ -448,7 +515,7 @@ export default function App() {
     }
   };
 
-  // Handle New Entry Submission to Gemini & Firestore
+  // Handle New Entry Submission to Gemini & Firestore (with safe offline draft fallback)
   const handleCreateOrUpdateReflection = async (
     content: string,
     customTitle?: string,
@@ -456,6 +523,40 @@ export default function App() {
   ) => {
     if (!currentUser?.uid) {
       addToast('error', 'Authentication Required', 'You must be logged in to save reflections.');
+      return;
+    }
+
+    const isEditing = viewMode === 'edit' && Boolean(selectedEntryId);
+    const saveLocallyOffline = async () => {
+      const offlineEntry = await saveOfflineJournalEntry({
+        userId: currentUser.uid,
+        userEmail: currentUser.email,
+        content,
+        customTitle,
+        promptType,
+        isEditing,
+        existingEntryId: selectedEntryId || undefined,
+      });
+
+      setEntries((prev) => {
+        const exists = prev.some((e) => e.id === offlineEntry.id);
+        if (exists) {
+          return prev.map((e) => (e.id === offlineEntry.id ? offlineEntry : e));
+        }
+        return [offlineEntry, ...prev];
+      });
+      setSelectedEntryId(offlineEntry.id);
+      setViewMode('view');
+      addToast('info', 'Saved on this device', 'Saved on this device, will sync when you are online.');
+    };
+
+    if (!isOnline) {
+      setIsSubmittingAI(true);
+      try {
+        await saveLocallyOffline();
+      } finally {
+        setIsSubmittingAI(false);
+      }
       return;
     }
 
@@ -504,7 +605,6 @@ export default function App() {
       };
 
       // Determine entry ID (new or existing edit)
-      const isEditing = viewMode === 'edit' && selectedEntryId;
       const entryId = isEditing ? selectedEntryId! : `entry_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const now = Date.now();
 
@@ -548,7 +648,7 @@ export default function App() {
         metadata: { wordCount, moodTags },
       });
 
-      // Step 3: Switch to View mode with the created/updated entry
+      // Step 4: Switch to View mode with the created/updated entry
       setSelectedEntryId(entryId);
       setViewMode('view');
       addToast(
@@ -557,6 +657,19 @@ export default function App() {
         'Empathetic insights and mood tags generated successfully.'
       );
     } catch (error: any) {
+      // Fallback to local IndexedDB draft when network drops mid-save
+      const errMsg = String(error?.message || '').toLowerCase();
+      const isNetworkFailure =
+        error instanceof TypeError ||
+        errMsg.includes('failed to fetch') ||
+        errMsg.includes('network') ||
+        errMsg.includes('offline');
+
+      if (isNetworkFailure) {
+        await saveLocallyOffline();
+        return;
+      }
+
       console.error('Reflection submission error:', error);
       addToast('error', 'Reflection Failed', error.message || 'Could not process reflection.');
       throw error;
@@ -675,9 +788,14 @@ export default function App() {
     if (viewMode === 'privacy') {
       return (
         <ErrorBoundary>
-          <div className="min-h-screen bg-[var(--bg-primary)] p-4 sm:p-6 overflow-y-auto">
-            <ReconnectingBanner />
-            <div className="max-w-4xl mx-auto py-6">
+          <div className="min-h-screen bg-[var(--bg-primary)] overflow-y-auto">
+            <header className="sticky top-0 z-30 bg-[var(--bg-card)]/90 backdrop-blur-md border-b border-[var(--border-color)] px-4 sm:px-6 py-3">
+              <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+                <span className="font-bold text-sm text-[var(--text-primary)]">Somotoz</span>
+                <OfflineModeIndicator />
+              </div>
+            </header>
+            <div className="max-w-4xl mx-auto p-4 sm:p-6 py-6">
               <Suspense fallback={<ScreenLoadingFallback label="Loading Privacy Policy..." />}>
                 <PrivacyPolicy onNavigate={handleNavigate} onBack={() => handleNavigate('dashboard')} />
               </Suspense>
@@ -690,9 +808,14 @@ export default function App() {
     if (viewMode === 'terms') {
       return (
         <ErrorBoundary>
-          <div className="min-h-screen bg-[var(--bg-primary)] p-4 sm:p-6 overflow-y-auto">
-            <ReconnectingBanner />
-            <div className="max-w-4xl mx-auto py-6">
+          <div className="min-h-screen bg-[var(--bg-primary)] overflow-y-auto">
+            <header className="sticky top-0 z-30 bg-[var(--bg-card)]/90 backdrop-blur-md border-b border-[var(--border-color)] px-4 sm:px-6 py-3">
+              <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+                <span className="font-bold text-sm text-[var(--text-primary)]">Somotoz</span>
+                <OfflineModeIndicator />
+              </div>
+            </header>
+            <div className="max-w-4xl mx-auto p-4 sm:p-6 py-6">
               <Suspense fallback={<ScreenLoadingFallback label="Loading Terms of Use..." />}>
                 <TermsOfUse onNavigate={handleNavigate} onBack={() => handleNavigate('dashboard')} />
               </Suspense>
@@ -705,7 +828,6 @@ export default function App() {
 
     return (
       <ErrorBoundary>
-        <ReconnectingBanner />
         <LandingPage
           onSignIn={handleGoogleSignIn}
           onManualAuth={handleManualAuth}
@@ -755,7 +877,6 @@ export default function App() {
   // Render Authenticated Dashboard & Engineering Workspace
   return (
     <ErrorBoundary>
-      <ReconnectingBanner />
       <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col h-screen overflow-hidden font-sans selection:bg-[#00FF41] selection:text-black transition-colors duration-300">
         
         {/* Top Navbar */}
@@ -856,26 +977,30 @@ export default function App() {
           {/* 3. JOURNAL WRITE VIEW */}
           {viewMode === 'write' && (
             <div className="max-w-5xl mx-auto">
-              <ReflectionEditor
-                isSubmitting={isSubmittingAI}
-                onSubmit={handleCreateOrUpdateReflection}
-                userName={userName}
-              />
+              <Suspense fallback={<JournalListSkeleton />}>
+                <ReflectionEditor
+                  isSubmitting={isSubmittingAI}
+                  onSubmit={handleCreateOrUpdateReflection}
+                  userName={userName}
+                />
+              </Suspense>
             </div>
           )}
 
           {/* 3. JOURNAL EDIT VIEW */}
           {viewMode === 'edit' && selectedEntry && (
             <div className="max-w-5xl mx-auto">
-              <ReflectionEditor
-                initialTitle={selectedEntry.title}
-                initialContent={selectedEntry.content}
-                isSubmitting={isSubmittingAI}
-                onSubmit={handleCreateOrUpdateReflection}
-                onCancelEdit={() => setViewMode('view')}
-                isEditMode={true}
-                userName={userName}
-              />
+              <Suspense fallback={<JournalListSkeleton />}>
+                <ReflectionEditor
+                  initialTitle={selectedEntry.title}
+                  initialContent={selectedEntry.content}
+                  isSubmitting={isSubmittingAI}
+                  onSubmit={handleCreateOrUpdateReflection}
+                  onCancelEdit={() => setViewMode('view')}
+                  isEditMode={true}
+                  userName={userName}
+                />
+              </Suspense>
             </div>
           )}
 
@@ -932,7 +1057,9 @@ export default function App() {
           {/* 6. DISCOVER VIEW (Knowledge Hub + Soundscapes + Quotes) */}
           {(viewMode === 'discover' || viewMode === 'wisdom' || viewMode === 'soundscapes') && (
             <div className="max-w-6xl mx-auto">
-              <DiscoverView />
+              <Suspense fallback={<ScreenLoadingFallback label="Loading Discover..." />}>
+                <DiscoverView />
+              </Suspense>
             </div>
           )}
 

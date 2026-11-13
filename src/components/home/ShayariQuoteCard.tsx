@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Sparkles,
@@ -23,8 +23,11 @@ import {
   exportQuoteImageCard,
 } from '../../lib/moodQuoteService';
 import { ShayariQuote, FALLBACK_SHAYARI_QUOTES } from '../../data/fallbackQuotes';
-import { MoodBackgroundCanvas } from './MoodBackgroundCanvas';
 import { useTheme } from '../../context/ThemeContext';
+
+const MoodBackgroundCanvas = lazy(() =>
+  import('./MoodBackgroundCanvas').then((m) => ({ default: m.MoodBackgroundCanvas }))
+);
 
 interface ShayariQuoteCardProps {
   currentMood: MoodId;
@@ -185,7 +188,9 @@ export const ShayariQuoteCard: React.FC<ShayariQuoteCardProps> = ({
   return (
     <div className="relative rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] overflow-hidden shadow-sm transition-all">
       {/* 1. Unique Mood Ambient Animation Canvas */}
-      <MoodBackgroundCanvas mood={currentMood} className="opacity-70" />
+      <Suspense fallback={null}>
+        <MoodBackgroundCanvas mood={currentMood} className="opacity-70" />
+      </Suspense>
 
       {/* 2. Top Header: Categories & Language Switch */}
       <div className="relative z-10 p-4 sm:p-5 border-b border-[var(--border-color)]/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-[var(--bg-card)]/80 backdrop-blur-md">

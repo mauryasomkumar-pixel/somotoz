@@ -25,6 +25,7 @@ import {
   Shield,
   ExternalLink,
   Bell,
+  RefreshCw,
 } from 'lucide-react';
 import { UserProfile, ViewMode } from '../types';
 import { useTheme } from '../context/ThemeContext';
@@ -39,6 +40,7 @@ import {
 import { compressProfileImage } from '../utils/imageCompressor';
 import { downloadMyUserData } from '../lib/userDataExport';
 import { PWAInstallButton } from './pwa/PWAInstallButton';
+import { resetAppCacheAndReload } from '../lib/pwaService';
 import {
   isPushSupported,
   getNotificationPermission,
@@ -561,9 +563,28 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </button>
         </div>
 
-        {/* In-App PWA Install Card */}
-        <div className="pt-2">
+        {/* In-App PWA Install Card & Cache Reset */}
+        <div className="pt-2 space-y-2.5">
           <PWAInstallButton variant="settings" />
+
+          <div className="flex items-center justify-between p-3.5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-color)] gap-3">
+            <div>
+              <h4 className="text-xs font-bold text-[var(--text-primary)]">App Cache & Offline Storage</h4>
+              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                Clear old cached files if pages look outdated or stuck offline.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                resetAppCacheAndReload();
+              }}
+              className="px-3.5 py-2 min-h-[44px] rounded-xl bg-[var(--bg-card)] hover:border-[var(--accent-color)] border border-[var(--border-color)] text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-[var(--accent-color)]" />
+              <span>Fix app cache</span>
+            </button>
+          </div>
         </div>
       </div>
 

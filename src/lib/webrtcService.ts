@@ -42,6 +42,23 @@ export interface WebRTCCall {
   endedAt?: number;
 }
 
+let turnWarningLogged = false;
+
+export function hasTurnConfig(): boolean {
+  const metaEnv = (import.meta as any).env || {};
+  const turnUrl = metaEnv.VITE_TURN_SERVER_URL || metaEnv.VITE_TURN_URL;
+  const hasConfig = Boolean(
+    turnUrl && metaEnv.VITE_TURN_USERNAME && metaEnv.VITE_TURN_CREDENTIAL
+  );
+  if (!turnUrl && !turnWarningLogged) {
+    turnWarningLogged = true;
+    console.warn(
+      '[WebRTC] TURN server environment variables (VITE_TURN_SERVER_URL, VITE_TURN_USERNAME, VITE_TURN_CREDENTIAL) are not set. Calls may not connect on some networks.'
+    );
+  }
+  return Boolean(turnUrl) || hasConfig;
+}
+
 /**
  * Returns ICE servers config including Google's public STUN servers
  * and configurable TURN server from environment variables.
@@ -56,13 +73,15 @@ export function getIceServers(): RTCConfiguration {
   ];
 
   const metaEnv = (import.meta as any).env || {};
-  const turnUrl = metaEnv.VITE_TURN_URL;
+  const turnUrl = metaEnv.VITE_TURN_SERVER_URL || metaEnv.VITE_TURN_URL;
   if (turnUrl) {
     iceServers.push({
       urls: turnUrl,
       username: metaEnv.VITE_TURN_USERNAME || undefined,
       credential: metaEnv.VITE_TURN_CREDENTIAL || undefined,
     });
+  } else {
+    hasTurnConfig();
   }
 
   return {

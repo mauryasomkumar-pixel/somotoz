@@ -10,12 +10,48 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 import helmet from 'helmet';
 import cors from 'cors';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import { isIP } from 'node:net';
 
 dotenv.config();
 
 const PORT = 3000;
 export const app = express();
+
+// Trust the immediate reverse proxy (Cloud Run / Vercel) so req.ip reflects the real client IP
+app.set('trust proxy', Number(process.env.TRUST_PROXY || 1));
+
+function extractForwardedForIp(forwardedHeader: string | string[] | undefined): string | null {
+  if (!forwardedHeader) return null;
+  const raw = Array.isArray(forwardedHeader) ? forwardedHeader[0] : forwardedHeader;
+  const match = raw.match(/for=(?:"([^"]+)"|([^;\s,]+))/i);
+  const value = (match?.[1] || match?.[2] || '').trim();
+  if (!value) return null;
+
+  const bracketed = value.match(/^\[([^\]]+)\](?::\d+)?$/);
+  const candidate = bracketed ? bracketed[1].trim() : value;
+  if (isIP(candidate)) return candidate;
+
+  const withoutPort = candidate.replace(/:\d+$/, '');
+  return isIP(withoutPort) ? withoutPort : null;
+}
+
+function getClientIpKey(req: Request): string {
+  const socketIp = req.socket?.remoteAddress || '';
+  let clientIp = req.ip || socketIp || '127.0.0.1';
+
+  // If Forwarded header (RFC 7239) is set and Express didn't override socket IP, parse `for=`
+  if (req.headers.forwarded && (!req.ip || req.ip === socketIp)) {
+    const forwardedIp = extractForwardedForIp(req.headers.forwarded);
+    if (forwardedIp) {
+      clientIp = forwardedIp;
+    }
+  }
+
+  // Strip IPv6-mapped IPv4 prefix or port if present
+  const normalized = clientIp.replace(/^::ffff:/i, '');
+  return isIP(normalized) ? ipKeyGenerator(normalized) : 'unknown-client';
+}
 
 // Security Headers with Helmet (relaxing contentSecurityPolicy for inline scripts and assets)
 app.use(
@@ -42,12 +78,13 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// General Rate Limiter for standard API routes (100 requests per minute)
+// General Rate Limiter for standard API routes (120 requests per minute)
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: getClientIpKey,
   message: { error: 'Too many requests. Please wait a minute before trying again.' },
 });
 
@@ -57,6 +94,7 @@ const aiRateLimiter = rateLimit({
   max: 40,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: getClientIpKey,
   message: { error: 'Too many requests. Please wait a minute before trying again.' },
 });
 
@@ -1536,6 +1574,9 @@ function getFirebaseAdminApp(): App {
   }
 
   // Application Default Credentials (ADC) or project identifier
+  console.warn(
+    '[Firebase Admin] FIREBASE_SERVICE_ACCOUNT or FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY is missing. Server-side admin operations require these environment variables in production.'
+  );
   try {
     console.log('[Firebase Admin] Initializing with Project ID / ADC:', projectId);
     return initializeApp({ projectId });
@@ -2264,8 +2305,12 @@ app.all('/api/quotes/generate', async (req: Request, res: Response) => {
       }
     }
 
-    const ai = getGeminiClient();
-    const systemInstruction = `You are a modern Urdu-Hinglish poetic writer for Somotoz.
+    let generatedQuote: any = null;
+
+    // Only invoke Gemini when a verified Firebase user token is present AND GEMINI_API_KEY is configured
+    if (authUser && process.env.GEMINI_API_KEY) {
+      const ai = getGeminiClient();
+      const systemInstruction = `You are a modern Urdu-Hinglish poetic writer for Somotoz.
 CRITICAL DIRECTIVES:
 1. Write 100% ORIGINAL contemporary couplets (shayari / quote) in Roman Hinglish and English.
 2. DO NOT reproduce, quote, or paraphrase any copyrighted songs, Bollywood lyrics, or contemporary living poets.
@@ -2276,7 +2321,7 @@ CRITICAL DIRECTIVES:
   "inspiringLine": "one short punchy takeaway line"
 }`;
 
-    const prompt = `Generate a fresh original quote for someone feeling "${mood}". Language requested: ${language}.
+      const prompt = `Generate a fresh original quote for someone feeling "${mood}". Language requested: ${language}.
 Mood context:
 - happy: joyful, bright, celebratory
 - chill: calm, coffee, peace, peaceful breeze
@@ -2286,33 +2331,35 @@ Mood context:
 - motivated: ambition, determination, fierce focus
 - focus: clarity, deep work, silence, flow state`;
 
-    let generatedQuote: any = null;
-    for (const modelName of ['gemini-3.1-flash-lite', 'gemini-3.7-flash', 'gemini-flash-latest']) {
-      try {
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents: prompt,
-          config: {
-            systemInstruction,
-            temperature: 0.7,
-            responseMimeType: 'application/json',
-          },
-        });
-        const parsed = JSON.parse(response.text || '{}');
-        if (parsed.text) {
-          generatedQuote = {
-            quote: parsed.text,
-            inspiringLine: parsed.inspiringLine || 'Keep your inner fire alive.',
-            source: 'Original by Somotoz',
-            mood,
-            lang: language,
-            authorTag: 'Original by Somotoz',
-          };
-          break;
+      for (const modelName of ['gemini-3.1-flash-lite', 'gemini-3.7-flash', 'gemini-flash-latest']) {
+        try {
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents: prompt,
+            config: {
+              systemInstruction,
+              temperature: 0.7,
+              responseMimeType: 'application/json',
+            },
+          });
+          const parsed = JSON.parse(response.text || '{}');
+          if (parsed.text) {
+            generatedQuote = {
+              quote: parsed.text,
+              inspiringLine: parsed.inspiringLine || 'Keep your inner fire alive.',
+              source: 'Original by Somotoz',
+              mood,
+              lang: language,
+              authorTag: 'Original by Somotoz',
+            };
+            break;
+          }
+        } catch (err: any) {
+          console.warn(`[Quote Gen] Model ${modelName} notice:`, err?.message || err);
         }
-      } catch (err: any) {
-        console.warn(`[Quote Gen] Model ${modelName} notice:`, err?.message || err);
       }
+    } else if (!authUser) {
+      console.info('[Quote Gen] Guest request served from OFFLINE_QUOTES_BANK without calling Gemini.');
     }
 
     // Fallback to offline quotes bank if generation fails or is offline
