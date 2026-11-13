@@ -1,12 +1,12 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { InferenceClient } from '@huggingface/inference';
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getAuth, Auth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue, Firestore } from 'firebase-admin/firestore';
 
 import helmet from 'helmet';
 import cors from 'cors';
@@ -99,7 +99,23 @@ const aiRateLimiter = rateLimit({
 });
 
 app.use('/api/', apiLimiter);
-app.use(['/api/reflect', '/api/chat', '/api/chat/stream', '/api/transcribe', '/api/search-wisdom', '/api/generate-art', '/api/mood/detect', '/api/quotes/generate'], aiRateLimiter);
+app.use(
+  [
+    '/api/reflect',
+    '/api/chat',
+    '/api/chat/stream',
+    '/api/transcribe',
+    '/api/search-wisdom',
+    '/api/generate-art',
+    '/api/mood/detect',
+    '/api/quotes/generate',
+    '/api/generate/image',
+    '/api/generate/music',
+    '/api/generate/video',
+    '/api/generate/limits',
+  ],
+  aiRateLimiter
+);
 
 // Lazy initializer for Gemini SDK client
 let genAIClient: GoogleGenAI | null = null;
@@ -109,17 +125,30 @@ function getGeminiClient(): GoogleGenAI {
     if (!apiKey) {
       console.warn('[Somotoz] GEMINI_API_KEY environment variable is not configured');
     }
-    genAIClient = new GoogleGenAI({ apiKey: apiKey || '' });
+    genAIClient = new GoogleGenAI({
+      apiKey: apiKey || '',
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
   }
   return genAIClient;
 }
 
 // Resilient Model Fallback Ladders - Optimized for lightning-fast sub-second latency
-const REFLECTION_MODELS = [
+const ENV_GEMINI_MODEL = (process.env.GEMINI_MODEL || '').trim();
+function buildGeminiModelList(fallbacks: string[]): string[] {
+  const list = ENV_GEMINI_MODEL ? [ENV_GEMINI_MODEL, ...fallbacks] : [...fallbacks];
+  return Array.from(new Set(list.filter(Boolean)));
+}
+
+const REFLECTION_MODELS = buildGeminiModelList([
   'gemini-3.1-flash-lite',
   'gemini-3.7-flash',
   'gemini-flash-latest',
-];
+]);
 
 const TRANSCRIBE_MODELS = [
   'gemini-3.5-transcribe',
@@ -128,11 +157,11 @@ const TRANSCRIBE_MODELS = [
   'gemini-flash-latest',
 ];
 
-const CHAT_MODELS = [
+const CHAT_MODELS = buildGeminiModelList([
   'gemini-3.1-flash-lite',
   'gemini-3.7-flash',
   'gemini-flash-latest',
-];
+]);
 
 interface AIReflectionResult {
   title: string;
@@ -963,70 +992,8 @@ async function generateMultimodalChatResponse(
   const ai = getGeminiClient();
   const latestUserPrompt = messages[messages.length - 1]?.content || 'Hello Somotoz';
 
-  // 1. IMAGE MODE: Advanced Photorealistic Image Synthesis Engine
+  // 1. IMAGE MODE: Dynamic High-Fidelity SVG Scene Synthesis Engine
   if (mode === 'image') {
-    const photorealisticPrompt = `A high-fidelity, ultra-detailed, photorealistic 8K cinematic photograph of: ${latestUserPrompt}.
-CRITICAL MASTER DIRECTIVES:
-1. REAL-WORLD PHOTOGRAPHY & IMAGINATION: Generate stunning, hyper-realistic, high-definition real-world photography and imaginative concepts. Strictly avoid abstract vector shapes, clip arts, or wireframe graphics.
-2. OPTICAL REALISM: Create true-to-life lighting, organic micro-textures, true depth of field, natural subsurface scattering, and crisp optical focus (35mm / 85mm f/1.4 lens, natural HDR exposure).
-3. BRAND WATERMARK: Include a subtle, clean, minimalist watermark reading "Somotoz" in the corner.`;
-
-    // Attempt 1: Native Gemini Image Generation models (if provisioned)
-    for (const imageModel of ['gemini-3.1-flash-image', 'gemini-3.1-flash-lite-image']) {
-      try {
-        console.log(`[Somotoz Image Generator] Calling photorealistic model: ${imageModel}`);
-        const response = await ai.models.generateContent({
-          model: imageModel,
-          contents: {
-            parts: [
-              { text: photorealisticPrompt },
-            ],
-          },
-          config: {
-            imageConfig: {
-              aspectRatio: '1:1',
-              imageSize: '1K',
-            },
-          },
-        });
-
-        // Search for inlineData in candidate parts
-        const candidates = response.candidates || [];
-        for (const candidate of candidates) {
-          const parts = candidate.content?.parts || [];
-          for (const part of parts) {
-            if (part.inlineData && part.inlineData.data) {
-              const mimeType = part.inlineData.mimeType || 'image/png';
-              const base64Str = part.inlineData.data;
-              const imageUrl = `data:${mimeType};base64,${base64Str}`;
-              console.log(`[Somotoz Image Generator] Successfully generated raster photorealistic image (${mimeType})`);
-
-              return {
-                reply: `📸 **Photorealistic Image Synthesized**: "${latestUserPrompt}"\n\nHigh-fidelity cinematic photograph rendered with true-to-life lighting, organic micro-textures, and optical depth of field.\n\n• **Resolution**: 1K High Definition\n• **Optics**: 35mm f/1.4 HDR\n• **Watermark**: Somotoz`,
-                sources: [],
-                media: {
-                  type: 'image',
-                  imageUrl: imageUrl,
-                  prompt: latestUserPrompt,
-                  aspectRatio: '1:1',
-                  watermark: 'Somotoz',
-                },
-                modelUsed: imageModel,
-              };
-            }
-          }
-        }
-      } catch (err: any) {
-        const isQuotaErr = err?.status === 'RESOURCE_EXHAUSTED' || err?.code === 429;
-        console.warn(`[Somotoz Image Generator] Native image model ${imageModel} ${isQuotaErr ? 'quota unavailable' : 'error'}:`, err?.message || err);
-        if (isQuotaErr) {
-          // Break immediately to avoid spamming 429 quota failures
-          break;
-        }
-      }
-    }
-
-    // Attempt 2: Dynamic High-Fidelity SVG Generation with resilient text models
     const svgPrompt = `You are the master visual generation core of Somotoz AI.
 Your absolute primary directive is 100% LITERAL & ACCURATE EXECUTION of the user prompt: "${latestUserPrompt}".
 Follow these rules strictly:
@@ -1035,15 +1002,13 @@ Follow these rules strictly:
 Generate a clean, high-fidelity, scalable SVG visual (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">...</svg>).
 Return ONLY valid SVG markup without markdown fences or preamble.`;
 
-    for (const textModel of ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.7-flash']) {
+    for (const textModel of ['gemini-4-hydrogen', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.7-flash']) {
       try {
         console.log(`[Somotoz Image Generator] Attempting dynamic SVG generation with model: ${textModel}`);
         const svgRes = await ai.models.generateContent({
           model: textModel,
           contents: svgPrompt,
-          config: {
-            temperature: 0.7,
-          },
+          ...(textModel.startsWith('gemini-4-') ? {} : { config: { temperature: 0.7 } }),
         });
 
         let rawSvg = svgRes.text || '';
@@ -1063,14 +1028,24 @@ Return ONLY valid SVG markup without markdown fences or preamble.`;
           };
         }
       } catch (err: any) {
-        console.warn(`[Somotoz Image Generator] Text model ${textModel} failed:`, err?.message);
+        const errMsg = String(err?.message || err);
+        const isQuotaErr =
+          err?.status === 429 ||
+          err?.code === 429 ||
+          err?.status === 'RESOURCE_EXHAUSTED' ||
+          errMsg.includes('429') ||
+          errMsg.includes('RESOURCE_EXHAUSTED');
+        console.warn(
+          `[Somotoz Image Generator] SVG model ${textModel} ${isQuotaErr ? 'quota unavailable' : 'failed'}:`,
+          errMsg.slice(0, 200)
+        );
       }
     }
 
-    // Attempt 3: High-Fidelity Procedural Photorealistic Scene Render Fallback (Guaranteed 0ms error-free)
+    // Fallback: High-Fidelity Procedural Scenic Render (Guaranteed 0ms error-free)
     const svgFallback = generateProceduralSvg(latestUserPrompt);
     return {
-      reply: `📸 **Photorealistic Scenic Render Synthesized**: "${latestUserPrompt}"\n\nHigh-resolution cinematic visual rendered with realistic scenic depth, multi-layer natural illumination, and photographic color grading.`,
+      reply: `📸 **Scenic Visual Render Synthesized**: "${latestUserPrompt}"\n\nHigh-resolution cinematic visual rendered with realistic scenic depth, multi-layer natural illumination, and photographic color grading.`,
       sources: [],
       media: {
         type: 'image',
@@ -1078,7 +1053,7 @@ Return ONLY valid SVG markup without markdown fences or preamble.`;
         prompt: latestUserPrompt,
         aspectRatio: '4:3',
       },
-      modelUsed: 'photorealistic-render-engine',
+      modelUsed: 'procedural-render-engine',
     };
   }
 
@@ -1517,80 +1492,134 @@ ${contextReflection ? `\nContext / Working Memory:\n"""${contextReflection.slice
 }
 
 // ============================================================================
-// FIREBASE ADMIN SDK & SERVER-SIDE AUTHORIZATION ARCHITECTURE
+// FIREBASE ADMIN SDK & SERVER-SIDE AUTHORIZATION ARCHITECTURE (LAZY & SAFE)
 // ============================================================================
 
-// Read Firebase client config for project metadata
-let serverFirebaseConfig: any = {};
-try {
-  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-  if (fs.existsSync(configPath)) {
-    serverFirebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  }
-} catch (e) {
-  console.warn('[Server] Could not load firebase-applet-config.json:', e);
-}
-
-function getFirebaseAdminApp(): App {
-  const existingApps = getApps();
-  if (existingApps.length > 0 && existingApps[0]) {
-    return existingApps[0];
-  }
-
-  const projectId =
-    process.env.FIREBASE_PROJECT_ID ||
-    process.env.VITE_FIREBASE_PROJECT_ID ||
-    serverFirebaseConfig.projectId ||
-    'hireme-ai-project';
-
-  // Support Vercel / serverless environment variables
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (serviceAccountJson) {
-    try {
-      const parsed = JSON.parse(serviceAccountJson);
-      console.log('[Firebase Admin] Initializing via FIREBASE_SERVICE_ACCOUNT JSON');
-      return initializeApp({
-        credential: cert(parsed),
-        projectId: parsed.project_id || projectId,
-      });
-    } catch (e) {
-      console.warn('[Firebase Admin] Error parsing FIREBASE_SERVICE_ACCOUNT JSON:', e);
-    }
-  }
-
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-  if (clientEmail && privateKey) {
-    privateKey = privateKey.replace(/\\n/g, '\n');
-    console.log('[Firebase Admin] Initializing via FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY');
-    return initializeApp({
-      credential: cert({
-        projectId,
-        clientEmail,
-        privateKey,
-      }),
-      projectId,
-    });
-  }
-
-  // Application Default Credentials (ADC) or project identifier
-  console.warn(
-    '[Firebase Admin] FIREBASE_SERVICE_ACCOUNT or FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY is missing. Server-side admin operations require these environment variables in production.'
-  );
+let cachedFirebaseConfig: any = null;
+function getServerFirebaseConfig(): any {
+  if (cachedFirebaseConfig !== null) return cachedFirebaseConfig;
+  cachedFirebaseConfig = {};
   try {
-    console.log('[Firebase Admin] Initializing with Project ID / ADC:', projectId);
-    return initializeApp({ projectId });
-  } catch (adcErr) {
-    console.warn('[Firebase Admin] Project init notice:', adcErr);
-    return initializeApp({ projectId }, 'somotoz-admin-app');
+    const candidates = [
+      path.join(process.cwd(), 'firebase-applet-config.json'),
+      path.join(process.cwd(), '..', 'firebase-applet-config.json'),
+    ];
+    for (const configPath of candidates) {
+      if (fs.existsSync(configPath)) {
+        cachedFirebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        break;
+      }
+    }
+  } catch (e) {
+    console.warn('[Server] Could not load firebase-applet-config.json:', e);
+  }
+  return cachedFirebaseConfig;
+}
+
+function normalizePrivateKey(rawKey?: string): string {
+  if (!rawKey) return '';
+  let trimmed = rawKey.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    trimmed = trimmed.slice(1, -1);
+  }
+  return trimmed.replace(/\\n/g, '\n');
+}
+
+let cachedAdminApp: App | null = null;
+let adminAppInitAttempted = false;
+
+function getFirebaseAdminApp(): App | null {
+  if (cachedAdminApp) return cachedAdminApp;
+
+  try {
+    const existingApps = getApps();
+    if (existingApps.length > 0 && existingApps[0]) {
+      cachedAdminApp = existingApps[0];
+      return cachedAdminApp;
+    }
+
+    if (adminAppInitAttempted) {
+      return null;
+    }
+    adminAppInitAttempted = true;
+
+    const cfg = getServerFirebaseConfig();
+    const projectId =
+      process.env.FIREBASE_PROJECT_ID ||
+      process.env.VITE_FIREBASE_PROJECT_ID ||
+      cfg.projectId ||
+      'hireme-ai-project';
+
+    const serviceAccountJson = (process.env.FIREBASE_SERVICE_ACCOUNT || '').trim();
+    if (serviceAccountJson) {
+      try {
+        const parsed = JSON.parse(serviceAccountJson);
+        if (typeof parsed.private_key === 'string') {
+          parsed.private_key = normalizePrivateKey(parsed.private_key);
+        }
+        console.log('[Firebase Admin] Initializing via FIREBASE_SERVICE_ACCOUNT JSON');
+        cachedAdminApp = initializeApp({
+          credential: cert(parsed),
+          projectId: parsed.project_id || projectId,
+        });
+        return cachedAdminApp;
+      } catch (e) {
+        console.warn('[Firebase Admin] Error initializing from FIREBASE_SERVICE_ACCOUNT:', e);
+      }
+    }
+
+    const clientEmail = (process.env.FIREBASE_CLIENT_EMAIL || '').trim();
+    const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
+    if (clientEmail && privateKey) {
+      console.log('[Firebase Admin] Initializing via FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY');
+      cachedAdminApp = initializeApp({
+        credential: cert({
+          projectId,
+          clientEmail,
+          privateKey,
+        }),
+        projectId,
+      });
+      return cachedAdminApp;
+    }
+
+    console.warn(
+      '[Firebase Admin] FIREBASE_SERVICE_ACCOUNT or FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY is missing. Falling back to Project ID initialization.'
+    );
+    cachedAdminApp = initializeApp({ projectId });
+    return cachedAdminApp;
+  } catch (err: any) {
+    console.error('[Firebase Admin] Safe lazy initialization failed:', err?.message || err);
+    return null;
   }
 }
 
-const adminApp = getFirebaseAdminApp();
-const adminAuth = getAuth(adminApp);
-const adminDb = serverFirebaseConfig.firestoreDatabaseId
-  ? getFirestore(adminApp, serverFirebaseConfig.firestoreDatabaseId)
-  : getFirestore(adminApp);
+function getAdminAuth(): Auth | null {
+  try {
+    const firebaseApp = getFirebaseAdminApp();
+    return firebaseApp ? getAuth(firebaseApp) : null;
+  } catch (err: any) {
+    console.warn('[Firebase Admin] getAuth unavailable:', err?.message || err);
+    return null;
+  }
+}
+
+function getAdminDb(): Firestore | null {
+  try {
+    const firebaseApp = getFirebaseAdminApp();
+    if (!firebaseApp) return null;
+    const cfg = getServerFirebaseConfig();
+    return cfg.firestoreDatabaseId
+      ? getFirestore(firebaseApp, cfg.firestoreDatabaseId)
+      : getFirestore(firebaseApp);
+  } catch (err: any) {
+    console.warn('[Firebase Admin] getFirestore unavailable:', err?.message || err);
+    return null;
+  }
+}
 
 export interface AuthenticatedUser {
   uid: string;
@@ -1628,6 +1657,10 @@ async function authenticateUserRequest(req: Request): Promise<AuthenticatedUser 
 
   // 1. Official Firebase Admin SDK ID token verification
   try {
+    const adminAuth = getAdminAuth();
+    if (!adminAuth) {
+      throw new Error('Firebase Admin Auth unavailable');
+    }
     const decoded = await adminAuth.verifyIdToken(token, true);
     const authTime = Number(decoded.auth_time || decoded.iat || Math.floor(Date.now() / 1000));
     // Admin check: strictly custom claim admin === true and email_verified === true
@@ -1654,10 +1687,12 @@ async function authenticateUserRequest(req: Request): Promise<AuthenticatedUser 
     }
 
     // 2. Cryptographic REST verification via Google Identity Toolkit
-    if (serverFirebaseConfig.apiKey) {
+    const cfg = getServerFirebaseConfig();
+    const webApiKey = process.env.VITE_FIREBASE_API_KEY || cfg.apiKey;
+    if (webApiKey) {
       try {
         const lookupRes = await fetch(
-          `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${serverFirebaseConfig.apiKey}`,
+          `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${webApiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1778,6 +1813,8 @@ async function persistActivityLog(data: {
 
   // Persist directly to Firestore
   try {
+    const adminDb = getAdminDb();
+    if (!adminDb) return;
     await adminDb.collection('admin_activity_logs').doc(logId).set({
       ...record,
       createdAt: FieldValue.serverTimestamp(),
@@ -1788,8 +1825,21 @@ async function persistActivityLog(data: {
 }
 
 // 2. API ROUTES
-app.get('/api/health', (req: Request, res: Response) => {
-  res.json({ ok: true, status: 'ok', suite: 'Somotoz AI', time: new Date().toISOString() });
+app.get('/api/health', (_req: Request, res: Response) => {
+  res.status(200).json({
+    ok: true,
+    status: 'ok',
+    suite: 'Somotoz AI',
+    time: new Date().toISOString(),
+    env: {
+      GEMINI_API_KEY: Boolean(process.env.GEMINI_API_KEY),
+      FIREBASE_PROJECT_ID: Boolean(process.env.FIREBASE_PROJECT_ID),
+      FIREBASE_CLIENT_EMAIL: Boolean(process.env.FIREBASE_CLIENT_EMAIL),
+      FIREBASE_PRIVATE_KEY: Boolean(process.env.FIREBASE_PRIVATE_KEY),
+      CORS_ORIGIN: Boolean(process.env.CORS_ORIGIN),
+      HF_TOKEN: Boolean(process.env.HF_TOKEN),
+    },
+  });
 });
 
 // AI Reflection Generation Endpoint
@@ -1919,101 +1969,137 @@ app.post('/api/chat', async (req: Request, res: Response) => {
   }
 });
 
-// Real-time Ultra-Fast Streaming Endpoint (Server-Sent Events)
+// Real-time Ultra-Fast Streaming Endpoint (Server-Sent Events) with non-streaming fallback
 app.post('/api/chat/stream', async (req: Request, res: Response) => {
-  const body = (req.body && typeof req.body === 'object') ? req.body : {};
-  const messages = Array.isArray(body.messages) ? body.messages : [];
-  const requestedMode = body.mode;
-  const role = typeof body.role === 'string' ? body.role : 'ai_engineer';
-  const contextReflection = typeof body.contextReflection === 'string' ? body.contextReflection : undefined;
-  const useSearchGrounding = Boolean(body.useSearchGrounding);
-  const clientTime = (body.clientTime && typeof body.clientTime === 'object') ? body.clientTime : undefined;
-
-  if (messages.length === 0) {
-    return res.status(400).json({ error: 'Messages array cannot be empty.' });
-  }
-
-  const authUser = await authenticateUserRequest(req);
-  if (authUser?.disabled) {
-    return res.status(403).json({ error: 'User access has been disabled by Somotoz administrator.' });
-  }
-
-  const latestMsg = messages[messages.length - 1];
-  const parsed = parseUserCommandIntent(latestMsg?.content || '', requestedMode);
-  const effectiveMode = parsed.mode;
-
-  // Use clean prompt for generation if slash command or intent matched
-  const effectiveMessages = [...messages];
-  if (parsed.cleanPrompt && (parsed.isExplicitSlash || effectiveMode !== 'text')) {
-    effectiveMessages[effectiveMessages.length - 1] = {
-      ...latestMsg,
-      content: parsed.cleanPrompt,
-    };
-  }
-
-  // Set SSE Headers for real-time unbuffered token delivery
-  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders?.();
-
-  // Send initial instant connection beacon with resolved effective mode
-  res.write(`data: ${JSON.stringify({ type: 'start', mode: effectiveMode })}\n\n`);
-
   try {
-    if (effectiveMode === 'text') {
-      let accumulatedText = '';
-      for await (const chunk of streamTextChatResponse(effectiveMessages, role, contextReflection, useSearchGrounding, clientTime)) {
-        accumulatedText += chunk.text;
-        res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunk.text, modelUsed: chunk.modelUsed })}\n\n`);
-      }
+    const body = (req.body && typeof req.body === 'object') ? req.body : {};
+    const messages = Array.isArray(body.messages) ? body.messages : [];
+    const requestedMode = body.mode;
+    const role = typeof body.role === 'string' ? body.role : 'ai_engineer';
+    const contextReflection = typeof body.contextReflection === 'string' ? body.contextReflection : undefined;
+    const useSearchGrounding = Boolean(body.useSearchGrounding);
+    const clientTime = (body.clientTime && typeof body.clientTime === 'object') ? body.clientTime : undefined;
 
-      persistActivityLog({
-        userId: authUser?.uid || 'anonymous',
-        userEmail: authUser?.email || 'anonymous@somotoz.ai',
-        userName: authUser?.name || 'Somotoz User',
-        activityType: 'ai_query',
-        query: (latestMsg?.content || '').slice(0, 500),
-        feature: 'Chat Companion (TEXT)',
-        status: 'success',
-        tokens: Math.round(accumulatedText.length / 4) + 100,
-        modelUsed: 'gemini-flash',
-      });
-
-      res.write(`data: ${JSON.stringify({ type: 'done', fullText: accumulatedText, mode: 'text' })}\n\n`);
-      res.end();
-    } else {
-      res.write(`data: ${JSON.stringify({ type: 'progress', message: `Synthesizing ${effectiveMode} generation pipeline...` })}\n\n`);
-      
-      const { reply, sources, media, modelUsed } = await generateMultimodalChatResponse(
-        effectiveMessages,
-        effectiveMode,
-        role,
-        contextReflection,
-        useSearchGrounding,
-        clientTime
-      );
-
-      persistActivityLog({
-        userId: authUser?.uid || 'anonymous',
-        userEmail: authUser?.email || 'anonymous@somotoz.ai',
-        userName: authUser?.name || 'Somotoz User',
-        activityType: 'media_gen',
-        query: (latestMsg?.content || '').slice(0, 500),
-        feature: `Chat Companion (${effectiveMode.toUpperCase()})`,
-        status: 'success',
-        tokens: 240,
-        modelUsed: modelUsed || 'gemini-multimodal',
-      });
-
-      res.write(`data: ${JSON.stringify({ type: 'done', fullText: reply, sources, media, mode: effectiveMode, modelUsed })}\n\n`);
-      res.end();
+    if (messages.length === 0) {
+      return res.status(400).json({ error: 'Messages array cannot be empty.' });
     }
-  } catch (err: any) {
-    console.error('[API /api/chat/stream Error]:', err);
-    res.write(`data: ${JSON.stringify({ type: 'error', error: err.message || 'Streaming generation failed.' })}\n\n`);
-    res.end();
+
+    const authUser = await authenticateUserRequest(req);
+    if (authUser?.disabled) {
+      return res.status(403).json({ error: 'User access has been disabled by Somotoz administrator.' });
+    }
+
+    const latestMsg = messages[messages.length - 1];
+    const parsed = parseUserCommandIntent(latestMsg?.content || '', requestedMode);
+    const effectiveMode = parsed.mode;
+
+    // Use clean prompt for generation if slash command or intent matched
+    const effectiveMessages = [...messages];
+    if (parsed.cleanPrompt && (parsed.isExplicitSlash || effectiveMode !== 'text')) {
+      effectiveMessages[effectiveMessages.length - 1] = {
+        ...latestMsg,
+        content: parsed.cleanPrompt,
+      };
+    }
+
+    // Set SSE Headers for real-time unbuffered token delivery
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+
+    // Send initial instant connection beacon with resolved effective mode
+    res.write(`data: ${JSON.stringify({ type: 'start', mode: effectiveMode })}\n\n`);
+
+    try {
+      if (effectiveMode === 'text') {
+        let accumulatedText = '';
+        for await (const chunk of streamTextChatResponse(effectiveMessages, role, contextReflection, useSearchGrounding, clientTime)) {
+          accumulatedText += chunk.text;
+          res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunk.text, modelUsed: chunk.modelUsed })}\n\n`);
+        }
+
+        persistActivityLog({
+          userId: authUser?.uid || 'anonymous',
+          userEmail: authUser?.email || 'anonymous@somotoz.ai',
+          userName: authUser?.name || 'Somotoz User',
+          activityType: 'ai_query',
+          query: (latestMsg?.content || '').slice(0, 500),
+          feature: 'Chat Companion (TEXT)',
+          status: 'success',
+          tokens: Math.round(accumulatedText.length / 4) + 100,
+          modelUsed: ENV_GEMINI_MODEL || 'gemini-flash',
+        });
+
+        res.write(`data: ${JSON.stringify({ type: 'done', fullText: accumulatedText, mode: 'text' })}\n\n`);
+        return res.end();
+      } else {
+        res.write(`data: ${JSON.stringify({ type: 'progress', message: `Synthesizing ${effectiveMode} generation pipeline...` })}\n\n`);
+
+        const { reply, sources, media, modelUsed } = await generateMultimodalChatResponse(
+          effectiveMessages,
+          effectiveMode,
+          role,
+          contextReflection,
+          useSearchGrounding,
+          clientTime
+        );
+
+        persistActivityLog({
+          userId: authUser?.uid || 'anonymous',
+          userEmail: authUser?.email || 'anonymous@somotoz.ai',
+          userName: authUser?.name || 'Somotoz User',
+          activityType: 'media_gen',
+          query: (latestMsg?.content || '').slice(0, 500),
+          feature: `Chat Companion (${effectiveMode.toUpperCase()})`,
+          status: 'success',
+          tokens: 240,
+          modelUsed: modelUsed || 'gemini-multimodal',
+        });
+
+        res.write(`data: ${JSON.stringify({ type: 'done', fullText: reply, sources, media, mode: effectiveMode, modelUsed })}\n\n`);
+        return res.end();
+      }
+    } catch (streamErr: any) {
+      console.warn('[API /api/chat/stream] Stream failed, attempting non-streaming fallback:', streamErr?.message || streamErr);
+      try {
+        const fallback = await generateMultimodalChatResponse(
+          effectiveMessages,
+          effectiveMode,
+          role,
+          contextReflection,
+          useSearchGrounding,
+          clientTime
+        );
+        res.write(
+          `data: ${JSON.stringify({
+            type: 'done',
+            fullText: fallback.reply,
+            sources: fallback.sources,
+            media: fallback.media,
+            mode: effectiveMode,
+            modelUsed: fallback.modelUsed,
+          })}\n\n`
+        );
+        return res.end();
+      } catch (fbErr: any) {
+        console.error('[API /api/chat/stream Fallback Error]:', fbErr);
+        res.write(`data: ${JSON.stringify({ type: 'error', error: fbErr?.message || 'Streaming generation failed.' })}\n\n`);
+        return res.end();
+      }
+    }
+  } catch (outerErr: any) {
+    console.error('[API /api/chat/stream Outer Error]:', outerErr);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Unable to process chat request right now. Please try again.' });
+    }
+    try {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: 'Streaming connection interrupted.' })}\n\n`);
+      return res.end();
+    } catch {
+      return;
+    }
   }
 });
 
@@ -2476,7 +2562,10 @@ async function recordAdminActionLog(params: {
       ipAddress: ip,
       metadata: params.metadata || {},
     };
-    await adminDb.collection('admin_action_logs').doc(logId).set(logData);
+    const adminDb = getAdminDb();
+    if (adminDb) {
+      await adminDb.collection('admin_action_logs').doc(logId).set(logData);
+    }
   } catch (err) {
     console.warn('[Admin Action Log] Notice:', err);
   }
@@ -2496,6 +2585,12 @@ async function runRetentionCleanup(adminEmail: string = 'system_scheduler'): Pro
   let deletedAccountsCount = 0;
 
   try {
+    const adminDb = getAdminDb();
+    const adminAuth = getAdminAuth();
+    if (!adminDb) {
+      return { deletedMessagesCount: 0, deletedAccountsCount: 0, retentionDays };
+    }
+
     // 1. Purge soft-deleted messages & expired messages older than retention cutoff
     const convsSnap = await adminDb.collection('conversations').limit(100).get();
     for (const convDoc of convsSnap.docs) {
@@ -2526,7 +2621,9 @@ async function runRetentionCleanup(adminEmail: string = 'system_scheduler'): Pro
       if (schedTime && schedTime <= cutoffTime) {
         const uid = docSnap.id;
         try {
-          await adminAuth.deleteUser(uid);
+          if (adminAuth) {
+            await adminAuth.deleteUser(uid);
+          }
         } catch {
           // Ignored if already deleted
         }
@@ -2552,12 +2649,14 @@ async function runRetentionCleanup(adminEmail: string = 'system_scheduler'): Pro
   return { deletedMessagesCount, deletedAccountsCount, retentionDays };
 }
 
-// Scheduled retention cleanup runner (Runs every 12 hours)
-setInterval(() => {
-  runRetentionCleanup('system_cron').catch((err) => {
-    console.warn('[Retention Cron] Background error:', err);
-  });
-}, 12 * 60 * 60 * 1000);
+// Scheduled retention cleanup runner (Only in long-lived Node servers, never serverless)
+if (!process.env.VERCEL) {
+  setInterval(() => {
+    runRetentionCleanup('system_cron').catch((err) => {
+      console.warn('[Retention Cron] Background error:', err);
+    });
+  }, 12 * 60 * 60 * 1000);
+}
 
 // Admin Session & Privilege Verification
 app.post('/api/admin/verify', async (req: Request, res: Response) => {
@@ -2594,22 +2693,29 @@ app.post('/api/admin/claim-admin-role', async (req: Request, res: Response) => {
   }
 
   try {
+    const adminAuth = getAdminAuth();
+    const adminDb = getAdminDb();
+
     // 1. Assign custom claim via Firebase Admin SDK
     try {
-      await adminAuth.setCustomUserClaims(user.uid, { admin: true, role: 'admin' });
-      console.log(`[Admin] Assigned custom claim admin=true to UID: ${user.uid} (${userEmail})`);
+      if (adminAuth) {
+        await adminAuth.setCustomUserClaims(user.uid, { admin: true, role: 'admin' });
+        console.log(`[Admin] Assigned custom claim admin=true to UID: ${user.uid} (${userEmail})`);
+      }
     } catch (claimErr: any) {
       console.warn('[Admin] adminAuth.setCustomUserClaims notice:', claimErr?.message || claimErr);
     }
 
     // 2. Persist in Firestore admin_roles
     try {
-      await adminDb.collection('admin_roles').doc(user.uid).set({
-        uid: user.uid,
-        email: user.email,
-        role: 'admin',
-        grantedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
+      if (adminDb) {
+        await adminDb.collection('admin_roles').doc(user.uid).set({
+          uid: user.uid,
+          email: user.email,
+          role: 'admin',
+          grantedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
     } catch (roleDbErr: any) {
       console.warn('[Admin] Firestore admin_roles write notice:', roleDbErr?.message || roleDbErr);
     }
@@ -2643,6 +2749,9 @@ app.get('/api/admin/analytics', async (req: Request, res: Response) => {
   }
 
   try {
+    const adminAuth = getAdminAuth();
+    const adminDb = getAdminDb();
+
     // 1. Count users from Firebase Auth
     let totalUsers = 0;
     let activeUsers = 0;
@@ -2652,6 +2761,7 @@ app.get('/api/admin/analytics', async (req: Request, res: Response) => {
     const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
 
     try {
+      if (!adminAuth) throw new Error('Admin Auth unavailable');
       const userList = await adminAuth.listUsers(500);
       totalUsers = userList.users.length;
       userList.users.forEach((u) => {
@@ -2672,6 +2782,7 @@ app.get('/api/admin/analytics', async (req: Request, res: Response) => {
     let underageReports = 0;
 
     try {
+      if (!adminDb) throw new Error('Admin DB unavailable');
       const repSnap = await adminDb.collection('reports').get();
       totalReports = repSnap.size;
       repSnap.forEach((doc) => {
@@ -2683,6 +2794,7 @@ app.get('/api/admin/analytics', async (req: Request, res: Response) => {
     } catch {
       // Fallback somo_reports
       try {
+        if (!adminDb) throw new Error('Admin DB unavailable');
         const fallbackRepSnap = await adminDb.collection('somo_reports').get();
         totalReports = fallbackRepSnap.size;
         fallbackRepSnap.forEach((doc) => {
@@ -2700,12 +2812,14 @@ app.get('/api/admin/analytics', async (req: Request, res: Response) => {
     let suspendedUsers = 0;
     let bannedUsers = 0;
     try {
-      const statusSnap = await adminDb.collection('user_status').get();
-      statusSnap.forEach((doc) => {
-        const st = doc.data()?.status;
-        if (st === 'suspended') suspendedUsers++;
-        else if (st === 'banned') bannedUsers++;
-      });
+      if (adminDb) {
+        const statusSnap = await adminDb.collection('user_status').get();
+        statusSnap.forEach((doc) => {
+          const st = doc.data()?.status;
+          if (st === 'suspended') suspendedUsers++;
+          else if (st === 'banned') bannedUsers++;
+        });
+      }
     } catch {
       // Ignored
     }
@@ -2716,13 +2830,15 @@ app.get('/api/admin/analytics', async (req: Request, res: Response) => {
     let totalWisdomQueriesCount = 0;
 
     try {
-      const logsSnap = await adminDb.collection('admin_activity_logs').limit(500).get();
-      logsSnap.forEach((doc) => {
-        const d = doc.data();
-        if (d.activityType === 'reflection') totalReflectionsCount++;
-        else if (d.activityType === 'ai_query' || d.activityType === 'media_gen') totalChatMessagesCount++;
-        else if (d.activityType === 'search') totalWisdomQueriesCount++;
-      });
+      if (adminDb) {
+        const logsSnap = await adminDb.collection('admin_activity_logs').limit(500).get();
+        logsSnap.forEach((doc) => {
+          const d = doc.data();
+          if (d.activityType === 'reflection') totalReflectionsCount++;
+          else if (d.activityType === 'ai_query' || d.activityType === 'media_gen') totalChatMessagesCount++;
+          else if (d.activityType === 'search') totalWisdomQueriesCount++;
+        });
+      }
     } catch {
       // Ignored
     }
@@ -2781,11 +2897,14 @@ app.get('/api/admin/users', async (req: Request, res: Response) => {
   }
 
   try {
+    const adminAuth = getAdminAuth();
+    const adminDb = getAdminDb();
     const searchTerm = (req.query.search as string || '').toLowerCase().trim();
     const usersMap = new Map<string, any>();
 
     // 1. Fetch real Firebase Authentication users
     try {
+      if (!adminAuth) throw new Error('Admin Auth unavailable');
       const listResult = await adminAuth.listUsers(200);
       listResult.users.forEach((u) => {
         const isAdmin = u.customClaims?.admin === true && u.emailVerified === true;
@@ -2812,22 +2931,25 @@ app.get('/api/admin/users', async (req: Request, res: Response) => {
 
     // 2. Fetch User Status from Firestore (`user_status`)
     try {
-      const statusSnap = await adminDb.collection('user_status').get();
-      statusSnap.forEach((doc) => {
-        const uid = doc.id;
-        const d = doc.data();
-        if (usersMap.has(uid)) {
-          const u = usersMap.get(uid);
-          u.status = d.status || (d.isDisabled ? 'suspended' : 'active');
-          u.disabledReason = d.reason;
-        }
-      });
+      if (adminDb) {
+        const statusSnap = await adminDb.collection('user_status').get();
+        statusSnap.forEach((doc) => {
+          const uid = doc.id;
+          const d = doc.data();
+          if (usersMap.has(uid)) {
+            const u = usersMap.get(uid);
+            u.status = d.status || (d.isDisabled ? 'suspended' : 'active');
+            u.disabledReason = d.reason;
+          }
+        });
+      }
     } catch {
       // Ignored
     }
 
     // 3. Count reports per user to populate `reportCount` & `isUnderageReported`
     try {
+      if (!adminDb) throw new Error('Admin DB unavailable');
       const reportsSnap = await adminDb.collection('reports').get();
       reportsSnap.forEach((doc) => {
         const d = doc.data();
@@ -2842,17 +2964,19 @@ app.get('/api/admin/users', async (req: Request, res: Response) => {
     } catch {
       // Fallback somo_reports
       try {
-        const somoReportsSnap = await adminDb.collection('somo_reports').get();
-        somoReportsSnap.forEach((doc) => {
-          const d = doc.data();
-          const reportedUid = d.reportedUserId;
-          if (reportedUid && usersMap.has(reportedUid)) {
-            const u = usersMap.get(reportedUid);
-            u.reportCount = (u.reportCount || 0) + 1;
-            if (d.reason === 'underage') u.isUnderageReported = true;
-            if (u.reportCount >= 2) u.isSuspicious = true;
-          }
-        });
+        if (adminDb) {
+          const somoReportsSnap = await adminDb.collection('somo_reports').get();
+          somoReportsSnap.forEach((doc) => {
+            const d = doc.data();
+            const reportedUid = d.reportedUserId;
+            if (reportedUid && usersMap.has(reportedUid)) {
+              const u = usersMap.get(reportedUid);
+              u.reportCount = (u.reportCount || 0) + 1;
+              if (d.reason === 'underage') u.isUnderageReported = true;
+              if (u.reportCount >= 2) u.isSuspicious = true;
+            }
+          });
+        }
       } catch {
         // Ignored
       }
@@ -2904,12 +3028,19 @@ app.post('/api/admin/users/:userId/action', async (req: Request, res: Response) 
   }
 
   try {
+    const adminAuth = getAdminAuth();
+    const adminDb = getAdminDb();
+    if (!adminDb) {
+      return res.status(503).json({ error: 'Database service unavailable.' });
+    }
     let targetUserName = '';
 
     if (action === 'suspend') {
       try {
-        await adminAuth.updateUser(userId, { disabled: true });
-        await adminAuth.revokeRefreshTokens(userId);
+        if (adminAuth) {
+          await adminAuth.updateUser(userId, { disabled: true });
+          await adminAuth.revokeRefreshTokens(userId);
+        }
       } catch (authErr: any) {
         console.warn('[Admin] adminAuth.updateUser notice:', authErr?.message || authErr);
       }
@@ -2922,7 +3053,9 @@ app.post('/api/admin/users/:userId/action', async (req: Request, res: Response) 
       }, { merge: true });
     } else if (action === 'unsuspend') {
       try {
-        await adminAuth.updateUser(userId, { disabled: false });
+        if (adminAuth) {
+          await adminAuth.updateUser(userId, { disabled: false });
+        }
       } catch (authErr: any) {
         console.warn('[Admin] adminAuth.updateUser notice:', authErr?.message || authErr);
       }
@@ -2935,8 +3068,10 @@ app.post('/api/admin/users/:userId/action', async (req: Request, res: Response) 
       }, { merge: true });
     } else if (action === 'ban') {
       try {
-        await adminAuth.updateUser(userId, { disabled: true });
-        await adminAuth.revokeRefreshTokens(userId);
+        if (adminAuth) {
+          await adminAuth.updateUser(userId, { disabled: true });
+          await adminAuth.revokeRefreshTokens(userId);
+        }
       } catch (authErr: any) {
         console.warn('[Admin] adminAuth.updateUser notice:', authErr?.message || authErr);
       }
@@ -2949,8 +3084,10 @@ app.post('/api/admin/users/:userId/action', async (req: Request, res: Response) 
       }, { merge: true });
     } else if (action === 'delete') {
       try {
-        await adminAuth.revokeRefreshTokens(userId);
-        await adminAuth.updateUser(userId, { disabled: true });
+        if (adminAuth) {
+          await adminAuth.revokeRefreshTokens(userId);
+          await adminAuth.updateUser(userId, { disabled: true });
+        }
       } catch {
         // Ignored
       }
@@ -2998,10 +3135,12 @@ app.get('/api/admin/reports', async (req: Request, res: Response) => {
   }
 
   try {
+    const adminDb = getAdminDb();
     const reportsMap = new Map<string, any>();
 
     // 1. Primary collection: `reports`
     try {
+      if (!adminDb) throw new Error('Admin DB unavailable');
       const snap = await adminDb.collection('reports').orderBy('timestamp', 'desc').limit(150).get();
       snap.docs.forEach((doc) => {
         const d = doc.data();
@@ -3031,6 +3170,7 @@ app.get('/api/admin/reports', async (req: Request, res: Response) => {
     // 2. Legacy fallback collection: `somo_reports`
     if (reportsMap.size === 0) {
       try {
+        if (!adminDb) throw new Error('Admin DB unavailable');
         const fallbackSnap = await adminDb.collection('somo_reports').orderBy('timestamp', 'desc').limit(150).get();
         fallbackSnap.docs.forEach((doc) => {
           const d = doc.data();
@@ -3090,6 +3230,11 @@ app.post('/api/admin/reports/:reportId/action', async (req: Request, res: Respon
   }
 
   try {
+    const adminAuth = getAdminAuth();
+    const adminDb = getAdminDb();
+    if (!adminDb) {
+      return res.status(503).json({ error: 'Database service unavailable.' });
+    }
     let reportDoc = await adminDb.collection('reports').doc(reportId).get();
     let isSomoCol = false;
     if (!reportDoc.exists) {
@@ -3117,8 +3262,10 @@ app.post('/api/admin/reports/:reportId/action', async (req: Request, res: Respon
     // Execute user suspension or ban if applicable
     if ((action === 'suspend' || action === 'ban') && reportedUserId) {
       try {
-        await adminAuth.updateUser(reportedUserId, { disabled: true });
-        await adminAuth.revokeRefreshTokens(reportedUserId);
+        if (adminAuth) {
+          await adminAuth.updateUser(reportedUserId, { disabled: true });
+          await adminAuth.revokeRefreshTokens(reportedUserId);
+        }
       } catch (authErr: any) {
         console.warn('[Admin Reports] User suspension notice:', authErr?.message || authErr);
       }
@@ -3158,6 +3305,10 @@ app.get('/api/admin/action-logs', async (req: Request, res: Response) => {
   }
 
   try {
+    const adminDb = getAdminDb();
+    if (!adminDb) {
+      return res.json({ success: true, logs: [] });
+    }
     const snap = await adminDb.collection('admin_action_logs')
       .orderBy('timestamp', 'desc')
       .limit(200)
@@ -3194,17 +3345,22 @@ app.get('/api/admin/flagged-queue', async (req: Request, res: Response) => {
   }
 
   try {
+    const adminAuth = getAdminAuth();
+    const adminDb = getAdminDb();
+
     // 1. Underage reports (Critical priority)
     const underageReports: any[] = [];
     try {
-      const repSnap = await adminDb.collection('reports')
-        .where('reason', '==', 'underage')
-        .orderBy('timestamp', 'desc')
-        .limit(50)
-        .get();
-      repSnap.forEach((doc) => {
-        underageReports.push({ id: doc.id, ...doc.data() });
-      });
+      if (adminDb) {
+        const repSnap = await adminDb.collection('reports')
+          .where('reason', '==', 'underage')
+          .orderBy('timestamp', 'desc')
+          .limit(50)
+          .get();
+        repSnap.forEach((doc) => {
+          underageReports.push({ id: doc.id, ...doc.data() });
+        });
+      }
     } catch {
       // Ignored
     }
@@ -3212,31 +3368,35 @@ app.get('/api/admin/flagged-queue', async (req: Request, res: Response) => {
     // 2. Suspicious accounts (reports >= 2 or rapid actions)
     const suspiciousUsers: any[] = [];
     try {
-      const allReports = await adminDb.collection('reports').get();
-      const reportCountByUid = new Map<string, number>();
-      allReports.forEach((doc) => {
-        const uid = doc.data().reportedUserId;
-        if (uid) {
-          reportCountByUid.set(uid, (reportCountByUid.get(uid) || 0) + 1);
-        }
-      });
-
-      for (const [uid, count] of reportCountByUid.entries()) {
-        if (count >= 2) {
-          let uRecord: any = null;
-          try {
-            uRecord = await adminAuth.getUser(uid);
-          } catch {
-            // Ignored
+      if (adminDb) {
+        const allReports = await adminDb.collection('reports').get();
+        const reportCountByUid = new Map<string, number>();
+        allReports.forEach((doc) => {
+          const uid = doc.data().reportedUserId;
+          if (uid) {
+            reportCountByUid.set(uid, (reportCountByUid.get(uid) || 0) + 1);
           }
-          suspiciousUsers.push({
-            uid,
-            displayName: uRecord?.displayName || 'User',
-            email: uRecord?.email || '',
-            reportCount: count,
-            status: uRecord?.disabled ? 'suspended' : 'active',
-            reasons: [`Accumulated ${count} user reports`],
-          });
+        });
+
+        for (const [uid, count] of reportCountByUid.entries()) {
+          if (count >= 2) {
+            let uRecord: any = null;
+            try {
+              if (adminAuth) {
+                uRecord = await adminAuth.getUser(uid);
+              }
+            } catch {
+              // Ignored
+            }
+            suspiciousUsers.push({
+              uid,
+              displayName: uRecord?.displayName || 'User',
+              email: uRecord?.email || '',
+              reportCount: count,
+              status: uRecord?.disabled ? 'suspended' : 'active',
+              reasons: [`Accumulated ${count} user reports`],
+            });
+          }
         }
       }
     } catch {
@@ -3272,13 +3432,21 @@ app.post('/api/admin/legal-export', async (req: Request, res: Response) => {
   }
 
   try {
+    const adminAuth = getAdminAuth();
+    const adminDb = getAdminDb();
+    if (!adminDb) {
+      return res.status(503).json({ error: 'Database service unavailable.' });
+    }
+
     const retentionDays = parseInt(process.env.DATA_RETENTION_DAYS || '90', 10);
     const retentionCutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
 
     // 1. Account Details
     let authRecord: any = null;
     try {
-      authRecord = await adminAuth.getUser(targetUserId);
+      if (adminAuth) {
+        authRecord = await adminAuth.getUser(targetUserId);
+      }
     } catch {
       // Ignored if user not found directly
     }
@@ -3335,8 +3503,6 @@ app.post('/api/admin/legal-export', async (req: Request, res: Response) => {
         const msgsSnap = await convDoc.ref.collection('messages').get();
         msgsSnap.forEach((msgDoc) => {
           const m = msgDoc.data();
-          // Include if active OR if soft-deleted inside retention window (deletedAt >= retentionCutoff)
-          // Strictly exclude if deleted earlier than retention cutoff
           if (!m.deletedAt || m.deletedAt >= retentionCutoff) {
             messages.push({
               id: msgDoc.id,
@@ -3454,9 +3620,537 @@ app.post('/api/admin/retention-cleanup', async (req: Request, res: Response) => 
   }
 });
 
-// 3. VITE MIDDLEWARE SETUP
+// ============================================================================
+// HUGGING FACE SERVER-SIDE MEDIA GENERATION ROUTES (IMAGE / MUSIC / VIDEO)
+// ============================================================================
+
+type HfMediaKind = 'image' | 'music' | 'video';
+
+const MAX_HF_RAW_BYTES = 2_800_000; // Keeps base64 + JSON envelope strictly < 4 MB for Vercel
+const HF_CALL_TIMEOUT_MS = 45_000;
+
+function getDailyMediaLimit(kind: HfMediaKind): number {
+  if (kind === 'image') return Math.max(1, Number.parseInt(process.env.DAILY_IMAGE_LIMIT || '5', 10) || 5);
+  if (kind === 'music') return Math.max(1, Number.parseInt(process.env.DAILY_MUSIC_LIMIT || '3', 10) || 3);
+  return Math.max(1, Number.parseInt(process.env.DAILY_VIDEO_LIMIT || '1', 10) || 1);
+}
+
+function getTodayUtcKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function validateAndSanitizeHfPrompt(rawPrompt: unknown): { valid: boolean; prompt: string; error?: string } {
+  if (typeof rawPrompt !== 'string') {
+    return { valid: false, prompt: '', error: 'Prompt must be a text string between 3 and 500 characters.' };
+  }
+  const cleaned = rawPrompt.replace(/\s+/g, ' ').trim();
+  if (cleaned.length < 3 || cleaned.length > 500) {
+    return { valid: false, prompt: '', error: 'Prompt must be between 3 and 500 characters.' };
+  }
+  return { valid: true, prompt: cleaned };
+}
+
+function checkHfPromptSafety(prompt: string): { safe: boolean; reason?: string } {
+  const lower = prompt.toLowerCase();
+
+  // Sexual / NSFW / nudity blocking
+  const sexualPattern = /\b(nsfw|porn|pornography|xxx|hentai|nude|naked|erotic|genitals|sexually\s+explicit|sexual\s+act|intercourse|fetish|strip\s*tease|uncensored\s+body|explicit\s+adult)\b/i;
+  if (sexualPattern.test(lower)) {
+    return { safe: false, reason: 'This prompt contains restricted sexual or explicit content and cannot be generated.' };
+  }
+
+  // Minors safety blocking (any sexualized, exploitative, or harmful context)
+  const minorPattern = /\b(loli|shota|csam|csae|child\s+porn|underage\s+(?:nude|sexy|explicit|romance)|minor\s+(?:nude|sexy|explicit))\b/i;
+  const minorWithRiskPattern =
+    /\b(child|children|minor|underage|kid|kids|teenager|teen|schoolgirl|schoolboy)\b/i.test(lower) &&
+    /\b(nude|naked|sexy|lingerie|bikini|seductive|intimate|kiss|violence|blood|weapon|hurt|abuse)\b/i.test(lower);
+  if (minorPattern.test(lower) || minorWithRiskPattern) {
+    return { safe: false, reason: 'Prompts involving minors in unsafe or suggestive contexts are strictly blocked.' };
+  }
+
+  // Real people's likeness / deepfakes / impersonation blocking
+  const deepfakePattern = /\b(deepfake|deep\s+fake|face\s*swap|faceswap|impersonat(?:e|ing)|clon(?:e|ing)\s+(?:face|voice)|exact\s+likeness\s+of|real\s+person(?:'s)?\s+face)\b/i;
+  const publicFigurePattern = /\b(donald\s+trump|joe\s+biden|barack\s+obama|elon\s+musk|taylor\s+swift|narendra\s+modi|rahul\s+gandhi|virat\s+kohli|shah\s+rukh\s+khan|salman\s+khan|kim\s+kardashian|beyonce)\b/i;
+  if (deepfakePattern.test(lower) || publicFigurePattern.test(lower)) {
+    return { safe: false, reason: 'Generating likenesses of real people or deepfakes is not allowed.' };
+  }
+
+  // Graphic violence / gore / self-harm blocking
+  const violencePattern = /\b(gore|gory|dismember|behead|decapitat|mutilat|torture|bloodbath|brutal\s+murder|graphic\s+violence|self[- ]harm|suicide|cutting\s+wrists|dead\s+body|corpse\s+blood)\b/i;
+  if (violencePattern.test(lower)) {
+    return { safe: false, reason: 'Graphic violence, gore, or self-harm content cannot be generated.' };
+  }
+
+  return { safe: true };
+}
+
+async function reserveHfDailyQuota(
+  uid: string,
+  kind: HfMediaKind,
+  limit: number
+): Promise<{ allowed: boolean; used: number; limit: number; remaining: number }> {
+  const adminDb = getAdminDb();
+  if (!adminDb) {
+    throw new Error('QUOTA_DB_UNAVAILABLE');
+  }
+
+  const today = getTodayUtcKey();
+  const docRef = adminDb.collection('hf_daily_usage').doc(`${uid}_${today}`);
+
+  return adminDb.runTransaction(async (tx) => {
+    const snap = await tx.get(docRef);
+    const data = snap.exists ? snap.data() || {} : {};
+    const current = Number(data[kind] || 0);
+    if (current >= limit) {
+      return { allowed: false, used: current, limit, remaining: 0 };
+    }
+    const nextCount = current + 1;
+    tx.set(
+      docRef,
+      {
+        uid,
+        date: today,
+        [kind]: nextCount,
+        updatedAt: Date.now(),
+      },
+      { merge: true }
+    );
+    return {
+      allowed: true,
+      used: nextCount,
+      limit,
+      remaining: Math.max(0, limit - nextCount),
+    };
+  });
+}
+
+async function refundHfDailyQuota(uid: string, kind: HfMediaKind): Promise<void> {
+  try {
+    const adminDb = getAdminDb();
+    if (!adminDb) return;
+    const today = getTodayUtcKey();
+    const docRef = adminDb.collection('hf_daily_usage').doc(`${uid}_${today}`);
+    await adminDb.runTransaction(async (tx) => {
+      const snap = await tx.get(docRef);
+      if (!snap.exists) return;
+      const data = snap.data() || {};
+      const current = Number(data[kind] || 0);
+      if (current > 0) {
+        tx.set(
+          docRef,
+          {
+            [kind]: current - 1,
+            updatedAt: Date.now(),
+          },
+          { merge: true }
+        );
+      }
+    });
+  } catch (err) {
+    console.warn('[HF Quota] Refund notice:', err);
+  }
+}
+
+async function blobToSafeDataUrl(blob: Blob, fallbackMime: string): Promise<string> {
+  if (typeof blob.size === 'number' && blob.size > MAX_HF_RAW_BYTES) {
+    throw new Error('HF_PAYLOAD_TOO_LARGE');
+  }
+  const arrayBuffer = await blob.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  if (buffer.byteLength === 0) {
+    throw new Error('HF_EMPTY_RESPONSE');
+  }
+  if (buffer.byteLength > MAX_HF_RAW_BYTES) {
+    throw new Error('HF_PAYLOAD_TOO_LARGE');
+  }
+  const mime = (blob.type && blob.type.includes('/')) ? blob.type : fallbackMime;
+  return `data:${mime};base64,${buffer.toString('base64')}`;
+}
+
+function classifyHfError(err: any): { status: number; code: 'hf_credits_exhausted' | 'hf_unavailable'; message: string } {
+  const msg = String(err?.message || err || '');
+  const status = Number(err?.status || err?.statusCode || err?.httpRequest?.status || 0);
+  if (
+    status === 402 ||
+    /credit|payment\s+required|monthly\s+included\s+credits|insufficient\s+funds|exceeded.*quota/i.test(msg)
+  ) {
+    return {
+      status: 429,
+      code: 'hf_credits_exhausted',
+      message: 'Free AI credits are temporarily exhausted. Please try again later.',
+    };
+  }
+  return {
+    status: 503,
+    code: 'hf_unavailable',
+    message: 'AI media service is temporarily unavailable.',
+  };
+}
+
+app.get('/api/generate/limits', async (req: Request, res: Response) => {
+  try {
+    const authUser = await authenticateUserRequest(req);
+    if (!authUser) {
+      return res.status(401).json({ error: 'Authentication required to check generation limits.' });
+    }
+    if (authUser.disabled) {
+      return res.status(403).json({ error: 'User access has been disabled.' });
+    }
+
+    const imageLimit = getDailyMediaLimit('image');
+    const musicLimit = getDailyMediaLimit('music');
+    const videoLimit = getDailyMediaLimit('video');
+    const videoEnabled = Boolean((process.env.HF_VIDEO_MODEL || '').trim()) && Boolean((process.env.HF_TOKEN || '').trim());
+
+    let imageUsed = 0;
+    let musicUsed = 0;
+    let videoUsed = 0;
+
+    try {
+      const adminDb = getAdminDb();
+      if (adminDb) {
+        const snap = await adminDb.collection('hf_daily_usage').doc(`${authUser.uid}_${getTodayUtcKey()}`).get();
+        if (snap.exists) {
+          const d = snap.data() || {};
+          imageUsed = Number(d.image || 0);
+          musicUsed = Number(d.music || 0);
+          videoUsed = Number(d.video || 0);
+        }
+      }
+    } catch (dbErr) {
+      console.warn('[HF Limits] Lookup notice:', dbErr);
+    }
+
+    return res.json({
+      success: true,
+      videoEnabled,
+      limits: {
+        image: { used: imageUsed, limit: imageLimit, remaining: Math.max(0, imageLimit - imageUsed) },
+        music: { used: musicUsed, limit: musicLimit, remaining: Math.max(0, musicLimit - musicUsed) },
+        video: { used: videoUsed, limit: videoLimit, remaining: Math.max(0, videoLimit - videoUsed) },
+      },
+    });
+  } catch (err: any) {
+    console.error('[API /api/generate/limits Error]:', err);
+    return res.status(500).json({ error: 'Could not retrieve daily generation limits.' });
+  }
+});
+
+app.post('/api/generate/image', async (req: Request, res: Response) => {
+  let reservedForUid: string | null = null;
+  try {
+    const authUser = await authenticateUserRequest(req);
+    if (!authUser) {
+      return res.status(401).json({ error: 'Please sign in to generate AI images.' });
+    }
+    if (authUser.disabled) {
+      return res.status(403).json({ error: 'User access has been disabled.' });
+    }
+
+    const body = (req.body && typeof req.body === 'object') ? req.body : {};
+    const validated = validateAndSanitizeHfPrompt(body.prompt);
+    if (!validated.valid) {
+      return res.status(400).json({ error: validated.error });
+    }
+
+    const safety = checkHfPromptSafety(validated.prompt);
+    if (!safety.safe) {
+      return res.status(400).json({ error: safety.reason, code: 'safety_blocked' });
+    }
+
+    const hfToken = (process.env.HF_TOKEN || '').trim();
+    if (!hfToken) {
+      return res.status(503).json({ error: 'AI image generation is unavailable right now.', code: 'hf_unavailable' });
+    }
+
+    const limit = getDailyMediaLimit('image');
+    let quota: { allowed: boolean; used: number; limit: number; remaining: number };
+    try {
+      quota = await reserveHfDailyQuota(authUser.uid, 'image', limit);
+    } catch {
+      return res.status(503).json({ error: 'Daily quota verification is unavailable right now.', code: 'hf_unavailable' });
+    }
+
+    if (!quota.allowed) {
+      return res.status(429).json({
+        error: 'Daily image generation limit reached for today.',
+        code: 'daily_limit_reached',
+        used: quota.used,
+        limit: quota.limit,
+        remaining: 0,
+      });
+    }
+    reservedForUid = authUser.uid;
+
+    const model = (process.env.HF_IMAGE_MODEL || '').trim() || 'black-forest-labs/FLUX.1-schnell';
+    const hf = new InferenceClient(hfToken);
+    const blob = await hf.textToImage(
+      {
+        model,
+        inputs: validated.prompt,
+        parameters: {
+          width: 768,
+          height: 576,
+        },
+      },
+      {
+        signal: AbortSignal.timeout(HF_CALL_TIMEOUT_MS),
+        outputType: 'blob',
+      }
+    );
+
+    const imageUrl = await blobToSafeDataUrl(blob, 'image/jpeg');
+    reservedForUid = null;
+
+    persistActivityLog({
+      userId: authUser.uid,
+      userEmail: authUser.email,
+      userName: authUser.name,
+      activityType: 'media_gen',
+      query: validated.prompt,
+      feature: 'Somotoz HF Image Generator',
+      status: 'success',
+      modelUsed: model,
+    });
+
+    return res.json({
+      success: true,
+      mode: 'image',
+      imageUrl,
+      prompt: validated.prompt,
+      modelUsed: model,
+      isAiGenerated: true,
+      used: quota.used,
+      limit: quota.limit,
+      remaining: quota.remaining,
+    });
+  } catch (err: any) {
+    if (reservedForUid) {
+      await refundHfDailyQuota(reservedForUid, 'image');
+    }
+    console.warn('[API /api/generate/image Error]:', err?.message || err);
+    const mapped = classifyHfError(err);
+    return res.status(mapped.status).json({ error: mapped.message, code: mapped.code });
+  }
+});
+
+app.post('/api/generate/music', async (req: Request, res: Response) => {
+  let reservedForUid: string | null = null;
+  try {
+    const authUser = await authenticateUserRequest(req);
+    if (!authUser) {
+      return res.status(401).json({ error: 'Please sign in to generate AI music.' });
+    }
+    if (authUser.disabled) {
+      return res.status(403).json({ error: 'User access has been disabled.' });
+    }
+
+    const body = (req.body && typeof req.body === 'object') ? req.body : {};
+    const validated = validateAndSanitizeHfPrompt(body.prompt);
+    if (!validated.valid) {
+      return res.status(400).json({ error: validated.error });
+    }
+
+    const safety = checkHfPromptSafety(validated.prompt);
+    if (!safety.safe) {
+      return res.status(400).json({ error: safety.reason, code: 'safety_blocked' });
+    }
+
+    const hfToken = (process.env.HF_TOKEN || '').trim();
+    if (!hfToken) {
+      return res.status(503).json({ error: 'AI music generation is unavailable right now.', code: 'hf_unavailable' });
+    }
+
+    const limit = getDailyMediaLimit('music');
+    let quota: { allowed: boolean; used: number; limit: number; remaining: number };
+    try {
+      quota = await reserveHfDailyQuota(authUser.uid, 'music', limit);
+    } catch {
+      return res.status(503).json({ error: 'Daily quota verification is unavailable right now.', code: 'hf_unavailable' });
+    }
+
+    if (!quota.allowed) {
+      return res.status(429).json({
+        error: 'Daily music generation limit reached for today.',
+        code: 'daily_limit_reached',
+        used: quota.used,
+        limit: quota.limit,
+        remaining: 0,
+      });
+    }
+    reservedForUid = authUser.uid;
+
+    const model = (process.env.HF_MUSIC_MODEL || '').trim() || 'facebook/musicgen-small';
+    const hf = new InferenceClient(hfToken);
+    const blob = await hf.textToAudio(
+      {
+        model,
+        inputs: validated.prompt,
+      },
+      {
+        signal: AbortSignal.timeout(HF_CALL_TIMEOUT_MS),
+      }
+    );
+
+    const audioUrl = await blobToSafeDataUrl(blob, 'audio/wav');
+    reservedForUid = null;
+
+    persistActivityLog({
+      userId: authUser.uid,
+      userEmail: authUser.email,
+      userName: authUser.name,
+      activityType: 'media_gen',
+      query: validated.prompt,
+      feature: 'Somotoz HF Music Generator',
+      status: 'success',
+      modelUsed: model,
+    });
+
+    return res.json({
+      success: true,
+      mode: 'music',
+      audioUrl,
+      prompt: validated.prompt,
+      modelUsed: model,
+      isAiGenerated: true,
+      used: quota.used,
+      limit: quota.limit,
+      remaining: quota.remaining,
+    });
+  } catch (err: any) {
+    if (reservedForUid) {
+      await refundHfDailyQuota(reservedForUid, 'music');
+    }
+    console.warn('[API /api/generate/music Error]:', err?.message || err);
+    const mapped = classifyHfError(err);
+    return res.status(mapped.status).json({ error: mapped.message, code: mapped.code });
+  }
+});
+
+app.post('/api/generate/video', async (req: Request, res: Response) => {
+  let reservedForUid: string | null = null;
+  try {
+    const authUser = await authenticateUserRequest(req);
+    if (!authUser) {
+      return res.status(401).json({ error: 'Please sign in to generate AI video.' });
+    }
+    if (authUser.disabled) {
+      return res.status(403).json({ error: 'User access has been disabled.' });
+    }
+
+    const body = (req.body && typeof req.body === 'object') ? req.body : {};
+    const validated = validateAndSanitizeHfPrompt(body.prompt);
+    if (!validated.valid) {
+      return res.status(400).json({ error: validated.error });
+    }
+
+    const safety = checkHfPromptSafety(validated.prompt);
+    if (!safety.safe) {
+      return res.status(400).json({ error: safety.reason, code: 'safety_blocked' });
+    }
+
+    const hfToken = (process.env.HF_TOKEN || '').trim();
+    const model = (process.env.HF_VIDEO_MODEL || '').trim();
+    if (!hfToken || !model) {
+      return res.status(503).json({ error: 'Video generation is not available right now', code: 'hf_unavailable' });
+    }
+
+    const limit = getDailyMediaLimit('video');
+    let quota: { allowed: boolean; used: number; limit: number; remaining: number };
+    try {
+      quota = await reserveHfDailyQuota(authUser.uid, 'video', limit);
+    } catch {
+      return res.status(503).json({ error: 'Video generation is not available right now', code: 'hf_unavailable' });
+    }
+
+    if (!quota.allowed) {
+      return res.status(429).json({
+        error: 'Daily video generation limit reached for today.',
+        code: 'daily_limit_reached',
+        used: quota.used,
+        limit: quota.limit,
+        remaining: 0,
+      });
+    }
+    reservedForUid = authUser.uid;
+
+    const hf = new InferenceClient(hfToken);
+    const blob = await hf.textToVideo(
+      {
+        model,
+        inputs: validated.prompt,
+      },
+      {
+        signal: AbortSignal.timeout(HF_CALL_TIMEOUT_MS),
+      }
+    );
+
+    const videoUrl = await blobToSafeDataUrl(blob, 'video/mp4');
+    reservedForUid = null;
+
+    persistActivityLog({
+      userId: authUser.uid,
+      userEmail: authUser.email,
+      userName: authUser.name,
+      activityType: 'media_gen',
+      query: validated.prompt,
+      feature: 'Somotoz HF Video Generator',
+      status: 'success',
+      modelUsed: model,
+    });
+
+    return res.json({
+      success: true,
+      mode: 'video',
+      videoUrl,
+      prompt: validated.prompt,
+      modelUsed: model,
+      isAiGenerated: true,
+      used: quota.used,
+      limit: quota.limit,
+      remaining: quota.remaining,
+    });
+  } catch (err: any) {
+    if (reservedForUid) {
+      await refundHfDailyQuota(reservedForUid, 'video');
+    }
+    console.warn('[API /api/generate/video Error]:', err?.message || err);
+    const mapped = classifyHfError(err);
+    return res.status(mapped.status).json({
+      error: 'Video generation is not available right now',
+      code: mapped.code,
+    });
+  }
+});
+
+// JSON 404 handler for all unmatched /api/* routes (prevents HTML or plain-text errors)
+app.use('/api', (_req: Request, res: Response) => {
+  res.status(404).json({ error: 'Requested API route was not found.' });
+});
+
+// Global Express JSON error handler
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+  console.error('[Somotoz Express Error]:', err?.message || err);
+  if (res.headersSent) {
+    return;
+  }
+  const status =
+    typeof err?.status === 'number' && err.status >= 400 && err.status < 600
+      ? err.status
+      : typeof err?.statusCode === 'number' && err.statusCode >= 400 && err.statusCode < 600
+      ? err.statusCode
+      : 500;
+  const friendlyMessage =
+    status < 500 && err?.message
+      ? String(err.message)
+      : 'A server error occurred while processing your request. Please try again.';
+  return res.status(status).json({ error: friendlyMessage });
+});
+
+// 3. VITE MIDDLEWARE SETUP (Local / Cloud Run only - NEVER executed on Vercel)
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,

@@ -94,6 +94,17 @@
         "mutedBy": { "type": "array", "items": { "type": "string" }, "description": "List of UIDs who muted" },
         "blockedBy": { "type": "array", "items": { "type": "string" }, "description": "List of UIDs who blocked" }
       }
+    },
+    "HfDailyUsage": {
+      "path": "hf_daily_usage/{usageId}",
+      "fields": {
+        "uid": { "type": "string", "description": "User UID" },
+        "date": { "type": "string", "description": "UTC calendar date YYYY-MM-DD" },
+        "image": { "type": "number", "description": "Daily image generation count" },
+        "music": { "type": "number", "description": "Daily music generation count" },
+        "video": { "type": "number", "description": "Daily video generation count" },
+        "updatedAt": { "type": "number", "description": "Last updated timestamp in ms" }
+      }
     }
   }
 }

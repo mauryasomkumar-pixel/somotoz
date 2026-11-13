@@ -11,6 +11,8 @@ export interface ChatMediaData {
   type: GenerationMode;
   url?: string;
   imageUrl?: string;
+  audioUrl?: string;
+  videoUrl?: string;
   svgData?: string;
   prompt?: string;
   aspectRatio?: string;
@@ -20,6 +22,9 @@ export interface ChatMediaData {
   genre?: string;
   videoFrames?: string[];
   animationType?: 'ambient_pulse' | 'cyber_wave' | 'neural_mesh' | 'cosmic_drift' | 'cinematic_motion' | string;
+  isAiGenerated?: boolean;
+  remaining?: number;
+  limit?: number;
 }
 
 export interface FileAttachment {

@@ -85,10 +85,11 @@ export async function apiFetch<T = any>(
     );
   }
 
-  const contentType = response.headers.get('content-type') || '';
+  const contentType = (response.headers.get('content-type') || '').toLowerCase();
   const isJson = contentType.includes('application/json');
 
   let responseData: any = null;
+  let rawText = '';
   if (isJson) {
     try {
       responseData = await response.json();
@@ -96,16 +97,37 @@ export async function apiFetch<T = any>(
       responseData = null;
     }
   } else {
-    // Non-JSON response (e.g. Vercel 404 HTML or plain text)
+    // Non-JSON response (e.g. Vercel plain-text crash or HTML fallback)
     try {
-      await response.text();
+      rawText = await response.text();
     } catch {}
+    // Try parsing in case server omitted Content-Type header
+    if (rawText && (rawText.trim().startsWith('{') || rawText.trim().startsWith('['))) {
+      try {
+        responseData = JSON.parse(rawText);
+      } catch {
+        responseData = null;
+      }
+    }
   }
 
   if (!response.ok) {
     const serverMessage = responseData?.error || responseData?.message;
     const userFriendly = getFriendlyErrorMessage(response.status, serverMessage);
-    throw new ApiError(response.status, serverMessage || response.statusText, userFriendly, responseData);
+    throw new ApiError(
+      response.status,
+      serverMessage || response.statusText || 'Request failed',
+      userFriendly,
+      responseData
+    );
+  }
+
+  if (responseData === null) {
+    throw new ApiError(
+      502,
+      'Invalid non-JSON server response',
+      'Our server returned an unexpected response. Please try again in a few moments.'
+    );
   }
 
   return responseData as T;

@@ -55,6 +55,7 @@ import {
 } from '../utils/mediaExport';
 import { SLASH_COMMANDS, parseClientInputIntent } from '../utils/commandParser';
 import { auth } from '../lib/firebase';
+import { apiFetch, ApiError } from '../lib/apiClient';
 
 const CanvasVideoSimulator = lazy(() => import('./media/CanvasVideoSimulator'));
 const MusicSynthesizer = lazy(() => import('./media/MusicSynthesizer'));
@@ -253,11 +254,50 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
 
   const [activeStreamingText, setActiveStreamingText] = useState<string>('');
   const [activeStreamingId, setActiveStreamingId] = useState<string | null>(null);
+  const [activeLoadingMode, setActiveLoadingMode] = useState<GenerationMode>('text');
   const [useSearchGrounding, setUseSearchGrounding] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [dailyLimits, setDailyLimits] = useState<{
+    image?: { used: number; limit: number; remaining: number };
+    music?: { used: number; limit: number; remaining: number };
+    video?: { used: number; limit: number; remaining: number };
+  } | null>(null);
+
+  useEffect(() => {
+    if (selectedMode === 'text' || !auth.currentUser) return;
+    let cancelled = false;
+    apiFetch<{
+      success: boolean;
+      limits?: {
+        image: { used: number; limit: number; remaining: number };
+        music: { used: number; limit: number; remaining: number };
+        video: { used: number; limit: number; remaining: number };
+      };
+    }>('/api/generate/limits')
+      .then((res) => {
+        if (!cancelled && res?.limits) {
+          setDailyLimits(res.limits);
+        }
+      })
+      .catch(() => {
+        // Silent best-effort fetch for remaining count display
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMode]);
+
+  const handleCancelGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
 
   // File Attachments & Multimodal Upload state
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
@@ -609,11 +649,15 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
     setInputText('');
     setAttachments([]);
     setIsLoading(true);
+    setActiveLoadingMode(effectiveMode);
 
     const modelMsgId = `model-${Date.now()}`;
     setActiveStreamingId(modelMsgId);
     setActiveStreamingText('');
     activeStreamBufferRef.current = '';
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     // Capture client local system time and period for seamless timezone context synchronization
     const now = new Date();
@@ -632,6 +676,172 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
       timeStr: now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true }),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local Browser Timezone',
     };
+
+    // Dedicated Server-Side Hugging Face Media Generation Pipeline (Image / Music / Video)
+    if (
+      (effectiveMode === 'image' || effectiveMode === 'music' || effectiveMode === 'video') &&
+      currentAttachments.length === 0
+    ) {
+      try {
+        const hfResult = await apiFetch<{
+          success: boolean;
+          mode: GenerationMode;
+          imageUrl?: string;
+          audioUrl?: string;
+          videoUrl?: string;
+          prompt: string;
+          modelUsed?: string;
+          isAiGenerated?: boolean;
+          used?: number;
+          limit?: number;
+          remaining?: number;
+        }>(`/api/generate/${effectiveMode}`, {
+          method: 'POST',
+          body: JSON.stringify({ prompt: cleanPrompt }),
+          signal: controller.signal,
+        });
+
+        if (typeof hfResult.remaining === 'number' && typeof hfResult.limit === 'number') {
+          setDailyLimits((prev) => ({
+            ...(prev || {}),
+            [effectiveMode]: {
+              used: hfResult.used ?? (hfResult.limit! - hfResult.remaining!),
+              limit: hfResult.limit!,
+              remaining: hfResult.remaining!,
+            },
+          }));
+        }
+
+        const aiMedia: ChatMediaData = {
+          type: effectiveMode,
+          imageUrl: hfResult.imageUrl,
+          audioUrl: hfResult.audioUrl,
+          videoUrl: hfResult.videoUrl,
+          prompt: hfResult.prompt || cleanPrompt,
+          isAiGenerated: true,
+          remaining: hfResult.remaining,
+          limit: hfResult.limit,
+        };
+
+        const aiLabelText =
+          effectiveMode === 'image'
+            ? `**AI generated** image for: "${aiMedia.prompt}"`
+            : effectiveMode === 'music'
+            ? `**AI generated** music track for: "${aiMedia.prompt}"`
+            : `**AI generated** video for: "${aiMedia.prompt}"`;
+
+        const finalizedHfMsg: ChatMessage = {
+          id: modelMsgId,
+          role: 'model',
+          content: aiLabelText,
+          timestamp: Date.now(),
+          mode: effectiveMode,
+          media: aiMedia,
+          modelUsed: hfResult.modelUsed,
+        };
+
+        setMessages((prev) => [...prev, finalizedHfMsg]);
+
+        if (onActivityLog) {
+          onActivityLog(
+            effectiveMode,
+            `Generated AI ${effectiveMode}: "${cleanPrompt.slice(0, 35)}${cleanPrompt.length > 35 ? '...' : ''}"`,
+            120
+          );
+        }
+
+        abortControllerRef.current = null;
+        setIsLoading(false);
+        setActiveStreamingId(null);
+        setActiveStreamingText('');
+        activeStreamBufferRef.current = '';
+        return;
+      } catch (hfErr: any) {
+        if (hfErr?.name === 'AbortError' || controller.signal.aborted) {
+          setErrorMsg('Generation cancelled.');
+          abortControllerRef.current = null;
+          setIsLoading(false);
+          setActiveStreamingId(null);
+          setActiveStreamingText('');
+          activeStreamBufferRef.current = '';
+          return;
+        }
+
+        const errorCode = hfErr?.data?.code;
+        if (errorCode === 'daily_limit_reached' && typeof hfErr?.data?.limit === 'number') {
+          setDailyLimits((prev) => ({
+            ...(prev || {}),
+            [effectiveMode]: {
+              used: hfErr.data.used ?? hfErr.data.limit,
+              limit: hfErr.data.limit,
+              remaining: 0,
+            },
+          }));
+        }
+
+        // Do not bypass safety blocks or invalid prompt lengths with fallback media
+        if (
+          errorCode === 'safety_blocked' ||
+          (hfErr instanceof ApiError && hfErr.status === 400)
+        ) {
+          setErrorMsg(hfErr.message || 'This prompt cannot be generated due to safety or validation rules.');
+          abortControllerRef.current = null;
+          setIsLoading(false);
+          setActiveStreamingId(null);
+          setActiveStreamingText('');
+          activeStreamBufferRef.current = '';
+          return;
+        }
+
+        // Seamless Fallback to existing SVG / CanvasVideoSimulator / MusicSynthesizer via /api/chat
+        try {
+          const fallbackData = await apiFetch<{
+            success: boolean;
+            reply: string;
+            mode?: GenerationMode;
+            media?: ChatMediaData;
+            sources?: Array<{ title: string; uri: string }>;
+          }>('/api/chat', {
+            method: 'POST',
+            body: JSON.stringify({
+              messages: [{ role: 'user', content: displayText, attachments: currentAttachments }],
+              mode: effectiveMode,
+              role: selectedRole,
+              contextReflection: initialReflection ? `${initialReflection.title}\n${initialReflection.content}` : undefined,
+              useSearchGrounding,
+              clientTime,
+            }),
+            signal: controller.signal,
+          });
+
+          const fallbackModelMsg: ChatMessage = {
+            id: modelMsgId,
+            role: 'model',
+            content: `Free AI limit reached or busy, showing the simple version.\n\n${fallbackData.reply}`,
+            timestamp: Date.now(),
+            mode: fallbackData.mode || effectiveMode,
+            media: fallbackData.media,
+            sources: fallbackData.sources,
+          };
+          setMessages((prev) => [...prev, fallbackModelMsg]);
+        } catch (fbErr: any) {
+          if (fbErr?.name !== 'AbortError') {
+            setErrorMsg(
+              fbErr instanceof ApiError
+                ? fbErr.userFriendlyMessage
+                : cleanErrorMessage(fbErr?.message)
+            );
+          }
+        } finally {
+          abortControllerRef.current = null;
+          setIsLoading(false);
+          setActiveStreamingId(null);
+          setActiveStreamingText('');
+          activeStreamBufferRef.current = '';
+        }
+        return;
+      }
+    }
 
     const chatHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
     if (auth.currentUser) {
@@ -656,6 +866,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: chatHeaders,
+        signal: controller.signal,
         body: JSON.stringify({
           messages: payloadMessages.length > 0 ? payloadMessages : [{ role: 'user', content: displayText, attachments: currentAttachments }],
           attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
@@ -667,8 +878,29 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
         }),
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error('Failed to initiate real-time streaming link.');
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+      if (!response.ok || !response.body || (!contentType.includes('text/event-stream') && !contentType.includes('application/json'))) {
+        throw new Error('Streaming unavailable; using standard reply.');
+      }
+
+      if (contentType.includes('application/json')) {
+        const jsonReply = await response.json();
+        if (jsonReply?.reply) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: modelMsgId,
+              role: 'model',
+              content: jsonReply.reply,
+              timestamp: Date.now(),
+              mode: jsonReply.mode || effectiveMode,
+              media: jsonReply.media,
+              sources: jsonReply.sources,
+            },
+          ]);
+          return;
+        }
+        throw new Error(jsonReply?.error || 'Unexpected response format.');
       }
 
       const reader = response.body.getReader();
@@ -745,12 +977,23 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
         );
       }
     } catch (err: any) {
+      if (err?.name === 'AbortError' || controller.signal.aborted) {
+        setErrorMsg('Request cancelled.');
+        return;
+      }
       console.warn('Streaming error, fallback triggered:', err);
-      // Fallback to standard endpoint if streaming connection was interrupted
+      // Fallback to standard endpoint via apiFetch if streaming connection was interrupted
       try {
-        const fallbackRes = await fetch('/api/chat', {
+        const fallbackData = await apiFetch<{
+          success: boolean;
+          reply: string;
+          mode?: GenerationMode;
+          media?: ChatMediaData;
+          sources?: Array<{ title: string; uri: string }>;
+          error?: string;
+        }>('/api/chat', {
           method: 'POST',
-          headers: chatHeaders,
+          signal: controller.signal,
           body: JSON.stringify({
             messages: [{ role: 'user', content: displayText, attachments: currentAttachments }],
             attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
@@ -762,8 +1005,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
           }),
         });
 
-        const fallbackData = await fallbackRes.json();
-        if (fallbackRes.ok && fallbackData.reply) {
+        if (fallbackData?.reply) {
           const fallbackModelMsg: ChatMessage = {
             id: `model-${Date.now()}`,
             role: 'model',
@@ -775,12 +1017,19 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
           };
           setMessages((prev) => [...prev, fallbackModelMsg]);
         } else {
-          setErrorMsg(cleanErrorMessage(err.message || fallbackData?.error));
+          setErrorMsg('Unable to generate a response right now. Please try again.');
         }
       } catch (fbErr: any) {
-        setErrorMsg(cleanErrorMessage(fbErr.message));
+        if (fbErr?.name === 'AbortError') {
+          setErrorMsg('Request cancelled.');
+        } else if (fbErr instanceof ApiError) {
+          setErrorMsg(fbErr.userFriendlyMessage);
+        } else {
+          setErrorMsg(cleanErrorMessage(fbErr?.message));
+        }
       }
     } finally {
+      abortControllerRef.current = null;
       setIsLoading(false);
       setActiveStreamingId(null);
       setActiveStreamingText('');
@@ -922,7 +1171,7 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
           );
         })}
 
-        {/* ACTIVE STREAMING ASSISTANT BUBBLE (Instant Visual Feedback & Clean Markdown) */}
+        {/* ACTIVE STREAMING / MEDIA GENERATION ASSISTANT BUBBLE */}
         {isLoading && (
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 shrink-0 bg-[var(--bg-secondary)] border border-[var(--border-active)] text-[var(--border-active)] flex items-center justify-center clip-badge-poly shadow-sm">
@@ -930,12 +1179,21 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
             </div>
 
             <div className="max-w-[92%] sm:max-w-[82%] p-4 bg-[var(--chat-bot-bg)] chat-bot-message border border-[var(--border-active)] text-[var(--text-primary)] clip-cyber-card shadow-md space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-mono text-[var(--border-active)] border-b border-[var(--border-color)] pb-1.5">
+              <div className="flex items-center justify-between gap-2 text-[11px] font-mono text-[var(--border-active)] border-b border-[var(--border-color)] pb-1.5">
                 <span className="flex items-center gap-1.5 font-bold">
                   <Zap className="w-3.5 h-3.5 animate-pulse text-[var(--border-active)]" />
-                  STREAMING REAL-TIME RESPONSE
+                  {activeLoadingMode === 'text' ? 'STREAMING REAL-TIME RESPONSE' : `GENERATING ${activeLoadingMode.toUpperCase()}`}
                 </span>
-                <span className="text-[var(--text-secondary)] uppercase px-1.5 py-0.2 bg-[var(--bg-elevated)] border border-[var(--border-color)] clip-badge-poly text-[9px]">{selectedMode} MODE</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[var(--text-secondary)] uppercase px-1.5 py-0.2 bg-[var(--bg-elevated)] border border-[var(--border-color)] clip-badge-poly text-[9px]">{activeLoadingMode} MODE</span>
+                  <button
+                    type="button"
+                    onClick={handleCancelGeneration}
+                    className="px-2 py-0.5 bg-rose-600/90 hover:bg-rose-500 text-white text-[10px] font-bold rounded cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
 
               <div className="min-h-[24px]">
@@ -948,9 +1206,15 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
                     <span className="inline-block w-2 h-4 bg-[var(--border-active)] ml-1 animate-pulse align-middle" />
                   </div>
                 ) : (
-                  <div className="text-[var(--text-muted)] italic font-mono text-xs flex items-center gap-2 py-1">
-                    <span className="w-2 h-2 bg-[var(--border-active)] rounded-full animate-ping" />
-                    <span>Thinking & generating in {activeLanguageStyle}...</span>
+                  <div className="text-[var(--text-muted)] italic font-mono text-xs flex flex-col gap-1 py-1">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-[var(--border-active)] rounded-full animate-ping" />
+                      <span>
+                        {activeLoadingMode === 'text'
+                          ? `Thinking & generating in ${activeLanguageStyle}...`
+                          : `Generating ${activeLoadingMode}... This can take up to a minute`}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1125,32 +1389,39 @@ export const ChatCompanion: React.FC<ChatCompanionProps> = ({
             </div>
           )}
 
-          {/* Clean Mode Selection Chips: Chat, Image, Video, Music */}
-          <div className="flex items-center gap-1.5 px-1 pb-1 overflow-x-auto no-scrollbar select-none">
-            {[
-              { id: 'text' as const, label: 'Chat', icon: MessageSquare },
-              { id: 'image' as const, label: 'Image', icon: ImageIcon },
-              { id: 'video' as const, label: 'Video', icon: Film },
-              { id: 'music' as const, label: 'Music', icon: Music },
-            ].map((chip) => {
-              const isSelected = selectedMode === chip.id;
-              const ChipIcon = chip.icon;
-              return (
-                <button
-                  key={chip.id}
-                  type="button"
-                  onClick={() => setSelectedMode(chip.id)}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-[var(--accent-color)] text-black shadow-xs'
-                      : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-color)]'
-                  }`}
-                >
-                  <ChipIcon className="w-3.5 h-3.5" />
-                  <span>{chip.label}</span>
-                </button>
-              );
-            })}
+          {/* Clean Mode Selection Chips: Chat, Image, Video, Music + Remaining Daily Count */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1 pb-1 select-none">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              {[
+                { id: 'text' as const, label: 'Chat', icon: MessageSquare },
+                { id: 'image' as const, label: 'Image', icon: ImageIcon },
+                { id: 'video' as const, label: 'Video', icon: Film },
+                { id: 'music' as const, label: 'Music', icon: Music },
+              ].map((chip) => {
+                const isSelected = selectedMode === chip.id;
+                const ChipIcon = chip.icon;
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => setSelectedMode(chip.id)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-[var(--accent-color)] text-black shadow-xs'
+                        : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-color)]'
+                    }`}
+                  >
+                    <ChipIcon className="w-3.5 h-3.5" />
+                    <span>{chip.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {selectedMode !== 'text' && dailyLimits?.[selectedMode] && (
+              <span className="text-[11px] font-mono text-[var(--text-secondary)]">
+                Daily {selectedMode} left: <strong className="text-[var(--text-primary)]">{dailyLimits[selectedMode]!.remaining}/{dailyLimits[selectedMode]!.limit}</strong>
+              </span>
+            )}
           </div>
 
           {/* Unified Single Input Box */}
@@ -1365,26 +1636,84 @@ const ChatMessageItem = memo<{
           <div className="mt-4 pt-3 border-t border-[var(--border-color)]">
             {message.media.type === 'image' && <InlineImageViewer media={message.media} />}
             {message.media.type === 'video' && (
-              <Suspense
-                fallback={
-                  <div className="h-56 rounded-xl bg-[#080814] border border-[#25253D] animate-pulse flex items-center justify-center text-xs font-mono text-[#FF007A]">
-                    Loading Video Studio...
+              message.media.videoUrl ? (
+                <div className="bg-[#080814] border border-[#FF007A]/60 rounded-xl overflow-hidden font-mono">
+                  <div className="px-3 py-2 border-b border-[#25253D] flex items-center justify-between gap-2 text-xs text-[#EDEDED]">
+                    <span className="flex items-center gap-1.5 text-[#FF007A] font-semibold">
+                      <Film className="w-3.5 h-3.5" />
+                      AI generated
+                    </span>
+                    <a
+                      href={message.media.videoUrl}
+                      download={`somotoz-video-${Date.now()}.mp4`}
+                      className="px-2.5 py-1 bg-[#FF007A] text-white text-[11px] font-bold rounded flex items-center gap-1"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Download</span>
+                    </a>
                   </div>
-                }
-              >
-                <CanvasVideoSimulator media={message.media} />
-              </Suspense>
+                  <div className="p-3 bg-black flex justify-center">
+                    <video
+                      src={message.media.videoUrl}
+                      controls
+                      playsInline
+                      className="max-h-[400px] w-full rounded border border-[#25253D]"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <Suspense
+                  fallback={
+                    <div className="h-56 rounded-xl bg-[#080814] border border-[#25253D] animate-pulse flex items-center justify-center text-xs font-mono text-[#FF007A]">
+                      Loading Video Studio...
+                    </div>
+                  }
+                >
+                  <CanvasVideoSimulator media={message.media} />
+                </Suspense>
+              )
             )}
             {message.media.type === 'music' && (
-              <Suspense
-                fallback={
-                  <div className="h-44 rounded-xl bg-[#080814] border border-[#25253D] animate-pulse flex items-center justify-center text-xs font-mono text-[#FFB800]">
-                    Loading Music Synthesizer...
+              message.media.audioUrl ? (
+                <div className="bg-[#080814] border border-[#FFB800]/60 rounded-xl overflow-hidden font-mono">
+                  <div className="px-3 py-2 border-b border-[#25253D] flex items-center justify-between gap-2 text-xs text-[#EDEDED]">
+                    <span className="flex items-center gap-1.5 text-[#FFB800] font-semibold">
+                      <Music className="w-3.5 h-3.5" />
+                      AI generated
+                    </span>
+                    <a
+                      href={message.media.audioUrl}
+                      download={`somotoz-music-${Date.now()}.wav`}
+                      className="px-2.5 py-1 bg-[#FFB800] text-black text-[11px] font-bold rounded flex items-center gap-1"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Download</span>
+                    </a>
                   </div>
-                }
-              >
-                <MusicSynthesizer media={message.media} />
-              </Suspense>
+                  <div className="p-3 bg-[#030308] space-y-2">
+                    <audio
+                      src={message.media.audioUrl}
+                      controls
+                      className="w-full"
+                    />
+                    {message.media.prompt && (
+                      <p className="text-[11px] text-[#A1A1AA] truncate">
+                        Prompt: <span className="text-[#EDEDED]">{message.media.prompt}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <Suspense
+                  fallback={
+                    <div className="h-44 rounded-xl bg-[#080814] border border-[#25253D] animate-pulse flex items-center justify-center text-xs font-mono text-[#FFB800]">
+                      Loading Music Synthesizer...
+                    </div>
+                  }
+                >
+                  <MusicSynthesizer media={message.media} />
+                </Suspense>
+              )
             )}
           </div>
         )}
@@ -1518,10 +1847,10 @@ const InlineImageViewer = memo<{ media: ChatMediaData }>(({ media }) => {
         <div className="flex items-center space-x-2">
           <span className="flex items-center gap-1.5 text-[#A855F7] font-semibold">
             <ImageIcon className="w-3.5 h-3.5 text-[#A855F7]" />
-            {hasRasterImage ? 'Photorealistic Image (1K)' : 'Photorealistic Scenic Render'}
+            {media.isAiGenerated ? 'AI generated' : hasRasterImage ? 'Photorealistic Image (1K)' : 'Photorealistic Scenic Render'}
           </span>
           <span className="text-[10px] text-[#A1A1AA] bg-black/60 px-2 py-0.5 clip-badge-poly border border-[#2D2D45] hidden sm:inline">
-            {hasRasterImage ? 'HDR Cinematic Optics' : 'Multi-Layer Atmospheric'}
+            {media.isAiGenerated ? 'AI generated' : hasRasterImage ? 'HDR Cinematic Optics' : 'Multi-Layer Atmospheric'}
           </span>
         </div>
         

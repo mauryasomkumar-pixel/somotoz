@@ -129,6 +129,10 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /hf_daily_usage/{usageId} {
+      allow read, write: if false;
+    }
+
     // =========================================================================
     // 5. SAFETY & USER CONDUCT REPORTS (reports/{reportId} & somo_reports/{reportId})
     // Users create reports with optional attached messages (up to 20).

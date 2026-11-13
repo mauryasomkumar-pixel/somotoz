@@ -111,7 +111,11 @@ async function pingHealthEndpoint(): Promise<boolean> {
       headers: { 'Cache-Control': 'no-cache' },
       signal: controller.signal,
     });
-    return res.ok;
+    if (!res.ok) return false;
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.includes('application/json')) return false;
+    const data = await res.json();
+    return Boolean(data && data.ok === true);
   } catch {
     return false;
   } finally {
@@ -126,13 +130,6 @@ export async function verifyConnectivityNow(): Promise<boolean> {
   const restricted = isRestrictedNetworkEnvironment();
   const navOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
 
-  // Outside restricted preview/dev/iframe, navigator.onLine === false marks offline immediately
-  if (navOffline && !restricted) {
-    consecutiveFailures = REQUIRED_FAILURES;
-    setOfflineState();
-    return false;
-  }
-
   isChecking = true;
   try {
     const ok = await pingHealthEndpoint();
@@ -141,11 +138,18 @@ export async function verifyConnectivityNow(): Promise<boolean> {
       return true;
     }
 
-    // In restricted environment, only mark offline if BOTH navigator.onLine === false AND /api/health failed
+    // In restricted environment (AI Studio preview iframe), only mark offline if BOTH navigator.onLine === false AND /api/health failed
     if (restricted && !navOffline) {
       consecutiveFailures = 0;
       setOnlineState();
       return true;
+    }
+
+    // If navigator already reports offline and /api/health failed, mark offline immediately
+    if (navOffline) {
+      consecutiveFailures = REQUIRED_FAILURES;
+      setOfflineState();
+      return false;
     }
 
     consecutiveFailures += 1;
@@ -182,12 +186,7 @@ function handleOnlineEvent() {
 }
 
 function handleOfflineEvent() {
-  if (isRestrictedNetworkEnvironment()) {
-    verifyConnectivityNow();
-  } else {
-    consecutiveFailures = REQUIRED_FAILURES;
-    setOfflineState();
-  }
+  verifyConnectivityNow();
 }
 
 function handleVisibilityChange() {
